@@ -1,0 +1,10 @@
+DROP TABLE IF EXISTS history_events;
+DROP TABLE IF EXISTS materials;
+DROP TABLE IF EXISTS tasks;
+DROP TABLE IF EXISTS topic_dependencies;
+DROP TABLE IF EXISTS topics;
+DROP TABLE IF EXISTS stages;
+DROP TABLE IF EXISTS roadmaps;
+DROP TABLE IF EXISTS users;
+DROP TYPE IF EXISTS topic_status;
+DROP TYPE IF EXISTS task_status;

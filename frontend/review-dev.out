@@ -1,0 +1,35 @@
+
+> improve-platform-frontend@0.1.0 dev
+> next dev -p 3025
+
+  ▲ Next.js 14.2.5
+  - Local:        http://localhost:3025
+
+ ✓ Starting...
+ ✓ Ready in 8.1s
+ ✓ Compiled /middleware in 240ms
+ ✓ Compiled (74 modules)
+ ○ Compiling /register ...
+ ✓ Compiled /register in 3.9s (604 modules)
+ GET /register 200 in 862ms
+ GET /register 200 in 26ms
+ ✓ Compiled /api/auth/register in 274ms (328 modules)
+ POST /api/auth/register 200 in 482ms
+ ✓ Compiled /api/auth/login in 135ms (330 modules)
+ POST /api/auth/login 200 in 302ms
+ ✓ Compiled /api/auth/session in 176ms (332 modules)
+ GET /api/auth/session 200 in 284ms
+ ✓ Compiled /api/auth/refresh in 167ms (334 modules)
+ POST /api/auth/refresh 200 in 275ms
+ ✓ Compiled /api/auth/logout in 174ms (336 modules)
+ POST /api/auth/logout 200 in 271ms
+ GET /api/auth/session 401 in 38ms
+ GET /register 200 in 115ms
+ GET /register 200 in 33ms
+ POST /api/auth/register 200 in 92ms
+ POST /api/auth/login 200 in 88ms
+ GET /api/auth/session 200 in 17ms
+ POST /api/auth/refresh 200 in 16ms
+ POST /api/auth/logout 200 in 13ms
+ GET /api/auth/session 401 in 12ms
+[?25h

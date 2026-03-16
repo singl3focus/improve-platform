@@ -1,0 +1,595 @@
+"use client";
+
+import Link from "next/link";
+import type { Dispatch, FormEvent, SetStateAction } from "react";
+import { useUserPreferences } from "@/components/providers/user-preferences-provider";
+import {
+  type MaterialDraft,
+  useMaterialsLibraryViewModel
+} from "@/components/hooks/use-materials-library-view-model";
+import type { LibraryMaterial } from "@/lib/materials-library-types";
+
+const MATERIALS_COPY = {
+  ru: {
+    title: "Личная библиотека материалов",
+    subtitle: "Просматривайте, обновляйте и упорядочивайте материалы по темам.",
+    search: "Поиск",
+    topic: "Тема",
+    allTopics: "Все темы",
+    searchPlaceholder: "Название, описание, тема",
+    createTitle: "Добавить материал",
+    createSubtitle: "Создайте новый элемент и задайте позицию в выбранной теме.",
+    fieldTitle: "Название",
+    fieldDescription: "Описание",
+    fieldPosition: "Позиция",
+    fieldProgress: "Прогресс (%)",
+    fieldTopic: "Тема",
+    createPlaceholderTitle: "Название материала",
+    createPlaceholderDescription: "Описание материала",
+    noTopicsAvailable: "Нет доступных тем",
+    createButton: "Создать материал",
+    creatingButton: "Создание...",
+    topicRequired: "Для создания материала нужна тема.",
+    titleDescriptionRequired: "Название и описание обязательны.",
+    createFailed: "Не удалось создать материал.",
+    updateFailed: "Не удалось обновить материал.",
+    deleteFailed: "Не удалось удалить материал.",
+    progressFailed: "Не удалось обновить прогресс.",
+    loading: "Загрузка библиотеки материалов...",
+    loadFailed: "Не удалось загрузить библиотеку материалов.",
+    retry: "Повторить",
+    progress: "Прогресс",
+    updateProgress: "Обновить прогресс",
+    edit: "Редактировать",
+    delete: "Удалить",
+    save: "Сохранить",
+    cancel: "Отмена",
+    empty: "Материалы по текущим фильтрам не найдены. Измените фильтр или добавьте новый элемент."
+  },
+  en: {
+    title: "Curated materials library",
+    subtitle: "Browse, update and organize learning materials with topic-aware ordering.",
+    search: "Search",
+    topic: "Topic",
+    allTopics: "All topics",
+    searchPlaceholder: "Title, description, topic",
+    createTitle: "Add material",
+    createSubtitle: "Create a new library item and place it at a position inside the selected topic.",
+    fieldTitle: "Title",
+    fieldDescription: "Description",
+    fieldPosition: "Position",
+    fieldProgress: "Progress (%)",
+    fieldTopic: "Topic",
+    createPlaceholderTitle: "Material title",
+    createPlaceholderDescription: "Material description",
+    noTopicsAvailable: "No topics available",
+    createButton: "Create material",
+    creatingButton: "Creating...",
+    topicRequired: "Topic is required for material creation.",
+    titleDescriptionRequired: "Title and description are required.",
+    createFailed: "Material creation failed.",
+    updateFailed: "Material update failed.",
+    deleteFailed: "Material removal failed.",
+    progressFailed: "Progress update failed.",
+    loading: "Loading materials library...",
+    loadFailed: "Materials library failed to load.",
+    retry: "Retry",
+    progress: "Progress",
+    updateProgress: "Update progress",
+    edit: "Edit",
+    delete: "Delete",
+    save: "Save",
+    cancel: "Cancel",
+    empty: "No materials found for the current filters. Try another topic or add a new item."
+  }
+} as const;
+
+type MaterialsCopy = (typeof MATERIALS_COPY)[keyof typeof MATERIALS_COPY];
+
+interface TopicOption {
+  id: string;
+  title: string;
+}
+
+function MaterialsLibraryHeader({
+  copy,
+  query,
+  topicId,
+  topics,
+  onQueryChange,
+  onTopicChange
+}: {
+  copy: MaterialsCopy;
+  query: string;
+  topicId: string;
+  topics: TopicOption[];
+  onQueryChange: (query: string) => void;
+  onTopicChange: (topicId: string) => void;
+}) {
+  return (
+    <header className="panel materials-library-header">
+      <div>
+        <h2>{copy.title}</h2>
+        <p>{copy.subtitle}</p>
+      </div>
+
+      <div className="materials-library-filters">
+        <label className="materials-filter-item">
+          <span>{copy.search}</span>
+          <input
+            type="search"
+            className="input materials-filter-input"
+            value={query}
+            onChange={(event) => onQueryChange(event.target.value)}
+            placeholder={copy.searchPlaceholder}
+          />
+        </label>
+
+        <label className="materials-filter-item">
+          <span>{copy.topic}</span>
+          <select
+            className="input materials-filter-select"
+            value={topicId}
+            onChange={(event) => onTopicChange(event.target.value)}
+          >
+            <option value="">{copy.allTopics}</option>
+            {topics.map((topic) => (
+              <option key={topic.id} value={topic.id}>
+                {topic.title}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+    </header>
+  );
+}
+
+function MaterialsCreatePanel({
+  copy,
+  createDraft,
+  setCreateDraft,
+  availableTopics,
+  isCreating,
+  onSubmit
+}: {
+  copy: MaterialsCopy;
+  createDraft: MaterialDraft;
+  setCreateDraft: Dispatch<SetStateAction<MaterialDraft>>;
+  availableTopics: TopicOption[];
+  isCreating: boolean;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+}) {
+  return (
+    <section className="panel materials-create-panel">
+      <header>
+        <h3>{copy.createTitle}</h3>
+        <p>{copy.createSubtitle}</p>
+      </header>
+
+      <form className="materials-create-form" onSubmit={onSubmit}>
+        <label className="materials-form-field materials-form-field-title">
+          <span>{copy.fieldTitle}</span>
+          <input
+            type="text"
+            className="input"
+            value={createDraft.title}
+            onChange={(event) =>
+              setCreateDraft((current) => ({
+                ...current,
+                title: event.target.value
+              }))
+            }
+            placeholder={copy.createPlaceholderTitle}
+          />
+        </label>
+
+        <label className="materials-form-field">
+          <span>{copy.fieldTopic}</span>
+          <select
+            className="input"
+            value={createDraft.topicId}
+            onChange={(event) =>
+              setCreateDraft((current) => ({
+                ...current,
+                topicId: event.target.value
+              }))
+            }
+          >
+            {availableTopics.length === 0 ? (
+              <option value="">{copy.noTopicsAvailable}</option>
+            ) : (
+              availableTopics.map((topic) => (
+                <option key={topic.id} value={topic.id}>
+                  {topic.title}
+                </option>
+              ))
+            )}
+          </select>
+        </label>
+
+        <label className="materials-form-field">
+          <span>{copy.fieldPosition}</span>
+          <input
+            type="number"
+            min={1}
+            className="input"
+            value={createDraft.position}
+            onChange={(event) =>
+              setCreateDraft((current) => ({
+                ...current,
+                position: event.target.value
+              }))
+            }
+          />
+        </label>
+
+        <label className="materials-form-field">
+          <span>{copy.fieldProgress}</span>
+          <input
+            type="number"
+            min={0}
+            max={100}
+            className="input"
+            value={createDraft.progressPercent}
+            onChange={(event) =>
+              setCreateDraft((current) => ({
+                ...current,
+                progressPercent: event.target.value
+              }))
+            }
+          />
+        </label>
+
+        <label className="materials-form-field materials-form-field-description">
+          <span>{copy.fieldDescription}</span>
+          <textarea
+            value={createDraft.description}
+            onChange={(event) =>
+              setCreateDraft((current) => ({
+                ...current,
+                description: event.target.value
+              }))
+            }
+            placeholder={copy.createPlaceholderDescription}
+          />
+        </label>
+
+        <button type="submit" className="button button-primary" disabled={isCreating}>
+          {isCreating ? copy.creatingButton : copy.createButton}
+        </button>
+      </form>
+    </section>
+  );
+}
+
+function MaterialsCard({
+  copy,
+  material,
+  availableTopics,
+  editingId,
+  editDraft,
+  setEditDraft,
+  updatingMaterialId,
+  onEditStart,
+  onDelete,
+  onProgressChange,
+  onEditSubmit,
+  onCancelEdit
+}: {
+  copy: MaterialsCopy;
+  material: LibraryMaterial;
+  availableTopics: TopicOption[];
+  editingId: string | null;
+  editDraft: MaterialDraft | null;
+  setEditDraft: Dispatch<SetStateAction<MaterialDraft | null>>;
+  updatingMaterialId: string | null;
+  onEditStart: (material: LibraryMaterial) => void;
+  onDelete: (materialId: string) => void;
+  onProgressChange: (materialId: string, progressPercent: number) => void;
+  onEditSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onCancelEdit: () => void;
+}) {
+  return (
+    <li className="materials-card">
+      <div className="materials-card-head">
+        <span className="topic-material-position">#{material.position}</span>
+        <Link
+          className="materials-card-topic-link"
+          href={`/topics?topicId=${encodeURIComponent(material.topicId)}`}
+        >
+          {material.topicTitle}
+        </Link>
+      </div>
+
+      <h3>{material.title}</h3>
+      <p>{material.description}</p>
+
+      <div className="materials-card-progress-head">
+        <span>{copy.progress}</span>
+        <strong>{material.progressPercent}%</strong>
+      </div>
+      <div className="roadmap-progress-track">
+        <span className="roadmap-progress-fill" style={{ width: `${material.progressPercent}%` }} />
+      </div>
+
+      <label className="materials-progress-range-wrap">
+        <span className="materials-progress-range-head">
+          <span>{copy.updateProgress}</span>
+          <strong>{material.progressPercent}%</strong>
+        </span>
+        <input
+          type="range"
+          className="materials-progress-range"
+          min={0}
+          max={100}
+          step={1}
+          value={material.progressPercent}
+          disabled={updatingMaterialId === material.id}
+          onChange={(event) => onProgressChange(material.id, Number.parseInt(event.target.value, 10))}
+        />
+      </label>
+
+      <div className="materials-card-actions">
+        <button
+          type="button"
+          className="button button-outline"
+          onClick={() => onEditStart(material)}
+          disabled={updatingMaterialId === material.id}
+        >
+          {copy.edit}
+        </button>
+        <button
+          type="button"
+          className="button button-outline materials-delete-button"
+          onClick={() => onDelete(material.id)}
+          disabled={updatingMaterialId === material.id}
+        >
+          {copy.delete}
+        </button>
+      </div>
+
+      {editingId === material.id && editDraft ? (
+        <form className="materials-edit-form" onSubmit={onEditSubmit}>
+          <label className="materials-form-field materials-form-field-title">
+            <span>{copy.fieldTitle}</span>
+            <input
+              type="text"
+              className="input"
+              value={editDraft.title}
+              onChange={(event) =>
+                setEditDraft((current) =>
+                  current
+                    ? {
+                        ...current,
+                        title: event.target.value
+                      }
+                    : current
+                )
+              }
+            />
+          </label>
+
+          <label className="materials-form-field">
+            <span>{copy.fieldTopic}</span>
+            <select
+              className="input"
+              value={editDraft.topicId}
+              onChange={(event) =>
+                setEditDraft((current) =>
+                  current
+                    ? {
+                        ...current,
+                        topicId: event.target.value
+                      }
+                    : current
+                )
+              }
+            >
+              {availableTopics.map((topic) => (
+                <option key={topic.id} value={topic.id}>
+                  {topic.title}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="materials-form-field">
+            <span>{copy.fieldPosition}</span>
+            <input
+              type="number"
+              min={1}
+              className="input"
+              value={editDraft.position}
+              onChange={(event) =>
+                setEditDraft((current) =>
+                  current
+                    ? {
+                        ...current,
+                        position: event.target.value
+                      }
+                    : current
+                )
+              }
+            />
+          </label>
+
+          <label className="materials-form-field">
+            <span>{copy.fieldProgress}</span>
+            <input
+              type="number"
+              min={0}
+              max={100}
+              className="input"
+              value={editDraft.progressPercent}
+              onChange={(event) =>
+                setEditDraft((current) =>
+                  current
+                    ? {
+                        ...current,
+                        progressPercent: event.target.value
+                      }
+                    : current
+                )
+              }
+            />
+          </label>
+
+          <label className="materials-form-field materials-form-field-description">
+            <span>{copy.fieldDescription}</span>
+            <textarea
+              value={editDraft.description}
+              onChange={(event) =>
+                setEditDraft((current) =>
+                  current
+                    ? {
+                        ...current,
+                        description: event.target.value
+                      }
+                    : current
+                )
+              }
+            />
+          </label>
+
+          <div className="materials-edit-actions">
+            <button
+              type="submit"
+              className="button button-primary"
+              disabled={updatingMaterialId === material.id}
+            >
+              {copy.save}
+            </button>
+            <button
+              type="button"
+              className="button button-outline"
+              onClick={onCancelEdit}
+              disabled={updatingMaterialId === material.id}
+            >
+              {copy.cancel}
+            </button>
+          </div>
+        </form>
+      ) : null}
+    </li>
+  );
+}
+
+export function MaterialsLibraryView() {
+  const { language } = useUserPreferences();
+  const copy = MATERIALS_COPY[language];
+  const {
+    filters,
+    setFilters,
+    createDraft,
+    setCreateDraft,
+    editingId,
+    editDraft,
+    setEditDraft,
+    isCreating,
+    updatingMaterialId,
+    mutationError,
+    materialsQuery,
+    availableTopics,
+    handleCreate,
+    startEditing,
+    cancelEditing,
+    handleEditSubmit,
+    handleDelete,
+    handleProgressUpdate
+  } = useMaterialsLibraryViewModel(copy);
+
+  return (
+    <section className="materials-library-view">
+      <MaterialsLibraryHeader
+        copy={copy}
+        query={filters.query}
+        topicId={filters.topicId}
+        topics={availableTopics}
+        onQueryChange={(query) =>
+          setFilters((current) => ({
+            ...current,
+            query
+          }))
+        }
+        onTopicChange={(topicId) =>
+          setFilters((current) => ({
+            ...current,
+            topicId
+          }))
+        }
+      />
+
+      <MaterialsCreatePanel
+        copy={copy}
+        createDraft={createDraft}
+        setCreateDraft={setCreateDraft}
+        availableTopics={availableTopics}
+        isCreating={isCreating}
+        onSubmit={handleCreate}
+      />
+
+      {mutationError ? (
+        <div className="dashboard-error">
+          <p>{mutationError}</p>
+        </div>
+      ) : null}
+
+      {materialsQuery.isPending ? (
+        <section className="panel materials-loading-panel">
+          <p className="materials-loading-title">{copy.loading}</p>
+          <div className="dashboard-loading" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+          </div>
+        </section>
+      ) : null}
+
+      {materialsQuery.isError ? (
+        <section className="panel materials-error-panel">
+          <div className="dashboard-error">
+            <p>{materialsQuery.error?.message ?? copy.loadFailed}</p>
+            <button
+              type="button"
+              className="button button-outline dashboard-retry"
+              onClick={() => {
+                void materialsQuery.refetch();
+              }}
+            >
+              {copy.retry}
+            </button>
+          </div>
+        </section>
+      ) : null}
+
+      {materialsQuery.status === "success" && materialsQuery.data ? (
+        materialsQuery.data.materials.length > 0 ? (
+          <ul className="materials-grid">
+            {materialsQuery.data.materials.map((material) => (
+              <MaterialsCard
+                key={material.id}
+                copy={copy}
+                material={material}
+                availableTopics={availableTopics}
+                editingId={editingId}
+                editDraft={editDraft}
+                setEditDraft={setEditDraft}
+                updatingMaterialId={updatingMaterialId}
+                onEditStart={startEditing}
+                onDelete={handleDelete}
+                onProgressChange={handleProgressUpdate}
+                onEditSubmit={handleEditSubmit}
+                onCancelEdit={cancelEditing}
+              />
+            ))}
+          </ul>
+        ) : (
+          <section className="panel">
+            <p className="dashboard-empty">{copy.empty}</p>
+          </section>
+        )
+      ) : null}
+    </section>
+  );
+}
