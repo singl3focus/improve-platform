@@ -384,6 +384,8 @@ func handleError(w http.ResponseWriter, err error) {
 		httpresp.Error(w, http.StatusBadRequest, "invalid_status", "invalid status transition")
 	case apperr.Is(err, ErrDependencyExists):
 		httpresp.Error(w, http.StatusConflict, "dependency_exists", "dependency already exists")
+	case apperr.Is(err, ErrDependencyNotFound):
+		httpresp.Error(w, http.StatusNotFound, "dependency_not_found", "dependency not found")
 	case apperr.Is(err, ErrSelfDependency):
 		httpresp.Error(w, http.StatusBadRequest, "self_dependency", "topic cannot depend on itself")
 	default:

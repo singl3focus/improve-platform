@@ -169,6 +169,7 @@ a {
   grid-template-columns: 272px 1fr;
   gap: 18px;
   padding: 14px;
+  align-items: start;
 }
 
 .sidebar {
@@ -180,6 +181,9 @@ a {
   padding: 18px;
   display: flex;
   flex-direction: column;
+  position: sticky;
+  top: 14px;
+  min-height: calc(100vh - 28px);
   box-shadow: 0 14px 34px rgba(24, 53, 92, 0.08);
 }
 
@@ -840,6 +844,18 @@ a {
   font-size: 0.94rem;
 }
 
+.roadmap-header-actions {
+  margin-top: 12px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.roadmap-header-actions .button {
+  min-height: 36px;
+  padding: 0 12px;
+}
+
 .roadmap-loading-panel,
 .roadmap-error-panel {
   display: grid;
@@ -924,17 +940,6 @@ a {
   box-shadow: 0 8px 20px rgba(19, 56, 94, 0.07);
 }
 
-.roadmap-dependency-mutation-panel {
-  display: grid;
-  gap: 12px;
-  border-radius: 18px;
-  border: 1px solid var(--border);
-  background:
-    linear-gradient(180deg, #fdfefe, #f6faff),
-    repeating-linear-gradient(0deg, transparent 0, transparent 19px, rgba(42, 125, 225, 0.03) 19px, rgba(42, 125, 225, 0.03) 20px);
-  box-shadow: 0 8px 20px rgba(19, 56, 94, 0.07);
-}
-
 .roadmap-stage-mutation-panel header h3,
 .roadmap-topic-mutation-panel header h3 {
   margin: 0;
@@ -942,16 +947,10 @@ a {
 }
 
 .roadmap-stage-mutation-panel header p,
-.roadmap-topic-mutation-panel header p,
-.roadmap-dependency-mutation-panel header p {
+.roadmap-topic-mutation-panel header p {
   margin: 5px 0 0;
   color: var(--muted);
   font-size: 0.82rem;
-}
-
-.roadmap-dependency-mutation-panel header h3 {
-  margin: 0;
-  font-size: 1rem;
 }
 
 .roadmap-stage-form,
@@ -1099,6 +1098,12 @@ a {
   stroke-width: 2;
 }
 
+.roadmap-connection-preview {
+  stroke: #4b7fe3;
+  stroke-width: 2.5;
+  stroke-dasharray: 6 4;
+}
+
 .roadmap-stage-columns {
   position: relative;
   z-index: 1;
@@ -1123,10 +1128,104 @@ a {
   font-size: 0.98rem;
 }
 
+.roadmap-stage-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
 .roadmap-stage-header p {
   margin: 4px 0 0;
   font-size: 0.79rem;
   color: var(--muted);
+}
+
+.roadmap-stage-edit-trigger {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 140ms ease;
+}
+
+.roadmap-stage-edit-trigger:hover:not(:disabled) {
+  border-color: #b5c9f2;
+  color: #1f4f95;
+  background: #f5f9ff;
+}
+
+.roadmap-stage-edit-trigger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.roadmap-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: rgba(10, 18, 30, 0.44);
+  backdrop-filter: blur(2px);
+  display: grid;
+  place-items: center;
+  padding: 14px;
+}
+
+.roadmap-modal {
+  width: min(560px, 100%);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: 0 22px 48px rgba(20, 35, 61, 0.28);
+  padding: 16px;
+  display: grid;
+  gap: 12px;
+}
+
+.roadmap-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.roadmap-modal-header h4 {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--text);
+}
+
+.roadmap-modal-close {
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: var(--surface-muted);
+  color: var(--muted);
+  font-size: 1.15rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.roadmap-modal-close:hover {
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.roadmap-modal-error {
+  margin: 0;
+}
+
+.roadmap-modal-actions {
+  border-top: 1px dashed var(--border);
+  padding-top: 10px;
+  justify-content: flex-end;
 }
 
 .roadmap-topic-list {
@@ -1138,6 +1237,7 @@ a {
 }
 
 .roadmap-topic-card {
+  position: relative;
   border: 1px solid var(--border-soft);
   border-radius: 14px;
   background: var(--surface);
@@ -1165,6 +1265,54 @@ a {
 .roadmap-topic-card-blocked {
   border-style: dashed;
   background: var(--surface-muted);
+}
+
+.roadmap-topic-card-link-source {
+  border-color: #6a96e9;
+  box-shadow: 0 0 0 2px rgba(75, 127, 227, 0.22);
+}
+
+.roadmap-topic-card-link-target {
+  border-color: #67b981;
+  box-shadow: 0 0 0 2px rgba(53, 152, 88, 0.24);
+}
+
+.roadmap-topic-link-handle {
+  position: absolute;
+  top: 50%;
+  right: -9px;
+  transform: translateY(-50%);
+  border: 1px solid #b8ccef;
+  background: #f4f9ff;
+  color: #295da6;
+  border-radius: 999px;
+  font-size: 0.67rem;
+  font-weight: 700;
+  line-height: 1;
+  min-height: 26px;
+  padding: 0 9px;
+  cursor: crosshair;
+  z-index: 2;
+}
+
+.roadmap-topic-link-handle:hover:not(:disabled) {
+  border-color: #8fb3ea;
+  background: #e9f3ff;
+}
+
+.roadmap-topic-link-handle:focus-visible {
+  outline: 2px solid #8bb4ff;
+  outline-offset: 2px;
+}
+
+.roadmap-topic-link-handle:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.roadmap-topic-link-handle-active {
+  border-color: #6a96e9;
+  box-shadow: 0 0 0 2px rgba(75, 127, 227, 0.22);
 }
 
 .roadmap-topic-top {
@@ -1721,6 +1869,14 @@ a {
   flex-wrap: wrap;
 }
 
+.tasks-board-controls {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .tasks-filter-item {
   display: grid;
   gap: 5px;
@@ -1748,6 +1904,19 @@ a {
 .tasks-create-panel {
   display: grid;
   gap: 12px;
+}
+
+.tasks-create-modal {
+  width: min(760px, 100%);
+}
+
+.tasks-create-modal .tasks-create-panel {
+  gap: 10px;
+}
+
+.tasks-create-modal .roadmap-modal-actions {
+  border-top: 0;
+  padding-top: 0;
 }
 
 .tasks-create-panel header h3 {
@@ -2026,6 +2195,14 @@ a {
   flex-wrap: wrap;
 }
 
+.materials-library-controls {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .materials-filter-item {
   display: grid;
   gap: 5px;
@@ -2046,6 +2223,19 @@ a {
 .materials-create-panel {
   display: grid;
   gap: 12px;
+}
+
+.materials-create-modal {
+  width: min(860px, 100%);
+}
+
+.materials-create-modal .materials-create-panel {
+  gap: 10px;
+}
+
+.materials-create-modal .roadmap-modal-actions {
+  border-top: 0;
+  padding-top: 0;
 }
 
 .materials-create-panel header h3 {
@@ -2285,6 +2475,35 @@ a {
   background: #432637;
 }
 
+:root[data-theme="dark"] .roadmap-stage-edit-trigger {
+  border-color: #415270;
+  color: #cfd9ee;
+  background: #1e2b45;
+}
+
+:root[data-theme="dark"] .roadmap-stage-edit-trigger:hover:not(:disabled) {
+  border-color: #5f7fb6;
+  color: #f2f6ff;
+  background: #273a5c;
+}
+
+:root[data-theme="dark"] .roadmap-modal {
+  background: #16253f;
+  border-color: #39517a;
+}
+
+:root[data-theme="dark"] .roadmap-modal-close {
+  border-color: #425775;
+  background: #22314f;
+  color: #d2d9e8;
+}
+
+:root[data-theme="dark"] .roadmap-modal-close:hover {
+  border-color: #637fa8;
+  color: #f0f4fb;
+  background: #2a3a5c;
+}
+
 :root[data-theme="dark"] .roadmap-prerequisite-remove {
   border-color: #6a7386;
   color: #d4d9e6;
@@ -2333,8 +2552,7 @@ a {
 }
 
 :root[data-theme="dark"] .roadmap-stage-mutation-panel,
-:root[data-theme="dark"] .roadmap-topic-mutation-panel,
-:root[data-theme="dark"] .roadmap-dependency-mutation-panel {
+:root[data-theme="dark"] .roadmap-topic-mutation-panel {
   background: linear-gradient(180deg, #15263f, #162b48);
   border-color: #314a6f;
 }
@@ -2376,6 +2594,9 @@ a {
   .sidebar {
     border-right: 1px solid var(--border);
     border-bottom: 1px solid var(--border);
+    position: static;
+    top: auto;
+    min-height: 0;
   }
 
   .nav-list {
@@ -2413,6 +2634,10 @@ a {
     align-items: flex-start;
   }
 
+  .roadmap-header-actions {
+    width: 100%;
+  }
+
   .roadmap-stage-form,
   .roadmap-topic-form,
   .roadmap-topic-edit-form,
@@ -2441,6 +2666,10 @@ a {
     flex-direction: column;
   }
 
+  .tasks-board-controls {
+    justify-content: flex-start;
+  }
+
   .tasks-board-columns {
     grid-template-columns: 1fr;
   }
@@ -2456,6 +2685,10 @@ a {
 
   .materials-library-header {
     flex-direction: column;
+  }
+
+  .materials-library-controls {
+    justify-content: flex-start;
   }
 
   .materials-create-form,

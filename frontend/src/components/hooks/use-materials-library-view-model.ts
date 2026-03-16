@@ -324,23 +324,23 @@ export function useMaterialsLibraryViewModel(copy: MaterialsCopyForViewModel) {
     progressTimersRef.current.set(materialId, timer);
   }
 
-  async function handleCreate(event: FormEvent<HTMLFormElement>) {
+  async function handleCreate(event: FormEvent<HTMLFormElement>): Promise<boolean> {
     event.preventDefault();
     if (!materialsQuery.data) {
-      return;
+      return false;
     }
 
     const topicId = createDraft.topicId || materialsQuery.data.topics[0]?.id || "";
     if (!topicId) {
       setMutationError(copy.topicRequired);
-      return;
+      return false;
     }
 
     const title = createDraft.title.trim();
     const description = createDraft.description.trim();
     if (!title || !description) {
       setMutationError(copy.titleDescriptionRequired);
-      return;
+      return false;
     }
 
     setMutationError(null);
@@ -359,8 +359,10 @@ export function useMaterialsLibraryViewModel(copy: MaterialsCopyForViewModel) {
         topicId
       });
       await invalidateMaterialsQuery();
+      return true;
     } catch (error) {
       setMutationError(error instanceof Error ? error.message : copy.createFailed);
+      return false;
     } finally {
       setIsCreating(false);
     }

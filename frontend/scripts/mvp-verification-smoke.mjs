@@ -130,6 +130,46 @@ function findTopicById(state, topicId) {
   return null;
 }
 
+function findStageById(state, stageId) {
+  return (state.roadmap?.stages ?? []).find((stage) => stage.id === stageId) ?? null;
+}
+
+function findTopicEntry(state, topicId) {
+  for (const stage of state.roadmap?.stages ?? []) {
+    const topicIndex = (stage.topics ?? []).findIndex((topic) => topic.id === topicId);
+    if (topicIndex >= 0) {
+      return {
+        stage,
+        topicIndex,
+        topic: stage.topics[topicIndex]
+      };
+    }
+  }
+
+  return null;
+}
+
+function removeTopicFromRoadmap(state, topicId) {
+  const topicEntry = findTopicEntry(state, topicId);
+  if (!topicEntry) {
+    return false;
+  }
+
+  topicEntry.stage.topics.splice(topicEntry.topicIndex, 1);
+
+  for (const stage of state.roadmap?.stages ?? []) {
+    for (const topic of stage.topics ?? []) {
+      if (Array.isArray(topic.dependencies)) {
+        topic.dependencies = topic.dependencies.filter((dependencyId) => dependencyId !== topicId);
+      }
+    }
+  }
+
+  state.tasks = state.tasks.filter((task) => task.topic_id !== topicId);
+  state.materials = state.materials.filter((material) => material.topic_id !== topicId);
+  return true;
+}
+
 function createMockBackendServer() {
   const state = createMockState();
 
@@ -148,7 +188,7 @@ function createMockBackendServer() {
       const roadmapMode = payload?.roadmapMode;
       const taskDeleteMode = payload?.taskDeleteMode;
 
-      if (roadmapMode === "ok" || roadmapMode === "not_found") {
+      if (roadmapMode === "ok" || roadmapMode === "not_found" || roadmapMode === "error") {
         state.roadmapMode = roadmapMode;
       }
       if (taskDeleteMode === "ok" || taskDeleteMode === "error") {
@@ -171,6 +211,14 @@ function createMockBackendServer() {
     }
 
     if (method === "GET" && path === "/api/v1/roadmap") {
+      if (state.roadmapMode === "error") {
+        sendJson(response, 500, {
+          message: "Roadmap backend failed.",
+          code: "roadmap_backend_failed"
+        });
+        return;
+      }
+
       if (state.roadmapMode === "not_found" || !state.roadmap) {
         sendJson(response, 404, {
           message: "Roadmap not found.",
@@ -236,6 +284,51 @@ function createMockBackendServer() {
       return;
     }
 
+    {
+      const stageByIdMatch = path.match(/^\/api\/v1\/roadmap\/stages\/([^/]+)$/);
+      if (stageByIdMatch) {
+        const stageId = decodeURIComponent(stageByIdMatch[1]);
+        const stage = findStageById(state, stageId);
+
+        if (!stage) {
+          sendJson(response, 404, { message: "stage not found", code: "stage_not_found" });
+          return;
+        }
+
+        if (method === "PUT") {
+          const payload = await parseJsonBody(request);
+          const title = typeof payload?.title === "string" ? payload.title.trim() : "";
+          const position = Number(payload?.position ?? stage.position);
+
+          if (!title) {
+            sendJson(response, 400, { message: "title is required", code: "validation_error" });
+            return;
+          }
+
+          if (!Number.isFinite(position) || position < 1) {
+            sendJson(response, 400, { message: "position is invalid", code: "validation_error" });
+            return;
+          }
+
+          stage.title = title;
+          stage.position = position;
+          sendJson(response, 200, stage);
+          return;
+        }
+
+        if (method === "DELETE") {
+          const stageTopics = [...(stage.topics ?? [])];
+          for (const topic of stageTopics) {
+            removeTopicFromRoadmap(state, topic.id);
+          }
+
+          state.roadmap.stages = state.roadmap.stages.filter((item) => item.id !== stageId);
+          sendJson(response, 200, { success: true });
+          return;
+        }
+      }
+    }
+
     if (method === "POST" && path === "/api/v1/roadmap/topics") {
       if (state.roadmapMode === "not_found" || !state.roadmap) {
         sendJson(response, 404, { message: "roadmap not found", code: "roadmap_not_found" });
@@ -284,14 +377,125 @@ function createMockBackendServer() {
 
     {
       const topicMatch = path.match(/^\/api\/v1\/roadmap\/topics\/([^/]+)$/);
-      if (method === "GET" && topicMatch) {
+      if (topicMatch) {
         const topicId = decodeURIComponent(topicMatch[1]);
+        const topicEntry = findTopicEntry(state, topicId);
+
+        if (!topicEntry) {
+          sendJson(response, 404, { message: "Topic not found.", code: "topic_not_found" });
+          return;
+        }
+
+        if (method === "GET") {
+          sendJson(response, 200, topicEntry.topic);
+          return;
+        }
+
+        if (method === "PUT") {
+          const payload = await parseJsonBody(request);
+          const stageId = typeof payload?.stage_id === "string" ? payload.stage_id : "";
+          const title = typeof payload?.title === "string" ? payload.title.trim() : "";
+          const description = typeof payload?.description === "string" ? payload.description : "";
+          const position = Number(payload?.position ?? topicEntry.topic.position ?? 1);
+
+          if (!stageId || !title) {
+            sendJson(response, 400, {
+              message: "stage_id and title are required",
+              code: "validation_error"
+            });
+            return;
+          }
+
+          const targetStage = findStageById(state, stageId);
+          if (!targetStage) {
+            sendJson(response, 404, { message: "stage not found", code: "stage_not_found" });
+            return;
+          }
+
+          if (!Number.isFinite(position) || position < 1) {
+            sendJson(response, 400, { message: "position is invalid", code: "validation_error" });
+            return;
+          }
+
+          const updatedTopic = {
+            ...topicEntry.topic,
+            stage_id: stageId,
+            title,
+            description,
+            position
+          };
+
+          topicEntry.stage.topics.splice(topicEntry.topicIndex, 1);
+          targetStage.topics.push(updatedTopic);
+          sendJson(response, 200, updatedTopic);
+          return;
+        }
+
+        if (method === "DELETE") {
+          removeTopicFromRoadmap(state, topicId);
+          sendJson(response, 200, { success: true });
+          return;
+        }
+      }
+    }
+
+    {
+      const dependenciesMatch = path.match(/^\/api\/v1\/roadmap\/topics\/([^/]+)\/dependencies$/);
+      if (method === "POST" && dependenciesMatch) {
+        const topicId = decodeURIComponent(dependenciesMatch[1]);
         const topic = findTopicById(state, topicId);
         if (!topic) {
           sendJson(response, 404, { message: "Topic not found.", code: "topic_not_found" });
           return;
         }
-        sendJson(response, 200, topic);
+
+        const payload = await parseJsonBody(request);
+        const dependencyTopicId =
+          typeof payload?.depends_on_topic_id === "string" ? payload.depends_on_topic_id : "";
+        const dependencyTopic = findTopicById(state, dependencyTopicId);
+
+        if (!dependencyTopic) {
+          sendJson(response, 404, {
+            message: "Dependency topic not found.",
+            code: "dependency_topic_not_found"
+          });
+          return;
+        }
+
+        if (dependencyTopicId === topicId) {
+          sendJson(response, 422, {
+            message: "Topic cannot depend on itself.",
+            code: "self_dependency"
+          });
+          return;
+        }
+
+        const dependencies = Array.isArray(topic.dependencies) ? topic.dependencies : [];
+        if (!dependencies.includes(dependencyTopicId)) {
+          dependencies.push(dependencyTopicId);
+        }
+        topic.dependencies = dependencies;
+
+        sendJson(response, 201, { success: true });
+        return;
+      }
+    }
+
+    {
+      const dependencyByIdMatch =
+        path.match(/^\/api\/v1\/roadmap\/topics\/([^/]+)\/dependencies\/([^/]+)$/);
+      if (method === "DELETE" && dependencyByIdMatch) {
+        const topicId = decodeURIComponent(dependencyByIdMatch[1]);
+        const dependencyTopicId = decodeURIComponent(dependencyByIdMatch[2]);
+        const topic = findTopicById(state, topicId);
+
+        if (!topic) {
+          sendJson(response, 404, { message: "Topic not found.", code: "topic_not_found" });
+          return;
+        }
+
+        topic.dependencies = (topic.dependencies ?? []).filter((item) => item !== dependencyTopicId);
+        sendJson(response, 200, { success: true });
         return;
       }
     }
@@ -624,6 +828,16 @@ async function run() {
       invariant(Array.isArray(firstTopic?.prerequisiteTopicIds), "Expected prerequisiteTopicIds array.");
     });
 
+    await check("Roadmap GET route returns API error when backend roadmap call fails", async () => {
+      await setMockScenario({ roadmapMode: "error" });
+      try {
+        const response = await request("/api/roadmap");
+        invariant(response.status === 500, `Expected 500, got ${response.status}`);
+      } finally {
+        await setMockScenario({ roadmapMode: "ok" });
+      }
+    });
+
     await check("Roadmap GET route keeps empty fallback when backend returns roadmap_not_found", async () => {
       await setMockScenario({ roadmapMode: "not_found" });
       try {
@@ -915,6 +1129,203 @@ async function run() {
           stage.topics.some((topic) => topic?.title === "Quick create topic")
       );
       invariant(hasCreatedTopic, "Expected quick-created topic in roadmap response.");
+
+      await setMockScenario({ roadmapMode: "ok" });
+    });
+
+    await check("Roadmap stage routes support create update delete flow", async () => {
+      const create = await request("/api/roadmap/stages", {
+        method: "POST",
+        body: JSON.stringify({
+          title: "Smoke stage",
+          position: 9
+        })
+      });
+      invariant(create.status === 201, `Stage create expected 201, got ${create.status}`);
+      const stageId = create.body?.id;
+      invariant(typeof stageId === "string", "Expected created stage id.");
+
+      const update = await request(`/api/roadmap/stages/${encodeURIComponent(stageId)}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          title: "Smoke stage updated",
+          position: 10
+        })
+      });
+      invariant(update.status === 200, `Stage update expected 200, got ${update.status}`);
+      invariant(update.body?.title === "Smoke stage updated", "Expected updated stage title.");
+
+      const remove = await request(`/api/roadmap/stages/${encodeURIComponent(stageId)}`, {
+        method: "DELETE"
+      });
+      invariant(remove.status === 200, `Stage delete expected 200, got ${remove.status}`);
+      invariant(remove.body?.success === true, "Expected stage delete success=true.");
+    });
+
+    await check("Roadmap topic routes support create update delete flow", async () => {
+      const stageCreate = await request("/api/roadmap/stages", {
+        method: "POST",
+        body: JSON.stringify({
+          title: "Smoke topic stage",
+          position: 11
+        })
+      });
+      invariant(stageCreate.status === 201, `Stage create expected 201, got ${stageCreate.status}`);
+      const stageId = stageCreate.body?.id;
+      invariant(typeof stageId === "string", "Expected stage id for topic flow.");
+
+      const topicCreate = await request("/api/roadmap/topics", {
+        method: "POST",
+        body: JSON.stringify({
+          stageId,
+          title: "Smoke topic",
+          description: "Created in smoke test.",
+          position: 1
+        })
+      });
+      invariant(topicCreate.status === 201, `Topic create expected 201, got ${topicCreate.status}`);
+      const topicId = topicCreate.body?.id;
+      invariant(typeof topicId === "string", "Expected created topic id.");
+
+      const topicUpdate = await request(`/api/roadmap/topics/${encodeURIComponent(topicId)}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          stageId,
+          title: "Smoke topic updated",
+          description: "Updated in smoke test.",
+          position: 2
+        })
+      });
+      invariant(topicUpdate.status === 200, `Topic update expected 200, got ${topicUpdate.status}`);
+      invariant(topicUpdate.body?.title === "Smoke topic updated", "Expected updated topic title.");
+
+      const topicDelete = await request(`/api/roadmap/topics/${encodeURIComponent(topicId)}`, {
+        method: "DELETE"
+      });
+      invariant(topicDelete.status === 200, `Topic delete expected 200, got ${topicDelete.status}`);
+      invariant(topicDelete.body?.success === true, "Expected topic delete success=true.");
+
+      const stageDelete = await request(`/api/roadmap/stages/${encodeURIComponent(stageId)}`, {
+        method: "DELETE"
+      });
+      invariant(stageDelete.status === 200, `Stage cleanup expected 200, got ${stageDelete.status}`);
+    });
+
+    await check("Roadmap dependency routes support add and remove flow", async () => {
+      const stageCreate = await request("/api/roadmap/stages", {
+        method: "POST",
+        body: JSON.stringify({
+          title: "Smoke dependency stage",
+          position: 12
+        })
+      });
+      invariant(stageCreate.status === 201, `Stage create expected 201, got ${stageCreate.status}`);
+      const stageId = stageCreate.body?.id;
+      invariant(typeof stageId === "string", "Expected stage id for dependency flow.");
+
+      const prerequisiteTopicCreate = await request("/api/roadmap/topics", {
+        method: "POST",
+        body: JSON.stringify({
+          stageId,
+          title: "Prerequisite topic",
+          description: "Source dependency topic",
+          position: 1
+        })
+      });
+      invariant(
+        prerequisiteTopicCreate.status === 201,
+        `Prerequisite topic create expected 201, got ${prerequisiteTopicCreate.status}`
+      );
+      const prerequisiteTopicId = prerequisiteTopicCreate.body?.id;
+      invariant(typeof prerequisiteTopicId === "string", "Expected prerequisite topic id.");
+
+      const dependentTopicCreate = await request("/api/roadmap/topics", {
+        method: "POST",
+        body: JSON.stringify({
+          stageId,
+          title: "Dependent topic",
+          description: "Target dependency topic",
+          position: 2
+        })
+      });
+      invariant(
+        dependentTopicCreate.status === 201,
+        `Dependent topic create expected 201, got ${dependentTopicCreate.status}`
+      );
+      const dependentTopicId = dependentTopicCreate.body?.id;
+      invariant(typeof dependentTopicId === "string", "Expected dependent topic id.");
+
+      const dependencyAdd = await request(
+        `/api/roadmap/topics/${encodeURIComponent(dependentTopicId)}/dependencies`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            prerequisiteTopicId
+          })
+        }
+      );
+      invariant(dependencyAdd.status === 201, `Dependency add expected 201, got ${dependencyAdd.status}`);
+      invariant(dependencyAdd.body?.success === true, "Expected dependency add success=true.");
+
+      const roadmapAfterAdd = await request("/api/roadmap");
+      invariant(roadmapAfterAdd.status === 200, `Roadmap expected 200, got ${roadmapAfterAdd.status}`);
+      const dependentTopicAfterAdd = roadmapAfterAdd.body.stages
+        .flatMap((stage) => stage.topics ?? [])
+        .find((topic) => topic.id === dependentTopicId);
+      invariant(Boolean(dependentTopicAfterAdd), "Expected dependent topic in roadmap payload.");
+      invariant(
+        dependentTopicAfterAdd.prerequisiteTopicIds.includes(prerequisiteTopicId),
+        "Expected dependency id in prerequisiteTopicIds after add."
+      );
+
+      const dependencyRemove = await request(
+        `/api/roadmap/topics/${encodeURIComponent(dependentTopicId)}/dependencies/${encodeURIComponent(
+          prerequisiteTopicId
+        )}`,
+        {
+          method: "DELETE"
+        }
+      );
+      invariant(
+        dependencyRemove.status === 200,
+        `Dependency remove expected 200, got ${dependencyRemove.status}`
+      );
+      invariant(dependencyRemove.body?.success === true, "Expected dependency remove success=true.");
+
+      const roadmapAfterRemove = await request("/api/roadmap");
+      invariant(roadmapAfterRemove.status === 200, `Roadmap expected 200, got ${roadmapAfterRemove.status}`);
+      const dependentTopicAfterRemove = roadmapAfterRemove.body.stages
+        .flatMap((stage) => stage.topics ?? [])
+        .find((topic) => topic.id === dependentTopicId);
+      invariant(Boolean(dependentTopicAfterRemove), "Expected dependent topic after dependency remove.");
+      invariant(
+        !dependentTopicAfterRemove.prerequisiteTopicIds.includes(prerequisiteTopicId),
+        "Expected dependency id to be removed from prerequisiteTopicIds."
+      );
+
+      const dependentTopicDelete = await request(`/api/roadmap/topics/${encodeURIComponent(dependentTopicId)}`, {
+        method: "DELETE"
+      });
+      invariant(
+        dependentTopicDelete.status === 200,
+        `Dependent topic cleanup expected 200, got ${dependentTopicDelete.status}`
+      );
+
+      const prerequisiteTopicDelete = await request(
+        `/api/roadmap/topics/${encodeURIComponent(prerequisiteTopicId)}`,
+        {
+          method: "DELETE"
+        }
+      );
+      invariant(
+        prerequisiteTopicDelete.status === 200,
+        `Prerequisite topic cleanup expected 200, got ${prerequisiteTopicDelete.status}`
+      );
+
+      const stageDelete = await request(`/api/roadmap/stages/${encodeURIComponent(stageId)}`, {
+        method: "DELETE"
+      });
+      invariant(stageDelete.status === 200, `Stage cleanup expected 200, got ${stageDelete.status}`);
     });
   } finally {
     await backend.stop();

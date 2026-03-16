@@ -251,6 +251,87 @@ func TestHandler_AddDependency_CycleRejected(t *testing.T) {
 	}
 }
 
+func TestHandler_AddDependency_SelfRejected(t *testing.T) {
+	svc := &mockService{
+		addDependencyFn: func(_ context.Context, _, _ string, _ roadmap.AddDependencyRequest) error {
+			return roadmap.ErrSelfDependency
+		},
+	}
+	h := roadmap.NewHandler(svc)
+
+	body, _ := json.Marshal(map[string]string{"depends_on_topic_id": "22222222-2222-2222-2222-222222222222"})
+	req := withURLParams(authedRequest(http.MethodPost, "/api/v1/roadmap/topics/t1/dependencies", body), "topicID", "11111111-1111-1111-1111-111111111111")
+	rec := httptest.NewRecorder()
+
+	h.AddDependency().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d", rec.Code)
+	}
+
+	var resp httpresp.ErrorResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode error: %v", err)
+	}
+	if resp.Error.Code != "self_dependency" {
+		t.Errorf("expected code 'self_dependency', got %s", resp.Error.Code)
+	}
+}
+
+func TestHandler_AddDependency_DuplicateRejected(t *testing.T) {
+	svc := &mockService{
+		addDependencyFn: func(_ context.Context, _, _ string, _ roadmap.AddDependencyRequest) error {
+			return roadmap.ErrDependencyExists
+		},
+	}
+	h := roadmap.NewHandler(svc)
+
+	body, _ := json.Marshal(map[string]string{"depends_on_topic_id": "22222222-2222-2222-2222-222222222222"})
+	req := withURLParams(authedRequest(http.MethodPost, "/api/v1/roadmap/topics/t1/dependencies", body), "topicID", "11111111-1111-1111-1111-111111111111")
+	rec := httptest.NewRecorder()
+
+	h.AddDependency().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusConflict {
+		t.Errorf("expected 409, got %d", rec.Code)
+	}
+
+	var resp httpresp.ErrorResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode error: %v", err)
+	}
+	if resp.Error.Code != "dependency_exists" {
+		t.Errorf("expected code 'dependency_exists', got %s", resp.Error.Code)
+	}
+}
+
+func TestHandler_AddDependency_TopicNotFound(t *testing.T) {
+	svc := &mockService{
+		addDependencyFn: func(_ context.Context, _, _ string, _ roadmap.AddDependencyRequest) error {
+			return roadmap.ErrTopicNotFound
+		},
+	}
+	h := roadmap.NewHandler(svc)
+
+	body, _ := json.Marshal(map[string]string{"depends_on_topic_id": "22222222-2222-2222-2222-222222222222"})
+	req := withURLParams(authedRequest(http.MethodPost, "/api/v1/roadmap/topics/t1/dependencies", body), "topicID", "11111111-1111-1111-1111-111111111111")
+	rec := httptest.NewRecorder()
+
+	h.AddDependency().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("expected 404, got %d", rec.Code)
+	}
+
+	var resp httpresp.ErrorResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode error: %v", err)
+	}
+	if resp.Error.Code != "topic_not_found" {
+		t.Errorf("expected code 'topic_not_found', got %s", resp.Error.Code)
+	}
+}
+
 func TestHandler_NoAuth(t *testing.T) {
 	h := roadmap.NewHandler(&mockService{})
 
@@ -346,5 +427,35 @@ func TestHandler_RemoveDependency_InvalidDepTopicID(t *testing.T) {
 	}
 	if resp.Error.Code != "validation_error" {
 		t.Errorf("expected code 'validation_error', got %s", resp.Error.Code)
+	}
+}
+
+func TestHandler_RemoveDependency_NotFound(t *testing.T) {
+	svc := &mockService{
+		removeDependencyFn: func(_ context.Context, _, _, _ string) error {
+			return roadmap.ErrDependencyNotFound
+		},
+	}
+	h := roadmap.NewHandler(svc)
+
+	req := withURLParams(
+		authedRequest(http.MethodDelete, "/api/v1/roadmap/topics/topic-1/dependencies/topic-2", nil),
+		"topicID", "11111111-1111-1111-1111-111111111111",
+		"depTopicID", "22222222-2222-2222-2222-222222222222",
+	)
+	rec := httptest.NewRecorder()
+
+	h.RemoveDependency().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("expected 404, got %d", rec.Code)
+	}
+
+	var resp httpresp.ErrorResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode error: %v", err)
+	}
+	if resp.Error.Code != "dependency_not_found" {
+		t.Errorf("expected code 'dependency_not_found', got %s", resp.Error.Code)
 	}
 }

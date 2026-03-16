@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import type { Dispatch, FormEvent, SetStateAction } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useUserPreferences } from "@/components/providers/user-preferences-provider";
 import {
   type MaterialDraft,
@@ -28,6 +29,8 @@ const MATERIALS_COPY = {
     createPlaceholderDescription: "Описание материала",
     noTopicsAvailable: "Нет доступных тем",
     createButton: "Создать материал",
+    createModalTitle: "Создать материал",
+    closeModalAria: "Закрыть окно создания материала",
     creatingButton: "Создание...",
     topicRequired: "Для создания материала нужна тема.",
     titleDescriptionRequired: "Название и описание обязательны.",
@@ -64,6 +67,8 @@ const MATERIALS_COPY = {
     createPlaceholderDescription: "Material description",
     noTopicsAvailable: "No topics available",
     createButton: "Create material",
+    createModalTitle: "Create material",
+    closeModalAria: "Close material creation modal",
     creatingButton: "Creating...",
     topicRequired: "Topic is required for material creation.",
     titleDescriptionRequired: "Title and description are required.",
@@ -110,7 +115,8 @@ function MaterialsLibraryHeader({
   topicId,
   topics,
   onQueryChange,
-  onTopicChange
+  onTopicChange,
+  onCreateClick
 }: {
   copy: MaterialsCopy;
   query: string;
@@ -118,6 +124,7 @@ function MaterialsLibraryHeader({
   topics: TopicOption[];
   onQueryChange: (query: string) => void;
   onTopicChange: (topicId: string) => void;
+  onCreateClick: (triggerElement: HTMLElement) => void;
 }) {
   return (
     <header className="panel materials-library-header">
@@ -126,33 +133,43 @@ function MaterialsLibraryHeader({
         <p>{copy.subtitle}</p>
       </div>
 
-      <div className="materials-library-filters">
-        <label className="materials-filter-item">
-          <span>{copy.search}</span>
-          <input
-            type="search"
-            className="input materials-filter-input"
-            value={query}
-            onChange={(event) => onQueryChange(event.target.value)}
-            placeholder={copy.searchPlaceholder}
-          />
-        </label>
+      <div className="materials-library-controls">
+        <div className="materials-library-filters">
+          <label className="materials-filter-item">
+            <span>{copy.search}</span>
+            <input
+              type="search"
+              className="input materials-filter-input"
+              value={query}
+              onChange={(event) => onQueryChange(event.target.value)}
+              placeholder={copy.searchPlaceholder}
+            />
+          </label>
 
-        <label className="materials-filter-item">
-          <span>{copy.topic}</span>
-          <select
-            className="input materials-filter-select"
-            value={topicId}
-            onChange={(event) => onTopicChange(event.target.value)}
-          >
-            <option value="">{copy.allTopics}</option>
-            {topics.map((topic) => (
-              <option key={topic.id} value={topic.id}>
-                {topic.title}
-              </option>
-            ))}
-          </select>
-        </label>
+          <label className="materials-filter-item">
+            <span>{copy.topic}</span>
+            <select
+              className="input materials-filter-select"
+              value={topicId}
+              onChange={(event) => onTopicChange(event.target.value)}
+            >
+              <option value="">{copy.allTopics}</option>
+              {topics.map((topic) => (
+                <option key={topic.id} value={topic.id}>
+                  {topic.title}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        <button
+          type="button"
+          className="button button-primary"
+          onClick={(event) => onCreateClick(event.currentTarget)}
+        >
+          {copy.createButton}
+        </button>
       </div>
     </header>
   );
@@ -164,7 +181,8 @@ function MaterialsCreatePanel({
   setCreateDraft,
   availableTopics,
   isCreating,
-  onSubmit
+  onSubmit,
+  includePanelStyles = true
 }: {
   copy: MaterialsCopy;
   createDraft: MaterialDraft;
@@ -172,9 +190,12 @@ function MaterialsCreatePanel({
   availableTopics: TopicOption[];
   isCreating: boolean;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  includePanelStyles?: boolean;
 }) {
+  const rootClassName = includePanelStyles ? "panel materials-create-panel" : "materials-create-panel";
+
   return (
-    <section className="panel materials-create-panel">
+    <section className={rootClassName}>
       <header>
         <h3>{copy.createTitle}</h3>
         <p>{copy.createSubtitle}</p>
@@ -508,6 +529,9 @@ function MaterialsCard({
 export function MaterialsLibraryView() {
   const { language } = useUserPreferences();
   const copy = MATERIALS_COPY[language];
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const createModalTriggerRef = useRef<HTMLElement | null>(null);
+  const createModalTitleId = "materials-create-modal-title";
   const {
     filters,
     setFilters,
@@ -530,6 +554,49 @@ export function MaterialsLibraryView() {
     handleProgressCommit
   } = useMaterialsLibraryViewModel(copy);
 
+  useEffect(() => {
+    if (!isCreateModalOpen) {
+      return;
+    }
+
+    function handleEscClose(event: KeyboardEvent) {
+      if (event.key !== "Escape" || isCreating) {
+        return;
+      }
+      setIsCreateModalOpen(false);
+      createModalTriggerRef.current?.focus();
+      createModalTriggerRef.current = null;
+    }
+
+    document.addEventListener("keydown", handleEscClose);
+    return () => document.removeEventListener("keydown", handleEscClose);
+  }, [isCreateModalOpen, isCreating]);
+
+  function openCreateModal(triggerElement: HTMLElement) {
+    createModalTriggerRef.current = triggerElement;
+    setIsCreateModalOpen(true);
+  }
+
+  function closeCreateModal() {
+    if (isCreating) {
+      return;
+    }
+    setIsCreateModalOpen(false);
+    createModalTriggerRef.current?.focus();
+    createModalTriggerRef.current = null;
+  }
+
+  async function handleCreateSubmit(event: FormEvent<HTMLFormElement>) {
+    const created = await handleCreate(event);
+    if (!created) {
+      return;
+    }
+
+    setIsCreateModalOpen(false);
+    createModalTriggerRef.current?.focus();
+    createModalTriggerRef.current = null;
+  }
+
   return (
     <section className="materials-library-view">
       <MaterialsLibraryHeader
@@ -549,16 +616,48 @@ export function MaterialsLibraryView() {
             topicId
           }))
         }
+        onCreateClick={openCreateModal}
       />
 
-      <MaterialsCreatePanel
-        copy={copy}
-        createDraft={createDraft}
-        setCreateDraft={setCreateDraft}
-        availableTopics={availableTopics}
-        isCreating={isCreating}
-        onSubmit={handleCreate}
-      />
+      {isCreateModalOpen ? (
+        <div className="roadmap-modal-overlay" role="presentation" onClick={closeCreateModal}>
+          <section
+            className="roadmap-modal materials-create-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={createModalTitleId}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="roadmap-modal-header">
+              <h4 id={createModalTitleId}>{copy.createModalTitle}</h4>
+              <button
+                type="button"
+                className="roadmap-modal-close"
+                aria-label={copy.closeModalAria}
+                onClick={closeCreateModal}
+              >
+                ×
+              </button>
+            </div>
+
+            <MaterialsCreatePanel
+              copy={copy}
+              createDraft={createDraft}
+              setCreateDraft={setCreateDraft}
+              availableTopics={availableTopics}
+              isCreating={isCreating}
+              onSubmit={handleCreateSubmit}
+              includePanelStyles={false}
+            />
+
+            <div className="roadmap-modal-actions">
+              <button type="button" className="button button-outline" onClick={closeCreateModal}>
+                {copy.cancel}
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
 
       {mutationError ? (
         <div className="dashboard-error">

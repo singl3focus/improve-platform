@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { Dispatch, DragEvent, FormEvent, SetStateAction } from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useUserPreferences } from "@/components/providers/user-preferences-provider";
 import {
   formatTaskDueDate,
@@ -40,6 +40,9 @@ const TASKS_COPY = {
     createPlaceholderTitle: "Например: Разобрать flex/grid кейсы",
     createPlaceholderDescription: "Краткое описание задачи (опционально)",
     createButton: "Создать задачу",
+    createModalTitle: "Создать задачу",
+    closeModalAria: "Закрыть окно создания задачи",
+    cancelButton: "Отмена",
     creatingButton: "Создание...",
     noTopicOption: "Без темы",
     titleRequired: "Название задачи обязательно.",
@@ -76,6 +79,9 @@ const TASKS_COPY = {
     createPlaceholderTitle: "For example: Practice flex/grid cases",
     createPlaceholderDescription: "Short task description (optional)",
     createButton: "Create task",
+    createModalTitle: "Create task",
+    closeModalAria: "Close task creation modal",
+    cancelButton: "Cancel",
     creatingButton: "Creating...",
     noTopicOption: "No topic",
     titleRequired: "Task title is required.",
@@ -117,7 +123,8 @@ function TasksBoardHeader({
   topicId,
   due,
   onTopicChange,
-  onDueChange
+  onDueChange,
+  onCreateClick
 }: {
   copy: TasksCopy;
   topics: TaskBoardTopicOption[];
@@ -125,6 +132,7 @@ function TasksBoardHeader({
   due: TaskBoardDueFilter;
   onTopicChange: (topicId: string) => void;
   onDueChange: (due: TaskBoardDueFilter) => void;
+  onCreateClick: (triggerElement: HTMLElement) => void;
 }) {
   return (
     <header className="tasks-board-header panel">
@@ -133,35 +141,45 @@ function TasksBoardHeader({
         <p>{copy.subtitle}</p>
       </div>
 
-      <div className="tasks-board-filters">
-        <label className="tasks-filter-item">
-          <span>{copy.topicFilter}</span>
-          <select
-            className="input tasks-filter-select"
-            value={topicId}
-            onChange={(event) => onTopicChange(event.target.value)}
-          >
-            <option value="">{copy.allTopics}</option>
-            {topics.map((topic) => (
-              <option key={topic.id} value={topic.id}>
-                {topic.title}
-              </option>
-            ))}
-          </select>
-        </label>
+      <div className="tasks-board-controls">
+        <div className="tasks-board-filters">
+          <label className="tasks-filter-item">
+            <span>{copy.topicFilter}</span>
+            <select
+              className="input tasks-filter-select"
+              value={topicId}
+              onChange={(event) => onTopicChange(event.target.value)}
+            >
+              <option value="">{copy.allTopics}</option>
+              {topics.map((topic) => (
+                <option key={topic.id} value={topic.id}>
+                  {topic.title}
+                </option>
+              ))}
+            </select>
+          </label>
 
-        <label className="tasks-filter-item">
-          <span>{copy.deadlineFilter}</span>
-          <select
-            className="input tasks-filter-select"
-            value={due}
-            onChange={(event) => onDueChange(event.target.value as TaskBoardDueFilter)}
-          >
-            <option value="all">{copy.dueAll}</option>
-            <option value="overdue">{copy.dueOverdue}</option>
-            <option value="week">{copy.dueWeek}</option>
-          </select>
-        </label>
+          <label className="tasks-filter-item">
+            <span>{copy.deadlineFilter}</span>
+            <select
+              className="input tasks-filter-select"
+              value={due}
+              onChange={(event) => onDueChange(event.target.value as TaskBoardDueFilter)}
+            >
+              <option value="all">{copy.dueAll}</option>
+              <option value="overdue">{copy.dueOverdue}</option>
+              <option value="week">{copy.dueWeek}</option>
+            </select>
+          </label>
+        </div>
+
+        <button
+          type="button"
+          className="button button-primary"
+          onClick={(event) => onCreateClick(event.currentTarget)}
+        >
+          {copy.createButton}
+        </button>
       </div>
     </header>
   );
@@ -295,7 +313,8 @@ function TasksCreatePanel({
   createDraft,
   setCreateDraft,
   isCreating,
-  onSubmit
+  onSubmit,
+  includePanelStyles = true
 }: {
   copy: TasksCopy;
   topics: TaskBoardTopicOption[];
@@ -303,9 +322,12 @@ function TasksCreatePanel({
   setCreateDraft: Dispatch<SetStateAction<TaskCreateDraft>>;
   isCreating: boolean;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  includePanelStyles?: boolean;
 }) {
+  const rootClassName = includePanelStyles ? "panel tasks-create-panel" : "tasks-create-panel";
+
   return (
-    <section className="panel tasks-create-panel">
+    <section className={rootClassName}>
       <header>
         <h3>{copy.createTitle}</h3>
         <p>{copy.createSubtitle}</p>
@@ -392,6 +414,9 @@ export function TasksKanbanView() {
   const columnConfig = useMemo(() => getTaskColumnConfig(language), [language]);
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [dragOverStatus, setDragOverStatus] = useState<TaskBoardStatus | null>(null);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const createModalTitleId = "tasks-create-modal-title";
+  const createModalTriggerRef = useRef<HTMLElement | null>(null);
   const {
     filters,
     setFilters,
@@ -414,6 +439,24 @@ export function TasksKanbanView() {
     }
     return statusMap;
   }, [state.data?.tasks]);
+
+  useEffect(() => {
+    if (!isCreateModalOpen) {
+      return;
+    }
+
+    function handleEscClose(event: KeyboardEvent) {
+      if (event.key !== "Escape" || isCreating) {
+        return;
+      }
+      setIsCreateModalOpen(false);
+      createModalTriggerRef.current?.focus();
+      createModalTriggerRef.current = null;
+    }
+
+    document.addEventListener("keydown", handleEscClose);
+    return () => document.removeEventListener("keydown", handleEscClose);
+  }, [isCreateModalOpen, isCreating]);
 
   function handleCardDragStart(event: DragEvent<HTMLLIElement>, taskId: string) {
     if (updatingTaskId === taskId) {
@@ -446,6 +489,31 @@ export function TasksKanbanView() {
     void handleStatusChange(taskId, status);
   }
 
+  function openCreateModal(triggerElement: HTMLElement) {
+    createModalTriggerRef.current = triggerElement;
+    setIsCreateModalOpen(true);
+  }
+
+  function closeCreateModal() {
+    if (isCreating) {
+      return;
+    }
+    setIsCreateModalOpen(false);
+    createModalTriggerRef.current?.focus();
+    createModalTriggerRef.current = null;
+  }
+
+  async function handleCreateSubmit(event: FormEvent<HTMLFormElement>) {
+    const created = await handleCreate(event);
+    if (!created) {
+      return;
+    }
+
+    setIsCreateModalOpen(false);
+    createModalTriggerRef.current?.focus();
+    createModalTriggerRef.current = null;
+  }
+
   return (
     <section className="tasks-board-view">
       <TasksBoardHeader
@@ -465,16 +533,48 @@ export function TasksKanbanView() {
             due
           }))
         }
+        onCreateClick={openCreateModal}
       />
 
-      <TasksCreatePanel
-        copy={copy}
-        topics={state.data?.topics ?? []}
-        createDraft={createDraft}
-        setCreateDraft={setCreateDraft}
-        isCreating={isCreating}
-        onSubmit={handleCreate}
-      />
+      {isCreateModalOpen ? (
+        <div className="roadmap-modal-overlay" role="presentation" onClick={closeCreateModal}>
+          <section
+            className="roadmap-modal tasks-create-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={createModalTitleId}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="roadmap-modal-header">
+              <h4 id={createModalTitleId}>{copy.createModalTitle}</h4>
+              <button
+                type="button"
+                className="roadmap-modal-close"
+                aria-label={copy.closeModalAria}
+                onClick={closeCreateModal}
+              >
+                ×
+              </button>
+            </div>
+
+            <TasksCreatePanel
+              copy={copy}
+              topics={state.data?.topics ?? []}
+              createDraft={createDraft}
+              setCreateDraft={setCreateDraft}
+              isCreating={isCreating}
+              onSubmit={handleCreateSubmit}
+              includePanelStyles={false}
+            />
+
+            <div className="roadmap-modal-actions">
+              <button type="button" className="button button-outline" onClick={closeCreateModal}>
+                {copy.cancelButton}
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
 
       {mutationError ? (
         <div className="dashboard-error">

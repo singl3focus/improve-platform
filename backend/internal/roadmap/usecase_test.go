@@ -165,6 +165,57 @@ func TestAddDependency_NoCycle(t *testing.T) {
 	}
 }
 
+func TestAddDependency_Duplicate(t *testing.T) {
+	repo := &mockRepo{
+		getTopicByIDFn: func(_ context.Context, id, _ string) (roadmap.Topic, error) {
+			return roadmap.Topic{ID: id, Status: "not_started"}, nil
+		},
+		getDependenciesFn: func(_ context.Context, _ string) ([]roadmap.TopicDep, error) {
+			return nil, nil
+		},
+		addDependencyFn: func(_ context.Context, _, _, _ string) error {
+			return roadmap.ErrDependencyExists
+		},
+	}
+	uc := roadmap.NewUseCase(repo)
+
+	err := uc.AddDependency(context.Background(), "u", "C", roadmap.AddDependencyRequest{DependsOnTopicID: "A"})
+	if !errors.Is(err, roadmap.ErrDependencyExists) {
+		t.Fatalf("expected ErrDependencyExists, got %v", err)
+	}
+}
+
+func TestAddDependency_TopicNotFound(t *testing.T) {
+	repo := &mockRepo{
+		getTopicByIDFn: func(_ context.Context, id, _ string) (roadmap.Topic, error) {
+			if id == "missing" {
+				return roadmap.Topic{}, roadmap.ErrTopicNotFound
+			}
+			return roadmap.Topic{ID: id, Status: "not_started"}, nil
+		},
+	}
+	uc := roadmap.NewUseCase(repo)
+
+	err := uc.AddDependency(context.Background(), "u", "missing", roadmap.AddDependencyRequest{DependsOnTopicID: "A"})
+	if !errors.Is(err, roadmap.ErrTopicNotFound) {
+		t.Fatalf("expected ErrTopicNotFound, got %v", err)
+	}
+}
+
+func TestRemoveDependency_NotFound(t *testing.T) {
+	repo := &mockRepo{
+		removeDependencyFn: func(_ context.Context, _, _, _ string) error {
+			return roadmap.ErrDependencyNotFound
+		},
+	}
+	uc := roadmap.NewUseCase(repo)
+
+	err := uc.RemoveDependency(context.Background(), "u", "A", "B")
+	if !errors.Is(err, roadmap.ErrDependencyNotFound) {
+		t.Fatalf("expected ErrDependencyNotFound, got %v", err)
+	}
+}
+
 // --- Status transition tests ---
 
 func TestUpdateTopicStatus_ToInProgress_Unblocked(t *testing.T) {

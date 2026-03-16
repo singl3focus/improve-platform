@@ -276,7 +276,7 @@ func (r *Repo) RemoveDependency(ctx context.Context, topicID, dependsOnTopicID, 
 		return apperr.E(op, err)
 	}
 	if tag.RowsAffected() == 0 {
-		return apperr.E(op, ErrTopicNotFound)
+		return apperr.E(op, ErrDependencyNotFound)
 	}
 	return nil
 }

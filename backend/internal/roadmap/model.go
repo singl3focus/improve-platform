@@ -7,15 +7,16 @@ import (
 )
 
 var (
-	ErrRoadmapNotFound  = errors.New("roadmap not found")
-	ErrRoadmapExists    = errors.New("roadmap already exists")
-	ErrStageNotFound    = errors.New("stage not found")
-	ErrTopicNotFound    = errors.New("topic not found")
-	ErrCycleDetected    = errors.New("dependency would create a cycle")
-	ErrTopicBlocked     = errors.New("topic is blocked by incomplete prerequisites")
-	ErrInvalidStatus    = errors.New("invalid status transition")
-	ErrDependencyExists = errors.New("dependency already exists")
-	ErrSelfDependency   = errors.New("topic cannot depend on itself")
+	ErrRoadmapNotFound    = errors.New("roadmap not found")
+	ErrRoadmapExists      = errors.New("roadmap already exists")
+	ErrStageNotFound      = errors.New("stage not found")
+	ErrTopicNotFound      = errors.New("topic not found")
+	ErrCycleDetected      = errors.New("dependency would create a cycle")
+	ErrTopicBlocked       = errors.New("topic is blocked by incomplete prerequisites")
+	ErrInvalidStatus      = errors.New("invalid status transition")
+	ErrDependencyExists   = errors.New("dependency already exists")
+	ErrDependencyNotFound = errors.New("dependency not found")
+	ErrSelfDependency     = errors.New("topic cannot depend on itself")
 )
 
 // Domain models

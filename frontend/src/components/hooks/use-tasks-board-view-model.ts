@@ -276,13 +276,13 @@ export function useTasksBoardViewModel(copy: TasksBoardCopyForViewModel) {
     return map;
   }, [state.data]);
 
-  async function handleCreate(event: FormEvent<HTMLFormElement>) {
+  async function handleCreate(event: FormEvent<HTMLFormElement>): Promise<boolean> {
     event.preventDefault();
 
     const title = createDraft.title.trim();
     if (!title) {
       setMutationError(copy.titleRequired);
-      return;
+      return false;
     }
 
     const description = createDraft.description.trim();
@@ -330,8 +330,10 @@ export function useTasksBoardViewModel(copy: TasksBoardCopyForViewModel) {
         ...initialTaskCreateDraft(),
         topicId: current.topicId
       }));
+      return true;
     } catch (error) {
       setMutationError(error instanceof Error ? error.message : copy.createFailed);
+      return false;
     } finally {
       setIsCreating(false);
     }
