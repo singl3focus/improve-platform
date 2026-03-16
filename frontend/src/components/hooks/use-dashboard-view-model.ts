@@ -6,6 +6,7 @@ import type {
   DashboardChartsPayload,
   DashboardBlockedTopic,
   DashboardDailySummary,
+  DashboardHistoryEvent,
   DashboardProgress,
   DashboardRecentMaterial,
   DashboardTask,
@@ -168,6 +169,10 @@ export function useDashboardViewModel() {
     "/api/dashboard/recent-materials",
     dashboardCopy
   );
+  const history = useDashboardResource<DashboardHistoryEvent[]>(
+    "/api/dashboard/history?limit=6",
+    dashboardCopy
+  );
 
   const roadmapProgressLabel = useMemo(() => {
     if (progress.state.status !== "success" || !progress.state.data) {
@@ -208,6 +213,7 @@ export function useDashboardViewModel() {
     blockedTopics,
     charts,
     recentMaterials,
+    history,
     roadmapProgressLabel,
     greetingLabel,
     todayLabel

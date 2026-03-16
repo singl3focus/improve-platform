@@ -3,24 +3,46 @@
 import { ReactNode, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import {
+  LayoutDashboard,
+  Map,
+  ListTodo,
+  Library,
+  Settings,
+  LucideIcon,
+} from "lucide-react";
 import { useUserPreferences } from "@/components/providers/user-preferences-provider";
 import { logout } from "@/lib/auth/client";
 
-const NAV_ITEMS = [
-  { href: "/dashboard", key: "dashboardLabel" },
-  { href: "/roadmap", key: "roadmapLabel" },
-  { href: "/tasks", key: "tasksLabel" },
-  { href: "/materials", key: "materialsLabel" },
-  { href: "/settings", key: "settingsLabel" }
-] as const satisfies ReadonlyArray<{
+type NavItemKey =
+  | "dashboardLabel"
+  | "roadmapLabel"
+  | "tasksLabel"
+  | "materialsLabel"
+  | "settingsLabel";
+
+type NavItem = {
   href: string;
-  key:
-    | "dashboardLabel"
-    | "roadmapLabel"
-    | "tasksLabel"
-    | "materialsLabel"
-    | "settingsLabel";
-}>;
+  key: NavItemKey;
+  icon: LucideIcon;
+};
+
+const MAIN_NAV_ITEMS: ReadonlyArray<NavItem> = [
+  { href: "/dashboard", key: "dashboardLabel", icon: LayoutDashboard },
+  { href: "/roadmap", key: "roadmapLabel", icon: Map },
+  { href: "/tasks", key: "tasksLabel", icon: ListTodo },
+  { href: "/materials", key: "materialsLabel", icon: Library },
+];
+
+const BOTTOM_NAV_ITEMS: ReadonlyArray<NavItem> = [
+  { href: "/settings", key: "settingsLabel", icon: Settings },
+];
+
+const ALL_NAV_ITEMS = [...MAIN_NAV_ITEMS, ...BOTTOM_NAV_ITEMS];
+
+function isItemActive(pathname: string, href: string): boolean {
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
 
 export function PrivateShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -29,7 +51,7 @@ export function PrivateShell({ children }: { children: ReactNode }) {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const currentSection = useMemo(() => {
-    const match = NAV_ITEMS.find((item) => pathname === item.href);
+    const match = ALL_NAV_ITEMS.find((item) => isItemActive(pathname, item.href));
     if (!match) {
       return copy.navigation.appLabel;
     }
@@ -50,16 +72,43 @@ export function PrivateShell({ children }: { children: ReactNode }) {
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <div className="brand">{copy.navigation.brand}</div>
-        <nav className="nav-list" aria-label={copy.navigation.ariaPrimary}>
-          {NAV_ITEMS.map((item) => {
-            const isActive = pathname === item.href;
+        <div className="brand">
+          <span className="brand-mark" aria-hidden="true" />
+          <div>
+            <strong>{copy.navigation.brand}</strong>
+            <p>{copy.navigation.appLabel}</p>
+          </div>
+        </div>
+        <nav className="nav-list nav-list-main" aria-label={copy.navigation.ariaPrimary}>
+          {MAIN_NAV_ITEMS.map((item) => {
+            const isActive = isItemActive(pathname, item.href);
+            const Icon = item.icon;
             return (
               <Link
                 key={item.href}
                 href={item.href}
                 className={isActive ? "nav-link nav-link-active" : "nav-link"}
               >
+                <Icon size={18} />
+                {copy.navigation[item.key]}
+              </Link>
+            );
+          })}
+        </nav>
+        
+        <div className="sidebar-spacer" />
+        
+        <nav className="nav-list nav-list-bottom" aria-label={copy.navigation.settingsLabel}>
+          {BOTTOM_NAV_ITEMS.map((item) => {
+            const isActive = isItemActive(pathname, item.href);
+            const Icon = item.icon;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={isActive ? "nav-link nav-link-active" : "nav-link"}
+              >
+                <Icon size={18} />
                 {copy.navigation[item.key]}
               </Link>
             );

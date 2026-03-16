@@ -54,3 +54,13 @@ export interface BackendMaterialResponse {
   position: number;
   updated_at: string;
 }
+
+export interface BackendHistoryEventResponse {
+  id: string;
+  entity_type: string;
+  entity_id: string;
+  event_type: string;
+  event_name: string;
+  payload: Record<string, unknown>;
+  created_at: string;
+}

@@ -9,8 +9,9 @@ import {
   isDashboardTaskOverdue,
   useDashboardViewModel
 } from "@/components/hooks/use-dashboard-view-model";
-import type { DashboardChartsPayload } from "@/lib/dashboard-types";
+import type { DashboardChartsPayload, DashboardHistoryEvent } from "@/lib/dashboard-types";
 import type { DashboardCopy } from "@/lib/ui-copy";
+import { DashboardCalendarRibbon } from "@/components/dashboard-calendar-ribbon";
 
 function DashboardPanel({
   title,
@@ -109,6 +110,10 @@ function formatChartDayLabel(value: string, locale: string): string {
     weekday: "short",
     day: "2-digit"
   }).format(date);
+}
+
+function formatHistorySubtitle(entry: DashboardHistoryEvent, locale: string, copy: DashboardCopy): string {
+  return `${entry.entityType} · ${entry.eventType} · ${formatDashboardDate(entry.createdAt, locale, copy.noDate)}`;
 }
 
 function DashboardCharts({
@@ -248,6 +253,7 @@ export function DashboardView() {
     blockedTopics,
     charts,
     recentMaterials,
+    history,
     roadmapProgressLabel,
     greetingLabel,
     todayLabel
@@ -266,6 +272,8 @@ export function DashboardView() {
         <h2 className="dashboard-personal-title">{greetingLabel}</h2>
         <p className="dashboard-personal-date">{todayLabel}</p>
       </section>
+
+      <DashboardCalendarRibbon locale={locale} />
 
       {charts.state.status === "loading" ? (
         <section className="dashboard-charts panel">
@@ -523,6 +531,41 @@ export function DashboardView() {
                       <span className="dashboard-badge dashboard-badge-blocked">
                         {dashboardCopy.blocked}
                       </span>
+                    </li>
+                  ))}
+                </ul>
+              )
+            ) : null}
+          </DashboardPanel>
+
+          <DashboardPanel
+            title={dashboardCopy.historyTitle}
+            description={dashboardCopy.historyDescription}
+            href="/dashboard/history"
+            copy={dashboardCopy}
+          >
+            {history.state.status === "loading" ? <DashboardLoading /> : null}
+            {history.state.status === "error" ? (
+              <DashboardError
+                message={history.state.errorMessage ?? dashboardCopy.historyLoadFailed}
+                onRetry={history.reload}
+                retryLabel={dashboardCopy.retry}
+              />
+            ) : null}
+            {history.state.status === "success" && history.state.data ? (
+              history.state.data.length === 0 ? (
+                <DashboardEmpty message={dashboardCopy.historyEmpty} />
+              ) : (
+                <ul className="dashboard-list">
+                  {history.state.data.map((entry) => (
+                    <li key={entry.id} className="dashboard-list-item">
+                      <div>
+                        <p className="dashboard-list-title">{entry.eventName}</p>
+                        <p className="dashboard-list-subtitle">
+                          {formatHistorySubtitle(entry, locale, dashboardCopy)}
+                        </p>
+                      </div>
+                      <span className="dashboard-badge">{entry.eventType}</span>
                     </li>
                   ))}
                 </ul>

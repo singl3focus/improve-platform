@@ -34,6 +34,16 @@ export interface DashboardRecentMaterial {
   lastOpenedAt: string;
 }
 
+export interface DashboardHistoryEvent {
+  id: string;
+  entityType: string;
+  entityId: string;
+  eventType: string;
+  eventName: string;
+  payload: Record<string, unknown>;
+  createdAt: string;
+}
+
 export interface DashboardDailySummary {
   nextTaskTitle: string | null;
   blockedTopicsCount: number;

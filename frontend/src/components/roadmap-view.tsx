@@ -39,6 +39,17 @@ interface TopicCreateDraft {
   position: string;
 }
 
+interface StageCreateDraft {
+  title: string;
+  position: string;
+}
+
+interface StageEditDraft {
+  stageId: string;
+  title: string;
+  position: string;
+}
+
 interface TopicEditDraft {
   topicId: string;
   stageId: string;
@@ -90,6 +101,27 @@ const ROADMAP_COPY = {
     quickCreatingButton: "Создание...",
     quickCreateTopicRequired: "Укажите название первой темы.",
     quickCreateFailed: "Не удалось создать первую тему.",
+    stageManageTitle: "Управление этапами",
+    stageManageSubtitle: "Создавайте, редактируйте и удаляйте этапы roadmap.",
+    stageFieldTitle: "Название этапа",
+    stageFieldPosition: "Позиция",
+    stageTitlePlaceholder: "Например: Базовый уровень",
+    stageCreateButton: "Создать этап",
+    stageCreatingButton: "Создание...",
+    stageEditButton: "Редактировать этап",
+    stageDeleteButton: "Удалить этап",
+    stageSaveButton: "Сохранить",
+    stageCancelButton: "Отмена",
+    stageUpdatingButton: "Сохранение...",
+    stageDeletingButton: "Удаление...",
+    stageTitleRequired: "Укажите название этапа.",
+    stageCreateFailed: "Не удалось создать этап.",
+    stageUpdateFailed: "Не удалось обновить этап.",
+    stageDeleteFailed: "Не удалось удалить этап.",
+    stageDeleteConfirm: (title: string) => `Удалить этап «${title}»?`,
+    stageCreateSuccess: "Этап создан.",
+    stageUpdateSuccess: "Этап обновлён.",
+    stageDeleteSuccess: "Этап удалён.",
     topicCreateTitle: "Добавить тему",
     topicCreateSubtitle: "Создайте новую тему в выбранном этапе текущего roadmap.",
     topicFieldStage: "Этап",
@@ -161,6 +193,27 @@ const ROADMAP_COPY = {
     quickCreatingButton: "Creating...",
     quickCreateTopicRequired: "First topic title is required.",
     quickCreateFailed: "Failed to create first topic.",
+    stageManageTitle: "Stage management",
+    stageManageSubtitle: "Create, edit, and delete roadmap stages.",
+    stageFieldTitle: "Stage title",
+    stageFieldPosition: "Position",
+    stageTitlePlaceholder: "For example: Fundamentals",
+    stageCreateButton: "Create stage",
+    stageCreatingButton: "Creating...",
+    stageEditButton: "Edit stage",
+    stageDeleteButton: "Delete stage",
+    stageSaveButton: "Save",
+    stageCancelButton: "Cancel",
+    stageUpdatingButton: "Saving...",
+    stageDeletingButton: "Deleting...",
+    stageTitleRequired: "Stage title is required.",
+    stageCreateFailed: "Stage creation failed.",
+    stageUpdateFailed: "Stage update failed.",
+    stageDeleteFailed: "Stage removal failed.",
+    stageDeleteConfirm: (title: string) => `Delete stage "${title}"?`,
+    stageCreateSuccess: "Stage created.",
+    stageUpdateSuccess: "Stage updated.",
+    stageDeleteSuccess: "Stage removed.",
     topicCreateTitle: "Add topic",
     topicCreateSubtitle: "Create a new topic in the selected stage of your current roadmap.",
     topicFieldStage: "Stage",
@@ -245,6 +298,13 @@ function initialTopicCreateDraft(): TopicCreateDraft {
     stageId: "",
     title: "",
     description: "",
+    position: "1"
+  };
+}
+
+function initialStageCreateDraft(): StageCreateDraft {
+  return {
+    title: "",
     position: "1"
   };
 }
@@ -344,6 +404,47 @@ async function createRoadmapTopic(payload: {
 
   if (!response.ok) {
     throw new Error(await parseErrorMessage(response, "Roadmap topic creation failed."));
+  }
+}
+
+async function createRoadmapStage(payload: { title: string; position: number }): Promise<void> {
+  const response = await fetch("/api/roadmap/stages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(payload)
+  });
+
+  if (!response.ok) {
+    throw new Error(await parseErrorMessage(response, "Roadmap stage creation failed."));
+  }
+}
+
+async function updateRoadmapStage(
+  stageId: string,
+  payload: { title: string; position: number }
+): Promise<void> {
+  const response = await fetch(`/api/roadmap/stages/${encodeURIComponent(stageId)}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(payload)
+  });
+
+  if (!response.ok) {
+    throw new Error(await parseErrorMessage(response, "Roadmap stage update failed."));
+  }
+}
+
+async function deleteRoadmapStage(stageId: string): Promise<void> {
+  const response = await fetch(`/api/roadmap/stages/${encodeURIComponent(stageId)}`, {
+    method: "DELETE"
+  });
+
+  if (!response.ok) {
+    throw new Error(await parseErrorMessage(response, "Roadmap stage removal failed."));
   }
 }
 
@@ -519,6 +620,16 @@ export function RoadmapView() {
   const [quickCreateDraft, setQuickCreateDraft] = useState<QuickCreateDraft>(initialQuickCreateDraft());
   const [quickCreateError, setQuickCreateError] = useState<string | null>(null);
   const [isQuickCreating, setIsQuickCreating] = useState(false);
+  const [stageCreateDraft, setStageCreateDraft] = useState<StageCreateDraft>(
+    initialStageCreateDraft()
+  );
+  const [stageEditDraft, setStageEditDraft] = useState<StageEditDraft | null>(null);
+  const [editingStageId, setEditingStageId] = useState<string | null>(null);
+  const [stageMutationError, setStageMutationError] = useState<string | null>(null);
+  const [stageMutationSuccess, setStageMutationSuccess] = useState<string | null>(null);
+  const [isStageCreating, setIsStageCreating] = useState(false);
+  const [updatingStageId, setUpdatingStageId] = useState<string | null>(null);
+  const [deletingStageId, setDeletingStageId] = useState<string | null>(null);
   const [topicCreateDraft, setTopicCreateDraft] = useState<TopicCreateDraft>(initialTopicCreateDraft());
   const [topicEditDraft, setTopicEditDraft] = useState<TopicEditDraft | null>(null);
   const [editingTopicId, setEditingTopicId] = useState<string | null>(null);
@@ -573,6 +684,18 @@ export function RoadmapView() {
     if (stages.length === 0) {
       return;
     }
+
+    setStageCreateDraft((current) => {
+      const nextPosition = String(stages.length + 1);
+      if (current.position === nextPosition) {
+        return current;
+      }
+
+      return {
+        ...current,
+        position: nextPosition
+      };
+    });
 
     setTopicCreateDraft((current) => {
       const selectedStage = stageById.get(current.stageId) ?? stages[0];
@@ -774,6 +897,114 @@ export function RoadmapView() {
     }
   }
 
+  async function handleStageCreate(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const title = stageCreateDraft.title.trim();
+    if (!title) {
+      setStageMutationSuccess(null);
+      setStageMutationError(copy.stageTitleRequired);
+      return;
+    }
+
+    const fallbackPosition = stages.length + 1;
+    const position = parsePositiveInteger(stageCreateDraft.position, fallbackPosition);
+
+    setStageMutationError(null);
+    setStageMutationSuccess(null);
+    setIsStageCreating(true);
+    try {
+      await createRoadmapStage({
+        title,
+        position
+      });
+      setStageCreateDraft({
+        title: "",
+        position: String(position + 1)
+      });
+      setStageMutationSuccess(copy.stageCreateSuccess);
+      roadmap.reload();
+    } catch (error) {
+      setStageMutationError(error instanceof Error ? error.message : copy.stageCreateFailed);
+    } finally {
+      setIsStageCreating(false);
+    }
+  }
+
+  function startStageEditing(stage: (typeof stages)[number], fallbackPosition: number) {
+    setEditingStageId(stage.id);
+    setStageEditDraft({
+      stageId: stage.id,
+      title: stage.title,
+      position: String(fallbackPosition)
+    });
+    setStageMutationError(null);
+    setStageMutationSuccess(null);
+  }
+
+  function cancelStageEditing() {
+    setEditingStageId(null);
+    setStageEditDraft(null);
+  }
+
+  async function handleStageUpdate(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!editingStageId || !stageEditDraft || stageEditDraft.stageId !== editingStageId) {
+      return;
+    }
+
+    const title = stageEditDraft.title.trim();
+    if (!title) {
+      setStageMutationSuccess(null);
+      setStageMutationError(copy.stageTitleRequired);
+      return;
+    }
+
+    const stageIndex = stages.findIndex((stage) => stage.id === editingStageId);
+    const fallbackPosition = stageIndex >= 0 ? stageIndex + 1 : 1;
+    const position = parsePositiveInteger(stageEditDraft.position, fallbackPosition);
+
+    setStageMutationError(null);
+    setStageMutationSuccess(null);
+    setUpdatingStageId(editingStageId);
+    try {
+      await updateRoadmapStage(editingStageId, {
+        title,
+        position
+      });
+      cancelStageEditing();
+      setStageMutationSuccess(copy.stageUpdateSuccess);
+      roadmap.reload();
+    } catch (error) {
+      setStageMutationError(error instanceof Error ? error.message : copy.stageUpdateFailed);
+    } finally {
+      setUpdatingStageId(null);
+    }
+  }
+
+  async function handleStageDelete(stage: (typeof stages)[number]) {
+    if (!window.confirm(copy.stageDeleteConfirm(stage.title))) {
+      return;
+    }
+
+    setStageMutationError(null);
+    setStageMutationSuccess(null);
+    setDeletingStageId(stage.id);
+    try {
+      await deleteRoadmapStage(stage.id);
+      if (editingStageId === stage.id) {
+        cancelStageEditing();
+      }
+      setStageMutationSuccess(copy.stageDeleteSuccess);
+      roadmap.reload();
+    } catch (error) {
+      setStageMutationError(error instanceof Error ? error.message : copy.stageDeleteFailed);
+    } finally {
+      setDeletingStageId(null);
+    }
+  }
+
   function startTopicEditing(topic: RoadmapTopic) {
     setEditingTopicId(topic.id);
     setTopicEditDraft({
@@ -943,6 +1174,51 @@ export function RoadmapView() {
       {roadmap.state.status === "success" ? (
         stages.length > 0 ? (
           <>
+            <section className="panel roadmap-stage-mutation-panel">
+              <header>
+                <h3>{copy.stageManageTitle}</h3>
+                <p>{copy.stageManageSubtitle}</p>
+              </header>
+
+              <form className="roadmap-stage-form" onSubmit={handleStageCreate}>
+                <label className="roadmap-topic-field roadmap-topic-field-title">
+                  <span>{copy.stageFieldTitle}</span>
+                  <input
+                    type="text"
+                    className="input"
+                    value={stageCreateDraft.title}
+                    onChange={(event) =>
+                      setStageCreateDraft((current) => ({
+                        ...current,
+                        title: event.target.value
+                      }))
+                    }
+                    placeholder={copy.stageTitlePlaceholder}
+                  />
+                </label>
+
+                <label className="roadmap-topic-field">
+                  <span>{copy.stageFieldPosition}</span>
+                  <input
+                    type="number"
+                    min={1}
+                    className="input"
+                    value={stageCreateDraft.position}
+                    onChange={(event) =>
+                      setStageCreateDraft((current) => ({
+                        ...current,
+                        position: event.target.value
+                      }))
+                    }
+                  />
+                </label>
+
+                <button type="submit" className="button button-primary" disabled={isStageCreating}>
+                  {isStageCreating ? copy.stageCreatingButton : copy.stageCreateButton}
+                </button>
+              </form>
+            </section>
+
             <section className="panel roadmap-topic-mutation-panel">
               <header>
                 <h3>{copy.topicCreateTitle}</h3>
@@ -1088,6 +1364,18 @@ export function RoadmapView() {
               </div>
             ) : null}
 
+            {stageMutationError ? (
+              <div className="dashboard-error">
+                <p>{stageMutationError}</p>
+              </div>
+            ) : null}
+
+            {stageMutationSuccess ? (
+              <div className="dashboard-success">
+                <p>{stageMutationSuccess}</p>
+              </div>
+            ) : null}
+
             {dependencyMutationError ? (
               <div className="dashboard-error">
                 <p>{dependencyMutationError}</p>
@@ -1095,10 +1383,96 @@ export function RoadmapView() {
             ) : null}
 
             <div className="roadmap-stage-strip" aria-label={copy.stageAria}>
-              {stages.map((stage) => (
+              {stages.map((stage, index) => (
                 <div key={stage.id} className="roadmap-stage-pill">
                   <span>{stage.title}</span>
                   <strong>{stage.topics.length}</strong>
+
+                  <div className="roadmap-stage-actions">
+                    <button
+                      type="button"
+                      className="button button-outline"
+                      disabled={
+                        isStageCreating || updatingStageId === stage.id || deletingStageId === stage.id
+                      }
+                      onClick={() => startStageEditing(stage, index + 1)}
+                    >
+                      {copy.stageEditButton}
+                    </button>
+                    <button
+                      type="button"
+                      className="button button-outline roadmap-stage-delete-button"
+                      disabled={
+                        isStageCreating || updatingStageId === stage.id || deletingStageId === stage.id
+                      }
+                      onClick={() => {
+                        void handleStageDelete(stage);
+                      }}
+                    >
+                      {deletingStageId === stage.id ? copy.stageDeletingButton : copy.stageDeleteButton}
+                    </button>
+                  </div>
+
+                  {editingStageId === stage.id && stageEditDraft ? (
+                    <form className="roadmap-stage-edit-form" onSubmit={handleStageUpdate}>
+                      <label className="roadmap-topic-field roadmap-topic-field-title">
+                        <span>{copy.stageFieldTitle}</span>
+                        <input
+                          type="text"
+                          className="input"
+                          value={stageEditDraft.title}
+                          onChange={(event) =>
+                            setStageEditDraft((current) =>
+                              current
+                                ? {
+                                    ...current,
+                                    title: event.target.value
+                                  }
+                                : current
+                            )
+                          }
+                        />
+                      </label>
+
+                      <label className="roadmap-topic-field">
+                        <span>{copy.stageFieldPosition}</span>
+                        <input
+                          type="number"
+                          min={1}
+                          className="input"
+                          value={stageEditDraft.position}
+                          onChange={(event) =>
+                            setStageEditDraft((current) =>
+                              current
+                                ? {
+                                    ...current,
+                                    position: event.target.value
+                                  }
+                                : current
+                            )
+                          }
+                        />
+                      </label>
+
+                      <div className="roadmap-stage-edit-actions">
+                        <button
+                          type="submit"
+                          className="button button-primary"
+                          disabled={updatingStageId === stage.id}
+                        >
+                          {updatingStageId === stage.id ? copy.stageUpdatingButton : copy.stageSaveButton}
+                        </button>
+                        <button
+                          type="button"
+                          className="button button-outline"
+                          disabled={updatingStageId === stage.id}
+                          onClick={cancelStageEditing}
+                        >
+                          {copy.stageCancelButton}
+                        </button>
+                      </div>
+                    </form>
+                  ) : null}
                 </div>
               ))}
             </div>

@@ -73,6 +73,13 @@ export interface DashboardCopy {
   recentMaterialsLoadFailed: string;
   recentMaterialsEmpty: string;
   openedAt: (topic: string, value: string) => string;
+  historyTitle: string;
+  historyDescription: string;
+  historyLoadFailed: string;
+  historyEmpty: string;
+  historyDetailsTitle: string;
+  historyDetailsDescription: string;
+  historyViewAll: string;
   upcomingTasksTitle: string;
   upcomingTasksDescription: string;
   upcomingTasksLoadFailed: string;
@@ -181,6 +188,13 @@ const RU_COPY: AppCopy = {
     recentMaterialsLoadFailed: "Не удалось загрузить материалы.",
     recentMaterialsEmpty: "Пока нет недавних материалов.",
     openedAt: (topic, value) => `${topic} · открыто ${value}`,
+    historyTitle: "История",
+    historyDescription: "Последние действия по задачам, темам и материалам.",
+    historyLoadFailed: "Не удалось загрузить историю.",
+    historyEmpty: "История пока пуста.",
+    historyDetailsTitle: "Подробная история",
+    historyDetailsDescription: "Лента последних событий в вашем обучении.",
+    historyViewAll: "Вся история",
     upcomingTasksTitle: "Ближайшие задачи",
     upcomingTasksDescription: "Что нужно сделать в ближайшее время.",
     upcomingTasksLoadFailed: "Не удалось загрузить задачи.",
@@ -283,6 +297,13 @@ const EN_COPY: AppCopy = {
     recentMaterialsLoadFailed: "Materials failed to load.",
     recentMaterialsEmpty: "No recent materials yet.",
     openedAt: (topic, value) => `${topic} · opened ${value}`,
+    historyTitle: "History",
+    historyDescription: "Recent actions for tasks, topics, and materials.",
+    historyLoadFailed: "History failed to load.",
+    historyEmpty: "History is empty for now.",
+    historyDetailsTitle: "History details",
+    historyDetailsDescription: "Timeline of your latest learning events.",
+    historyViewAll: "View all",
     upcomingTasksTitle: "Upcoming tasks",
     upcomingTasksDescription: "What should be done soon.",
     upcomingTasksLoadFailed: "Tasks failed to load.",

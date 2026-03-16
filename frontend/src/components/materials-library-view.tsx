@@ -86,6 +86,19 @@ const MATERIALS_COPY = {
 
 type MaterialsCopy = (typeof MATERIALS_COPY)[keyof typeof MATERIALS_COPY];
 
+function isSliderCommitKey(key: string): boolean {
+  return (
+    key === "ArrowLeft" ||
+    key === "ArrowRight" ||
+    key === "ArrowUp" ||
+    key === "ArrowDown" ||
+    key === "Home" ||
+    key === "End" ||
+    key === "PageUp" ||
+    key === "PageDown"
+  );
+}
+
 interface TopicOption {
   id: string;
   title: string;
@@ -273,7 +286,8 @@ function MaterialsCard({
   updatingMaterialId,
   onEditStart,
   onDelete,
-  onProgressChange,
+  onProgressPreview,
+  onProgressCommit,
   onEditSubmit,
   onCancelEdit
 }: {
@@ -286,7 +300,8 @@ function MaterialsCard({
   updatingMaterialId: string | null;
   onEditStart: (material: LibraryMaterial) => void;
   onDelete: (materialId: string) => void;
-  onProgressChange: (materialId: string, progressPercent: number) => void;
+  onProgressPreview: (materialId: string, progressPercent: number) => void;
+  onProgressCommit: (materialId: string, progressPercent?: number) => void;
   onEditSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onCancelEdit: () => void;
 }) {
@@ -325,8 +340,23 @@ function MaterialsCard({
           max={100}
           step={1}
           value={material.progressPercent}
-          disabled={updatingMaterialId === material.id}
-          onChange={(event) => onProgressChange(material.id, Number.parseInt(event.target.value, 10))}
+          aria-valuetext={`${material.progressPercent}%`}
+          onChange={(event) =>
+            onProgressPreview(material.id, Number.parseInt(event.target.value, 10))
+          }
+          onPointerUp={(event) =>
+            onProgressCommit(material.id, Number.parseInt(event.currentTarget.value, 10))
+          }
+          onBlur={(event) =>
+            onProgressCommit(material.id, Number.parseInt(event.currentTarget.value, 10))
+          }
+          onKeyUp={(event) => {
+            if (!isSliderCommitKey(event.key)) {
+              return;
+            }
+
+            onProgressCommit(material.id, Number.parseInt(event.currentTarget.value, 10));
+          }}
         />
       </label>
 
@@ -496,7 +526,8 @@ export function MaterialsLibraryView() {
     cancelEditing,
     handleEditSubmit,
     handleDelete,
-    handleProgressUpdate
+    handleProgressPreview,
+    handleProgressCommit
   } = useMaterialsLibraryViewModel(copy);
 
   return (
@@ -578,7 +609,8 @@ export function MaterialsLibraryView() {
                 updatingMaterialId={updatingMaterialId}
                 onEditStart={startEditing}
                 onDelete={handleDelete}
-                onProgressChange={handleProgressUpdate}
+                onProgressPreview={handleProgressPreview}
+                onProgressCommit={handleProgressCommit}
                 onEditSubmit={handleEditSubmit}
                 onCancelEdit={cancelEditing}
               />
