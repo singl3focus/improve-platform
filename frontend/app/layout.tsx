@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { Montserrat } from "next/font/google";
+import { GlobalUiControls } from "@/components/layout/global-ui-controls";
 import { AppQueryProvider } from "@/components/providers/app-query-provider";
 import { UserPreferencesProvider } from "@/components/providers/user-preferences-provider";
 import "./globals.css";
@@ -24,7 +25,10 @@ export default function RootLayout({
     <html lang="en">
       <body className={montserrat.className}>
         <UserPreferencesProvider>
-          <AppQueryProvider>{children}</AppQueryProvider>
+          <AppQueryProvider>
+            <GlobalUiControls />
+            {children}
+          </AppQueryProvider>
         </UserPreferencesProvider>
       </body>
     </html>

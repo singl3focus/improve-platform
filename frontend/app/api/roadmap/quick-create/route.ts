@@ -9,13 +9,11 @@ import {
 
 interface QuickCreatePayload {
   roadmapTitle?: unknown;
-  stageTitle?: unknown;
   topicTitle?: unknown;
   topicDescription?: unknown;
 }
 
 const DEFAULT_ROADMAP_TITLE = "Learning roadmap";
-const DEFAULT_STAGE_TITLE = "Stage 1";
 
 function normalizeNonEmptyText(value: unknown): string | null {
   if (typeof value !== "string") {
@@ -26,12 +24,29 @@ function normalizeNonEmptyText(value: unknown): string | null {
   return normalized.length > 0 ? normalized : null;
 }
 
-function getNextTopicPosition(roadmap: BackendRoadmapResponse, stageId: string): number {
-  const stage = (roadmap.stages ?? []).find((item) => item.id === stageId);
-  if (!stage || !Array.isArray(stage.topics)) {
-    return 1;
+function getRoadmapTopics(roadmap: BackendRoadmapResponse): Array<{ position?: number }> {
+  if (Array.isArray((roadmap as { topics?: unknown }).topics)) {
+    return (roadmap as unknown as { topics: Array<{ position?: number }> }).topics;
   }
-  return stage.topics.length + 1;
+
+  if (Array.isArray(roadmap.stages)) {
+    return roadmap.stages.flatMap((stage) => stage.topics ?? []);
+  }
+
+  return [];
+}
+
+function getNextTopicPosition(roadmap: BackendRoadmapResponse): number {
+  const topics = getRoadmapTopics(roadmap);
+  const maxPosition = topics.reduce((max, topic) => {
+    if (typeof topic.position !== "number" || !Number.isFinite(topic.position)) {
+      return max;
+    }
+
+    return Math.max(max, topic.position);
+  }, 0);
+
+  return maxPosition + 1;
 }
 
 export async function POST(request: NextRequest) {
@@ -54,53 +69,32 @@ export async function POST(request: NextRequest) {
   const topicDescription =
     typeof payload.topicDescription === "string" ? payload.topicDescription.trim() : "";
   const roadmapTitle = normalizeNonEmptyText(payload.roadmapTitle) ?? DEFAULT_ROADMAP_TITLE;
-  const stageTitle = normalizeNonEmptyText(payload.stageTitle) ?? DEFAULT_STAGE_TITLE;
   const client = createBackendClient(request);
 
   try {
-    let roadmap: BackendRoadmapResponse | null = null;
-    const roadmapResult = await client.call("/api/v1/roadmap", { method: "GET" });
+    const createRoadmapResult = await client.call("/api/v1/roadmap", {
+      method: "POST",
+      body: { title: roadmapTitle }
+    });
 
-    if (roadmapResult.response.ok) {
-      roadmap = roadmapResult.payload as BackendRoadmapResponse;
-    } else if (
-      roadmapResult.response.status === 404 &&
-      isBackendErrorCode(roadmapResult.payload, "roadmap_not_found")
+    if (
+      !createRoadmapResult.response.ok &&
+      !(
+        createRoadmapResult.response.status === 409 &&
+        isBackendErrorCode(createRoadmapResult.payload, "roadmap_exists")
+      )
     ) {
-      const createRoadmapResult = await client.call("/api/v1/roadmap", {
-        method: "POST",
-        body: { title: roadmapTitle }
-      });
+      const errorResponse = createBackendErrorResponse(
+        createRoadmapResult.response,
+        createRoadmapResult.payload,
+        "Roadmap creation failed."
+      );
+      client.applyUpdatedSession(errorResponse);
+      return errorResponse;
+    }
 
-      if (
-        !createRoadmapResult.response.ok &&
-        !(
-          createRoadmapResult.response.status === 409 &&
-          isBackendErrorCode(createRoadmapResult.payload, "roadmap_exists")
-        )
-      ) {
-        const errorResponse = createBackendErrorResponse(
-          createRoadmapResult.response,
-          createRoadmapResult.payload,
-          "Roadmap creation failed."
-        );
-        client.applyUpdatedSession(errorResponse);
-        return errorResponse;
-      }
-
-      const reloadedRoadmapResult = await client.call("/api/v1/roadmap", { method: "GET" });
-      if (!reloadedRoadmapResult.response.ok) {
-        const errorResponse = createBackendErrorResponse(
-          reloadedRoadmapResult.response,
-          reloadedRoadmapResult.payload,
-          "Roadmap load after creation failed."
-        );
-        client.applyUpdatedSession(errorResponse);
-        return errorResponse;
-      }
-
-      roadmap = reloadedRoadmapResult.payload as BackendRoadmapResponse;
-    } else {
+    const roadmapResult = await client.call("/api/v1/roadmap", { method: "GET" });
+    if (!roadmapResult.response.ok) {
       const errorResponse = createBackendErrorResponse(
         roadmapResult.response,
         roadmapResult.payload,
@@ -110,44 +104,17 @@ export async function POST(request: NextRequest) {
       return errorResponse;
     }
 
-    const existingStages = Array.isArray(roadmap.stages) ? [...roadmap.stages] : [];
-    const sortedStages = existingStages.sort((left, right) => left.position - right.position);
-    let stageId = sortedStages[0]?.id ?? "";
+    const roadmap = roadmapResult.payload as BackendRoadmapResponse;
 
-    if (!stageId) {
-      const createStageResult = await client.call("/api/v1/roadmap/stages", {
-        method: "POST",
-        body: {
-          title: stageTitle,
-          position: 1
-        }
-      });
-
-      if (!createStageResult.response.ok) {
-        const errorResponse = createBackendErrorResponse(
-          createStageResult.response,
-          createStageResult.payload,
-          "Roadmap stage creation failed."
-        );
-        client.applyUpdatedSession(errorResponse);
-        return errorResponse;
-      }
-
-      stageId = (createStageResult.payload as { id?: string }).id ?? "";
-    }
-
-    if (!stageId) {
-      return NextResponse.json({ message: "Roadmap stage id is missing." }, { status: 500 });
-    }
+    const topicBody = {
+      title: topicTitle,
+      description: topicDescription,
+      position: getNextTopicPosition(roadmap)
+    };
 
     const createTopicResult = await client.call("/api/v1/roadmap/topics", {
       method: "POST",
-      body: {
-        stage_id: stageId,
-        title: topicTitle,
-        description: topicDescription,
-        position: getNextTopicPosition(roadmap, stageId)
-      }
+      body: topicBody
     });
 
     if (!createTopicResult.response.ok) {
@@ -160,10 +127,9 @@ export async function POST(request: NextRequest) {
       return errorResponse;
     }
 
-    const createdTopic = createTopicResult.payload as { id?: string; title?: string; stage_id?: string };
+    const createdTopic = createTopicResult.payload as { id?: string; title?: string };
     const response = NextResponse.json(
       {
-        stageId: createdTopic.stage_id ?? stageId,
         topicId: createdTopic.id ?? null,
         topicTitle: createdTopic.title ?? topicTitle
       },

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { RoadmapResponse } from "@/lib/roadmap-types";
+import type { RoadmapResponse, RoadmapTopic } from "@/lib/roadmap-types";
 import type {
   BackendRoadmapResponse,
   BackendRoadmapTopic,
@@ -18,7 +18,25 @@ interface TopicMetrics {
   materialsCount: number;
 }
 
-function getBlockedReason(topic: BackendRoadmapTopic): string | null {
+interface BackendFlatRoadmapTopic {
+  id: string;
+  title: string;
+  description: string;
+  position: number;
+  status: BackendRoadmapTopic["status"];
+  is_blocked: boolean;
+  block_reasons: string[];
+  dependencies: string[];
+  stage_id?: string;
+}
+
+interface BackendFlatRoadmapResponse {
+  id: string;
+  title: string;
+  topics: BackendFlatRoadmapTopic[];
+}
+
+function getBlockedReason(topic: { block_reasons?: string[] }): string | null {
   if (!Array.isArray(topic.block_reasons) || topic.block_reasons.length === 0) {
     return null;
   }
@@ -114,11 +132,27 @@ export async function GET(request: NextRequest) {
       return errorResponse;
     }
 
-    const roadmap = roadmapResult.payload as BackendRoadmapResponse;
+    const roadmapPayload = roadmapResult.payload as BackendRoadmapResponse | BackendFlatRoadmapResponse;
     const mappedStages: RoadmapResponse["stages"] = [];
 
-    for (const stage of roadmap.stages ?? []) {
-      const mappedTopics: RoadmapResponse["stages"][number]["topics"] = [];
+    const hasStageGroups = Array.isArray((roadmapPayload as BackendRoadmapResponse).stages);
+    const normalizedStages = hasStageGroups
+      ? (roadmapPayload as BackendRoadmapResponse).stages
+      : [
+          {
+            id: (roadmapPayload as BackendFlatRoadmapResponse).id,
+            title: (roadmapPayload as BackendFlatRoadmapResponse).title,
+            position: 1,
+            topics: Array.isArray((roadmapPayload as BackendFlatRoadmapResponse).topics)
+              ? [...(roadmapPayload as BackendFlatRoadmapResponse).topics].sort(
+                  (left, right) => left.position - right.position
+                )
+              : []
+          }
+        ];
+
+    for (const stage of normalizedStages) {
+      const mappedTopics: RoadmapTopic[] = [];
 
       for (const [topicIndex, topic] of (stage.topics ?? []).entries()) {
         const metricsResult = await loadTopicMetrics(client, topic.id);

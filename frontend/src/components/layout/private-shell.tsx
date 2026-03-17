@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode, useMemo, useState } from "react";
+import { ReactNode, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -38,8 +38,6 @@ const BOTTOM_NAV_ITEMS: ReadonlyArray<NavItem> = [
   { href: "/settings", key: "settingsLabel", icon: Settings },
 ];
 
-const ALL_NAV_ITEMS = [...MAIN_NAV_ITEMS, ...BOTTOM_NAV_ITEMS];
-
 function isItemActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
@@ -49,14 +47,6 @@ export function PrivateShell({ children }: { children: ReactNode }) {
   const router = useRouter();
   const { copy } = useUserPreferences();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-
-  const currentSection = useMemo(() => {
-    const match = ALL_NAV_ITEMS.find((item) => isItemActive(pathname, item.href));
-    if (!match) {
-      return copy.navigation.appLabel;
-    }
-    return copy.navigation[match.key];
-  }, [copy.navigation, pathname]);
 
   async function handleLogout() {
     setIsLoggingOut(true);
@@ -121,10 +111,6 @@ export function PrivateShell({ children }: { children: ReactNode }) {
       </aside>
 
       <div className="content-column">
-        <header className="header">
-          <h1>{currentSection}</h1>
-        </header>
-
         <main className="main-content">{children}</main>
       </div>
     </div>

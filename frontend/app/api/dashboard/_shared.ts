@@ -17,6 +17,15 @@ export interface MaterialWithTopic {
   topicTitle: string;
 }
 
+interface DashboardRoadmapTopic {
+  id: string;
+  title: string;
+  status: "not_started" | "in_progress" | "paused" | "completed";
+  is_blocked: boolean;
+  block_reasons?: string[];
+  target_date?: string | null;
+}
+
 export function dashboardJson(
   client: ReturnType<typeof createBackendClient>,
   payload: unknown
@@ -61,11 +70,20 @@ export async function loadRoadmapOrEmpty(client: ReturnType<typeof createBackend
 
 export const buildTopicTitleMap = buildRoadmapTopicTitleMap;
 
-export function flattenRoadmapTopics(roadmap: BackendRoadmapResponse | null) {
+function getRoadmapTopics(roadmap: BackendRoadmapResponse | null) {
   if (!roadmap) {
-    return [];
+    return [] as DashboardRoadmapTopic[];
   }
-  return roadmap.stages.flatMap((stage) => stage.topics ?? []);
+
+  if (Array.isArray((roadmap as { topics?: unknown }).topics)) {
+    return (roadmap as unknown as { topics: DashboardRoadmapTopic[] }).topics;
+  }
+
+  return (roadmap.stages ?? []).flatMap((stage) => stage.topics ?? []) as DashboardRoadmapTopic[];
+}
+
+export function flattenRoadmapTopics(roadmap: BackendRoadmapResponse | null) {
+  return getRoadmapTopics(roadmap);
 }
 
 export async function loadTasks(client: ReturnType<typeof createBackendClient>) {
@@ -91,7 +109,8 @@ export async function loadMaterials(
   client: ReturnType<typeof createBackendClient>,
   roadmap: BackendRoadmapResponse | null
 ) {
-  if (!roadmap) {
+  const topics = getRoadmapTopics(roadmap);
+  if (topics.length === 0) {
     return {
       materials: [] as MaterialWithTopic[],
       errorResponse: null as NextResponse | null
@@ -99,37 +118,35 @@ export async function loadMaterials(
   }
 
   const materials: MaterialWithTopic[] = [];
-  for (const stage of roadmap.stages ?? []) {
-    for (const topic of stage.topics ?? []) {
-      const materialsResult = await client.call(
-        `/api/v1/roadmap/topics/${encodeURIComponent(topic.id)}/materials`,
-        { method: "GET" }
-      );
+  for (const topic of topics) {
+    const materialsResult = await client.call(
+      `/api/v1/roadmap/topics/${encodeURIComponent(topic.id)}/materials`,
+      { method: "GET" }
+    );
 
-      if (!materialsResult.response.ok) {
-        if (
-          materialsResult.response.status === 404 &&
-          isBackendErrorCode(materialsResult.payload, "topic_not_found")
-        ) {
-          continue;
-        }
-
-        return {
-          materials: [] as MaterialWithTopic[],
-          errorResponse: createBackendErrorResponse(
-            materialsResult.response,
-            materialsResult.payload,
-            "Failed to load materials."
-          )
-        };
+    if (!materialsResult.response.ok) {
+      if (
+        materialsResult.response.status === 404 &&
+        isBackendErrorCode(materialsResult.payload, "topic_not_found")
+      ) {
+        continue;
       }
 
-      for (const material of (materialsResult.payload as BackendMaterialResponse[]) ?? []) {
-        materials.push({
-          material,
-          topicTitle: topic.title
-        });
-      }
+      return {
+        materials: [] as MaterialWithTopic[],
+        errorResponse: createBackendErrorResponse(
+          materialsResult.response,
+          materialsResult.payload,
+          "Failed to load materials."
+        )
+      };
+    }
+
+    for (const material of (materialsResult.payload as BackendMaterialResponse[]) ?? []) {
+      materials.push({
+        material,
+        topicTitle: topic.title
+      });
     }
   }
 

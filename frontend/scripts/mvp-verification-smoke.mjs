@@ -134,6 +134,26 @@ function findStageById(state, stageId) {
   return (state.roadmap?.stages ?? []).find((stage) => stage.id === stageId) ?? null;
 }
 
+function ensureFallbackStage(state) {
+  if (!state.roadmap) {
+    return null;
+  }
+
+  if ((state.roadmap.stages ?? []).length > 0) {
+    return state.roadmap.stages[0];
+  }
+
+  state.stageCounter += 1;
+  const stage = {
+    id: `stage-created-${state.stageCounter}`,
+    title: "Fallback stage",
+    position: 1,
+    topics: []
+  };
+  state.roadmap.stages = [stage];
+  return stage;
+}
+
 function findTopicEntry(state, topicId) {
   for (const stage of state.roadmap?.stages ?? []) {
     const topicIndex = (stage.topics ?? []).findIndex((topic) => topic.id === topicId);
@@ -336,14 +356,17 @@ function createMockBackendServer() {
       }
 
       const payload = await parseJsonBody(request);
-      const stageId = typeof payload?.stage_id === "string" ? payload.stage_id : "";
+      const stageIdFromPayload = typeof payload?.stage_id === "string" ? payload.stage_id : "";
       const title = typeof payload?.title === "string" ? payload.title.trim() : "";
       const description = typeof payload?.description === "string" ? payload.description : "";
       const position = Number(payload?.position ?? 1);
+      const fallbackStage = ensureFallbackStage(state);
+      const fallbackStageId = fallbackStage?.id ?? "";
+      const stageId = stageIdFromPayload || fallbackStageId;
 
-      if (!stageId || !title) {
+      if (!title) {
         sendJson(response, 400, {
-          message: "stage_id and title are required",
+          message: "title is required",
           code: "validation_error"
         });
         return;
@@ -393,14 +416,15 @@ function createMockBackendServer() {
 
         if (method === "PUT") {
           const payload = await parseJsonBody(request);
-          const stageId = typeof payload?.stage_id === "string" ? payload.stage_id : "";
+          const stageIdFromPayload = typeof payload?.stage_id === "string" ? payload.stage_id : "";
           const title = typeof payload?.title === "string" ? payload.title.trim() : "";
           const description = typeof payload?.description === "string" ? payload.description : "";
           const position = Number(payload?.position ?? topicEntry.topic.position ?? 1);
+          const stageId = stageIdFromPayload || topicEntry.topic.stage_id;
 
-          if (!stageId || !title) {
+          if (!title) {
             sendJson(response, 400, {
-              message: "stage_id and title are required",
+              message: "title is required",
               code: "validation_error"
             });
             return;
@@ -1107,77 +1131,37 @@ async function run() {
 
     await check("Roadmap quick-create route creates first topic on empty roadmap", async () => {
       await setMockScenario({ roadmapMode: "not_found" });
+      try {
+        const create = await request("/api/roadmap/quick-create", {
+          method: "POST",
+          body: JSON.stringify({
+            topicTitle: "Quick create topic",
+            topicDescription: "Created by smoke scenario."
+          })
+        });
+        invariant(create.status === 201, `Quick-create expected 201, got ${create.status}`);
+        invariant(typeof create.body?.topicId === "string", "Expected created topicId in response.");
 
-      const create = await request("/api/roadmap/quick-create", {
-        method: "POST",
-        body: JSON.stringify({
-          topicTitle: "Quick create topic",
-          topicDescription: "Created by smoke scenario."
-        })
-      });
-      invariant(create.status === 201, `Quick-create expected 201, got ${create.status}`);
-      invariant(typeof create.body?.topicId === "string", "Expected created topicId in response.");
+        const roadmap = await request("/api/roadmap");
+        invariant(roadmap.status === 200, `Roadmap expected 200 after quick-create, got ${roadmap.status}`);
+        invariant(Array.isArray(roadmap.body?.stages), "Expected roadmap stages array.");
+        invariant(roadmap.body.stages.length > 0, "Expected at least one stage after quick-create.");
 
-      const roadmap = await request("/api/roadmap");
-      invariant(roadmap.status === 200, `Roadmap expected 200 after quick-create, got ${roadmap.status}`);
-      invariant(Array.isArray(roadmap.body?.stages), "Expected roadmap stages array.");
-      invariant(roadmap.body.stages.length > 0, "Expected at least one stage after quick-create.");
-
-      const hasCreatedTopic = roadmap.body.stages.some(
-        (stage) =>
-          Array.isArray(stage?.topics) &&
-          stage.topics.some((topic) => topic?.title === "Quick create topic")
-      );
-      invariant(hasCreatedTopic, "Expected quick-created topic in roadmap response.");
-
-      await setMockScenario({ roadmapMode: "ok" });
+        const hasCreatedTopic = roadmap.body.stages.some(
+          (stage) =>
+            Array.isArray(stage?.topics) &&
+            stage.topics.some((topic) => topic?.title === "Quick create topic")
+        );
+        invariant(hasCreatedTopic, "Expected quick-created topic in roadmap response.");
+      } finally {
+        await setMockScenario({ roadmapMode: "ok" });
+      }
     });
 
-    await check("Roadmap stage routes support create update delete flow", async () => {
-      const create = await request("/api/roadmap/stages", {
-        method: "POST",
-        body: JSON.stringify({
-          title: "Smoke stage",
-          position: 9
-        })
-      });
-      invariant(create.status === 201, `Stage create expected 201, got ${create.status}`);
-      const stageId = create.body?.id;
-      invariant(typeof stageId === "string", "Expected created stage id.");
-
-      const update = await request(`/api/roadmap/stages/${encodeURIComponent(stageId)}`, {
-        method: "PUT",
-        body: JSON.stringify({
-          title: "Smoke stage updated",
-          position: 10
-        })
-      });
-      invariant(update.status === 200, `Stage update expected 200, got ${update.status}`);
-      invariant(update.body?.title === "Smoke stage updated", "Expected updated stage title.");
-
-      const remove = await request(`/api/roadmap/stages/${encodeURIComponent(stageId)}`, {
-        method: "DELETE"
-      });
-      invariant(remove.status === 200, `Stage delete expected 200, got ${remove.status}`);
-      invariant(remove.body?.success === true, "Expected stage delete success=true.");
-    });
-
-    await check("Roadmap topic routes support create update delete flow", async () => {
-      const stageCreate = await request("/api/roadmap/stages", {
-        method: "POST",
-        body: JSON.stringify({
-          title: "Smoke topic stage",
-          position: 11
-        })
-      });
-      invariant(stageCreate.status === 201, `Stage create expected 201, got ${stageCreate.status}`);
-      const stageId = stageCreate.body?.id;
-      invariant(typeof stageId === "string", "Expected stage id for topic flow.");
-
+    await check("Roadmap topic routes support stage-free create update delete flow", async () => {
       const topicCreate = await request("/api/roadmap/topics", {
         method: "POST",
         body: JSON.stringify({
-          stageId,
           title: "Smoke topic",
           description: "Created in smoke test.",
           position: 1
@@ -1190,7 +1174,6 @@ async function run() {
       const topicUpdate = await request(`/api/roadmap/topics/${encodeURIComponent(topicId)}`, {
         method: "PUT",
         body: JSON.stringify({
-          stageId,
           title: "Smoke topic updated",
           description: "Updated in smoke test.",
           position: 2
@@ -1204,29 +1187,12 @@ async function run() {
       });
       invariant(topicDelete.status === 200, `Topic delete expected 200, got ${topicDelete.status}`);
       invariant(topicDelete.body?.success === true, "Expected topic delete success=true.");
-
-      const stageDelete = await request(`/api/roadmap/stages/${encodeURIComponent(stageId)}`, {
-        method: "DELETE"
-      });
-      invariant(stageDelete.status === 200, `Stage cleanup expected 200, got ${stageDelete.status}`);
     });
 
-    await check("Roadmap dependency routes support add and remove flow", async () => {
-      const stageCreate = await request("/api/roadmap/stages", {
-        method: "POST",
-        body: JSON.stringify({
-          title: "Smoke dependency stage",
-          position: 12
-        })
-      });
-      invariant(stageCreate.status === 201, `Stage create expected 201, got ${stageCreate.status}`);
-      const stageId = stageCreate.body?.id;
-      invariant(typeof stageId === "string", "Expected stage id for dependency flow.");
-
+    await check("Roadmap dependency routes support stage-free add and remove flow", async () => {
       const prerequisiteTopicCreate = await request("/api/roadmap/topics", {
         method: "POST",
         body: JSON.stringify({
-          stageId,
           title: "Prerequisite topic",
           description: "Source dependency topic",
           position: 1
@@ -1242,7 +1208,6 @@ async function run() {
       const dependentTopicCreate = await request("/api/roadmap/topics", {
         method: "POST",
         body: JSON.stringify({
-          stageId,
           title: "Dependent topic",
           description: "Target dependency topic",
           position: 2
@@ -1321,11 +1286,6 @@ async function run() {
         prerequisiteTopicDelete.status === 200,
         `Prerequisite topic cleanup expected 200, got ${prerequisiteTopicDelete.status}`
       );
-
-      const stageDelete = await request(`/api/roadmap/stages/${encodeURIComponent(stageId)}`, {
-        method: "DELETE"
-      });
-      invariant(stageDelete.status === 200, `Stage cleanup expected 200, got ${stageDelete.status}`);
     });
   } finally {
     await backend.stop();

@@ -14,7 +14,6 @@ interface RouteContext {
 }
 
 interface TopicUpdatePayload {
-  stageId?: unknown;
   title?: unknown;
   description?: unknown;
   position?: unknown;
@@ -28,10 +27,9 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     return NextResponse.json({ message: "Invalid JSON body." }, { status: 400 });
   }
 
-  const stageId = normalizeText(payload.stageId);
   const title = normalizeText(payload.title);
-  if (!stageId || !title) {
-    return NextResponse.json({ message: "Stage id and title are required." }, { status: 422 });
+  if (!title) {
+    return NextResponse.json({ message: "Title is required." }, { status: 422 });
   }
 
   if (payload.description !== undefined && typeof payload.description !== "string") {
@@ -72,7 +70,6 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     const updateResult = await client.call(`/api/v1/roadmap/topics/${encodeURIComponent(topicId)}`, {
       method: "PUT",
       body: {
-        stage_id: stageId,
         title,
         description,
         position,
@@ -93,7 +90,6 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     const response = NextResponse.json(
       {
         id: topicId,
-        stageId,
         title,
         description,
         position

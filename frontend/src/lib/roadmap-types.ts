@@ -2,7 +2,7 @@ export type RoadmapTopicStatus = "not_started" | "in_progress" | "paused" | "com
 
 export interface RoadmapTopic {
   id: string;
-  stageId: string;
+  stageId?: string;
   title: string;
   description: string;
   position: number;
@@ -22,5 +22,20 @@ export interface RoadmapStage {
 }
 
 export interface RoadmapResponse {
-  stages: RoadmapStage[];
+  stages?: RoadmapStage[];
+  topics?: RoadmapTopic[];
+}
+
+export function flattenRoadmapTopics(roadmap: RoadmapResponse): RoadmapTopic[] {
+  if (Array.isArray(roadmap.topics)) {
+    return roadmap.topics;
+  }
+
+  const topics: RoadmapTopic[] = [];
+  for (const stage of roadmap.stages ?? []) {
+    for (const topic of stage.topics ?? []) {
+      topics.push(topic);
+    }
+  }
+  return topics;
 }

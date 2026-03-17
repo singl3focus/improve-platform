@@ -8,19 +8,17 @@ import {
 import { normalizeText, parseInteger } from "@/lib/payload-parsers";
 
 interface TopicCreatePayload {
-  stageId?: unknown;
   title?: unknown;
   description?: unknown;
   position?: unknown;
 }
 
-function getNextTopicPosition(roadmap: BackendRoadmapResponse, stageId: string): number | null {
-  const stage = (roadmap.stages ?? []).find((item) => item.id === stageId);
-  if (!stage) {
-    return null;
-  }
-
-  return (stage.topics?.length ?? 0) + 1;
+function getNextTopicPosition(roadmap: BackendRoadmapResponse): number {
+  const totalTopics = (roadmap.stages ?? []).reduce(
+    (count, stage) => count + (stage.topics?.length ?? 0),
+    0
+  );
+  return totalTopics + 1;
 }
 
 export async function POST(request: NextRequest) {
@@ -31,10 +29,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: "Invalid JSON body." }, { status: 400 });
   }
 
-  const stageId = normalizeText(payload.stageId);
   const title = normalizeText(payload.title);
-  if (!stageId || !title) {
-    return NextResponse.json({ message: "Stage id and title are required." }, { status: 422 });
+  if (!title) {
+    return NextResponse.json({ message: "Title is required." }, { status: 422 });
   }
 
   if (payload.description !== undefined && typeof payload.description !== "string") {
@@ -68,15 +65,11 @@ export async function POST(request: NextRequest) {
     }
 
     const roadmap = roadmapResult.payload as BackendRoadmapResponse;
-    const fallbackPosition = getNextTopicPosition(roadmap, stageId);
-    if (fallbackPosition === null) {
-      return NextResponse.json({ message: "Stage does not exist in roadmap." }, { status: 422 });
-    }
+    const fallbackPosition = getNextTopicPosition(roadmap);
 
     const createResult = await client.call("/api/v1/roadmap/topics", {
       method: "POST",
       body: {
-        stage_id: stageId,
         title,
         description,
         position: position ?? fallbackPosition

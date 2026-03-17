@@ -5,12 +5,17 @@ export interface TopicTitleOption {
   title: string;
 }
 
-export function extractTopicTitleOptions(roadmap: BackendRoadmapResponse | null): TopicTitleOption[] {
-  if (!roadmap) {
-    return [];
+type FlatRoadmapTopic = {
+  id: string;
+  title: string;
+};
+
+function extractRoadmapTopics(roadmap: BackendRoadmapResponse): FlatRoadmapTopic[] {
+  if (Array.isArray((roadmap as { topics?: unknown }).topics)) {
+    return (roadmap as unknown as { topics: FlatRoadmapTopic[] }).topics;
   }
 
-  const topics: TopicTitleOption[] = [];
+  const topics: FlatRoadmapTopic[] = [];
   for (const stage of roadmap.stages ?? []) {
     for (const topic of stage.topics ?? []) {
       topics.push({
@@ -21,6 +26,17 @@ export function extractTopicTitleOptions(roadmap: BackendRoadmapResponse | null)
   }
 
   return topics;
+}
+
+export function extractTopicTitleOptions(roadmap: BackendRoadmapResponse | null): TopicTitleOption[] {
+  if (!roadmap) {
+    return [];
+  }
+
+  return extractRoadmapTopics(roadmap).map((topic) => ({
+    id: topic.id,
+    title: topic.title
+  }));
 }
 
 export function buildTopicTitleMap(topics: TopicTitleOption[]): Map<string, string> {

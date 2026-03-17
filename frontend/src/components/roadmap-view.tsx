@@ -41,26 +41,13 @@ interface QuickCreateDraft {
 }
 
 interface TopicCreateDraft {
-  stageId: string;
   title: string;
   description: string;
   position: string;
 }
 
-interface StageCreateDraft {
-  title: string;
-  position: string;
-}
-
-interface StageEditDraft {
-  stageId: string;
-  title: string;
-  position: string;
-}
-
 interface TopicEditDraft {
   topicId: string;
-  stageId: string;
   title: string;
   description: string;
   position: string;
@@ -168,6 +155,9 @@ const ROADMAP_COPY = {
       `Начать перетаскивание зависимости из темы «${title}»`,
     dependencyDragHandleActiveAria: (title: string) =>
       `Источник связи выбран: «${title}». Перетащите к целевой теме.`,
+    dependencyControlsAria: "Управление связями графа",
+    dependencyRemoveEdgeAria: (fromTitle: string, toTitle: string) =>
+      `Удалить связь: «${fromTitle}» -> «${toTitle}»`,
     dependencyRemoveButton: "Удалить связь",
     dependencyRemovingButton: "Удаление...",
     dependencySelfError: "Тема не может зависеть сама от себя.",
@@ -270,6 +260,9 @@ const ROADMAP_COPY = {
       `Start dragging a dependency from topic "${title}"`,
     dependencyDragHandleActiveAria: (title: string) =>
       `Dependency source selected: "${title}". Drag to a target topic.`,
+    dependencyControlsAria: "Roadmap dependency controls",
+    dependencyRemoveEdgeAria: (fromTitle: string, toTitle: string) =>
+      `Remove dependency link: "${fromTitle}" -> "${toTitle}"`,
     dependencyRemoveButton: "Remove link",
     dependencyRemovingButton: "Removing...",
     dependencySelfError: "A topic cannot depend on itself.",
@@ -324,16 +317,8 @@ function initialQuickCreateDraft(): QuickCreateDraft {
 
 function initialTopicCreateDraft(): TopicCreateDraft {
   return {
-    stageId: "",
     title: "",
     description: "",
-    position: "1"
-  };
-}
-
-function initialStageCreateDraft(): StageCreateDraft {
-  return {
-    title: "",
     position: "1"
   };
 }
@@ -418,7 +403,6 @@ async function quickCreateFirstTopic(payload: {
 }
 
 async function createRoadmapTopic(payload: {
-  stageId: string;
   title: string;
   description: string;
   position: number;
@@ -453,51 +437,9 @@ async function createRoadmapTopic(payload: {
   throw new Error("Roadmap topic creation succeeded, but topic id is missing in response.");
 }
 
-async function createRoadmapStage(payload: { title: string; position: number }): Promise<void> {
-  const response = await fetch("/api/roadmap/stages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(payload)
-  });
-
-  if (!response.ok) {
-    throw new Error(await parseErrorMessage(response, "Roadmap stage creation failed."));
-  }
-}
-
-async function updateRoadmapStage(
-  stageId: string,
-  payload: { title: string; position: number }
-): Promise<void> {
-  const response = await fetch(`/api/roadmap/stages/${encodeURIComponent(stageId)}`, {
-    method: "PUT",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(payload)
-  });
-
-  if (!response.ok) {
-    throw new Error(await parseErrorMessage(response, "Roadmap stage update failed."));
-  }
-}
-
-async function deleteRoadmapStage(stageId: string): Promise<void> {
-  const response = await fetch(`/api/roadmap/stages/${encodeURIComponent(stageId)}`, {
-    method: "DELETE"
-  });
-
-  if (!response.ok) {
-    throw new Error(await parseErrorMessage(response, "Roadmap stage removal failed."));
-  }
-}
-
 async function updateRoadmapTopic(
   topicId: string,
   payload: {
-    stageId: string;
     title: string;
     description: string;
     position: number;
@@ -604,6 +546,26 @@ function getStatusClassName(status: RoadmapTopicStatus): string {
   return "roadmap-status-not-started";
 }
 
+function getConnectionMidpoint(connection: {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+}): { x: number; y: number } {
+  const t = 0.5;
+  const controlY = connection.y1 + Math.max((connection.y2 - connection.y1) * 0.5, 36);
+  const cubic = (p0: number, p1: number, p2: number, p3: number) =>
+    (1 - t) ** 3 * p0 +
+    3 * (1 - t) ** 2 * t * p1 +
+    3 * (1 - t) * t ** 2 * p2 +
+    t ** 3 * p3;
+
+  return {
+    x: cubic(connection.x1, connection.x1, connection.x2, connection.x2),
+    y: cubic(connection.y1, controlY, controlY, connection.y2)
+  };
+}
+
 function useRoadmapData(errorFallback: string) {
   const [state, setState] = useState<RoadmapState>(initialRoadmapState());
   const [reloadKey, setReloadKey] = useState(0);
@@ -644,81 +606,8 @@ function useRoadmapData(errorFallback: string) {
   };
 }
 
-function StageMutationPanel(props: {
-  copy: RoadmapCopy;
-  draft: StageCreateDraft;
-  error?: string | null;
-  isSubmitting: boolean;
-  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
-  onTitleChange: (value: string) => void;
-  onPositionChange: (value: string) => void;
-  onCancel?: () => void;
-  titleInputRef?: { current: HTMLInputElement | null };
-}) {
-  return (
-    <section className="panel roadmap-stage-mutation-panel">
-      <header>
-        <h3>{props.copy.stageManageTitle}</h3>
-        <p>{props.copy.stageManageSubtitle}</p>
-      </header>
-
-      {props.error ? (
-        <div className="dashboard-error roadmap-modal-error">
-          <p>{props.error}</p>
-        </div>
-      ) : null}
-
-      <form className="roadmap-stage-form" onSubmit={props.onSubmit}>
-        <label className="roadmap-topic-field roadmap-topic-field-title">
-          <span>{props.copy.stageFieldTitle}</span>
-          <input
-            ref={props.titleInputRef}
-            type="text"
-            className="input"
-            value={props.draft.title}
-            onChange={(event) => props.onTitleChange(event.target.value)}
-            placeholder={props.copy.stageTitlePlaceholder}
-          />
-        </label>
-
-        <label className="roadmap-topic-field roadmap-topic-field-position">
-          <span>{props.copy.stageFieldPosition}</span>
-          <input
-            type="number"
-            min={1}
-            className="input"
-            value={props.draft.position}
-            onChange={(event) => props.onPositionChange(event.target.value)}
-          />
-        </label>
-
-        {props.onCancel ? (
-          <div className="roadmap-stage-actions">
-            <button
-              type="button"
-              className="button button-outline"
-              disabled={props.isSubmitting}
-              onClick={props.onCancel}
-            >
-              {props.copy.stageCancelButton}
-            </button>
-            <button type="submit" className="button button-primary" disabled={props.isSubmitting}>
-              {props.isSubmitting ? props.copy.stageCreatingButton : props.copy.stageCreateButton}
-            </button>
-          </div>
-        ) : (
-          <button type="submit" className="button button-primary" disabled={props.isSubmitting}>
-            {props.isSubmitting ? props.copy.stageCreatingButton : props.copy.stageCreateButton}
-          </button>
-        )}
-      </form>
-    </section>
-  );
-}
-
 function TopicMutationPanel(props: {
   copy: RoadmapCopy;
-  stages: RoadmapResponse["stages"];
   draft: TopicCreateDraft;
   error?: string | null;
   title?: string;
@@ -727,7 +616,6 @@ function TopicMutationPanel(props: {
   submitLoadingLabel?: string;
   isSubmitting: boolean;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
-  onStageChange: (value: string) => void;
   onTitleChange: (value: string) => void;
   onPositionChange: (value: string) => void;
   onDescriptionChange: (value: string) => void;
@@ -748,21 +636,6 @@ function TopicMutationPanel(props: {
       ) : null}
 
       <form className="roadmap-topic-form" onSubmit={props.onSubmit}>
-        <label className="roadmap-topic-field">
-          <span>{props.copy.topicFieldStage}</span>
-          <select
-            className="input"
-            value={props.draft.stageId}
-            onChange={(event) => props.onStageChange(event.target.value)}
-          >
-            {props.stages.map((stage) => (
-              <option key={stage.id} value={stage.id}>
-                {stage.title}
-              </option>
-            ))}
-          </select>
-        </label>
-
         <label className="roadmap-topic-field roadmap-topic-field-title">
           <span>{props.copy.topicFieldTitle}</span>
           <input
@@ -885,12 +758,8 @@ export function RoadmapView() {
   const suppressTopicClickRef = useRef(false);
   const dependencyDragStartPointRef = useRef<{ x: number; y: number } | null>(null);
   const dependencyDragExceededThresholdRef = useRef(false);
-  const stageModalTitleInputRef = useRef<HTMLInputElement | null>(null);
-  const stageModalTriggerRef = useRef<HTMLElement | null>(null);
-  const stageCreateModalTitleInputRef = useRef<HTMLInputElement | null>(null);
   const topicCreateModalTitleInputRef = useRef<HTMLInputElement | null>(null);
   const topicModalTitleInputRef = useRef<HTMLInputElement | null>(null);
-  const stageCreateModalTriggerRef = useRef<HTMLElement | null>(null);
   const topicCreateModalTriggerRef = useRef<HTMLElement | null>(null);
   const topicModalTriggerRef = useRef<HTMLElement | null>(null);
   const { connections, graphSize } = useRoadmapGraphLayout({
@@ -902,17 +771,6 @@ export function RoadmapView() {
   const [quickCreateDraft, setQuickCreateDraft] = useState<QuickCreateDraft>(initialQuickCreateDraft());
   const [quickCreateError, setQuickCreateError] = useState<string | null>(null);
   const [isQuickCreating, setIsQuickCreating] = useState(false);
-  const [stageCreateDraft, setStageCreateDraft] = useState<StageCreateDraft>(
-    initialStageCreateDraft()
-  );
-  const [stageEditDraft, setStageEditDraft] = useState<StageEditDraft | null>(null);
-  const [editingStageId, setEditingStageId] = useState<string | null>(null);
-  const [stageMutationError, setStageMutationError] = useState<string | null>(null);
-  const [stageMutationSuccess, setStageMutationSuccess] = useState<string | null>(null);
-  const [isStageCreating, setIsStageCreating] = useState(false);
-  const [isStageCreateModalOpen, setIsStageCreateModalOpen] = useState(false);
-  const [updatingStageId, setUpdatingStageId] = useState<string | null>(null);
-  const [deletingStageId, setDeletingStageId] = useState<string | null>(null);
   const [topicCreateDraft, setTopicCreateDraft] = useState<TopicCreateDraft>(initialTopicCreateDraft());
   const [topicEditDraft, setTopicEditDraft] = useState<TopicEditDraft | null>(null);
   const [editingTopicId, setEditingTopicId] = useState<string | null>(null);
@@ -978,14 +836,6 @@ export function RoadmapView() {
       ),
     [stages]
   );
-  const editingStage = useMemo(() => {
-    if (!editingStageId) {
-      return null;
-    }
-
-    return stageById.get(editingStageId) ?? null;
-  }, [editingStageId, stageById]);
-
   const childTopicParent = useMemo(
     () => (childTopicParentId ? topicById.get(childTopicParentId) ?? null : null),
     [childTopicParentId, topicById]
@@ -997,19 +847,6 @@ export function RoadmapView() {
 
     return topicById.get(editingTopicId) ?? null;
   }, [editingTopicId, topicById]);
-  const childTopicTargetStage = useMemo(() => {
-    if (!childTopicParent) {
-      return null;
-    }
-
-    const parentStageIndex = stages.findIndex((stage) => stage.id === childTopicParent.stageId);
-    if (parentStageIndex < 0 || parentStageIndex + 1 >= stages.length) {
-      return null;
-    }
-
-    return stages[parentStageIndex + 1];
-  }, [childTopicParent, stages]);
-
   const statusCounters = useMemo(() => {
     return {
       completed: allTopics.filter((topic) => topic.status === "completed").length,
@@ -1028,12 +865,12 @@ export function RoadmapView() {
   }, [allTopics]);
 
   useEffect(() => {
-    if (stages.length === 0) {
+    if (allTopics.length === 0) {
       return;
     }
 
-    setStageCreateDraft((current) => {
-      const nextPosition = String(stages.length + 1);
+    setTopicCreateDraft((current) => {
+      const nextPosition = String(allTopics.length + 1);
       if (current.position === nextPosition) {
         return current;
       }
@@ -1043,30 +880,7 @@ export function RoadmapView() {
         position: nextPosition
       };
     });
-
-    setTopicCreateDraft((current) => {
-      const selectedStage = stageById.get(current.stageId) ?? stages[0];
-      const nextPosition = String((selectedStage?.topics.length ?? 0) + 1);
-
-      if (current.stageId === selectedStage.id && current.position === nextPosition) {
-        return current;
-      }
-
-      return {
-        ...current,
-        stageId: selectedStage.id,
-        position: nextPosition
-      };
-    });
-  }, [stageById, stages]);
-
-  useEffect(() => {
-    if (!editingStageId) {
-      return;
-    }
-
-    stageModalTitleInputRef.current?.focus();
-  }, [editingStageId]);
+  }, [allTopics.length]);
 
   useEffect(() => {
     if (!editingTopicId) {
@@ -1077,7 +891,7 @@ export function RoadmapView() {
   }, [editingTopicId]);
 
   useEffect(() => {
-    if (!editingStageId && !editingTopicId && !isStageCreateModalOpen && !isTopicCreateModalOpen) {
+    if (!editingTopicId && !isTopicCreateModalOpen) {
       return;
     }
 
@@ -1087,17 +901,6 @@ export function RoadmapView() {
       }
 
       event.preventDefault();
-      if (editingStageId) {
-        setEditingStageId(null);
-        setStageEditDraft(null);
-        const trigger = stageModalTriggerRef.current;
-        if (trigger && trigger.isConnected) {
-          trigger.focus();
-        }
-        stageModalTriggerRef.current = null;
-        return;
-      }
-
       if (editingTopicId) {
         setEditingTopicId(null);
         setTopicEditDraft(null);
@@ -1116,16 +919,6 @@ export function RoadmapView() {
           trigger.focus();
         }
         topicCreateModalTriggerRef.current = null;
-        return;
-      }
-
-      if (isStageCreateModalOpen && !isStageCreating) {
-        setIsStageCreateModalOpen(false);
-        const trigger = stageCreateModalTriggerRef.current;
-        if (trigger && trigger.isConnected) {
-          trigger.focus();
-        }
-        stageCreateModalTriggerRef.current = null;
       }
     };
 
@@ -1134,10 +927,7 @@ export function RoadmapView() {
       window.removeEventListener("keydown", onWindowKeyDown);
     };
   }, [
-    editingStageId,
     editingTopicId,
-    isStageCreateModalOpen,
-    isStageCreating,
     isTopicCreateModalOpen,
     isTopicCreating
   ]);
@@ -1176,41 +966,12 @@ export function RoadmapView() {
   }, [topicMenuTopicId]);
 
   useEffect(() => {
-    if (!isStageCreateModalOpen) {
-      return;
-    }
-
-    stageCreateModalTitleInputRef.current?.focus();
-  }, [isStageCreateModalOpen]);
-
-  useEffect(() => {
     if (!isTopicCreateModalOpen) {
       return;
     }
 
     topicCreateModalTitleInputRef.current?.focus();
   }, [isTopicCreateModalOpen]);
-
-  function openStageCreateModal(triggerElement: HTMLElement) {
-    stageCreateModalTriggerRef.current = triggerElement;
-    setStageMutationError(null);
-    setStageMutationSuccess(null);
-    setIsStageCreateModalOpen(true);
-  }
-
-  function closeStageCreateModal() {
-    if (isStageCreating) {
-      return;
-    }
-
-    setIsStageCreateModalOpen(false);
-    setStageMutationError(null);
-    const trigger = stageCreateModalTriggerRef.current;
-    if (trigger && trigger.isConnected) {
-      trigger.focus();
-    }
-    stageCreateModalTriggerRef.current = null;
-  }
 
   function openTopicCreateModal(triggerElement: HTMLElement) {
     topicCreateModalTriggerRef.current = triggerElement;
@@ -1236,21 +997,11 @@ export function RoadmapView() {
   }
 
   function startChildTopicCreate(parentTopic: RoadmapTopic, triggerElement: HTMLElement) {
-    const parentStageIndex = stages.findIndex((stage) => stage.id === parentTopic.stageId);
-    const nextStage = parentStageIndex >= 0 ? stages[parentStageIndex + 1] : null;
-
-    if (!nextStage) {
-      setTopicMenuTopicId(null);
-      setTopicMutationError(copy.topicCreateNoNextStage);
-      return;
-    }
-
     topicCreateModalTriggerRef.current = triggerElement;
     setTopicCreateDraft({
-      stageId: nextStage.id,
       title: "",
       description: "",
-      position: String((nextStage.topics.length ?? 0) + 1)
+      position: String(Math.max(parentTopic.position + 1, 1))
     });
     setTopicMutationError(null);
     setTopicMenuTopicId(null);
@@ -1325,30 +1076,19 @@ export function RoadmapView() {
   async function handleTopicCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    const stageId = topicCreateDraft.stageId.trim();
     const title = topicCreateDraft.title.trim();
-    if (!stageId) {
-      setTopicMutationError(copy.topicStageRequired);
-      return;
-    }
     if (!title) {
       setTopicMutationError(copy.topicTitleRequired);
       return;
     }
 
-    const selectedStage = stageById.get(stageId);
-    if (!selectedStage) {
-      setTopicMutationError(copy.topicStageRequired);
-      return;
-    }
-    const fallbackPosition = (selectedStage?.topics.length ?? 0) + 1;
+    const fallbackPosition = allTopics.length + 1;
     const position = parsePositiveInteger(topicCreateDraft.position, fallbackPosition);
 
     setTopicMutationError(null);
     setIsTopicCreating(true);
     try {
       const createdTopic = await createRoadmapTopic({
-        stageId,
         title,
         description: topicCreateDraft.description.trim(),
         position
@@ -1375,7 +1115,6 @@ export function RoadmapView() {
       }
 
       setTopicCreateDraft((current) => ({
-        stageId,
         title: "",
         description: "",
         position: String(parsePositiveInteger(current.position, fallbackPosition) + 1)
@@ -1391,129 +1130,6 @@ export function RoadmapView() {
     }
   }
 
-  async function handleStageCreate(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    const title = stageCreateDraft.title.trim();
-    if (!title) {
-      setStageMutationSuccess(null);
-      setStageMutationError(copy.stageTitleRequired);
-      return;
-    }
-
-    const fallbackPosition = stages.length + 1;
-    const position = parsePositiveInteger(stageCreateDraft.position, fallbackPosition);
-
-    setStageMutationError(null);
-    setStageMutationSuccess(null);
-    setIsStageCreating(true);
-    try {
-      await createRoadmapStage({
-        title,
-        position
-      });
-      setStageCreateDraft({
-        title: "",
-        position: String(position + 1)
-      });
-      setStageMutationSuccess(copy.stageCreateSuccess);
-      setIsStageCreateModalOpen(false);
-      stageCreateModalTriggerRef.current = null;
-      roadmap.reload();
-    } catch (error) {
-      setStageMutationError(error instanceof Error ? error.message : copy.stageCreateFailed);
-    } finally {
-      setIsStageCreating(false);
-    }
-  }
-
-  function startStageEditing(
-    stage: (typeof stages)[number],
-    fallbackPosition: number,
-    triggerElement?: HTMLElement
-  ) {
-    if (triggerElement) {
-      stageModalTriggerRef.current = triggerElement;
-    }
-
-    setEditingStageId(stage.id);
-    setStageEditDraft({
-      stageId: stage.id,
-      title: stage.title,
-      position: String(fallbackPosition)
-    });
-    setStageMutationError(null);
-    setStageMutationSuccess(null);
-  }
-
-  function cancelStageEditing() {
-    setEditingStageId(null);
-    setStageEditDraft(null);
-    const trigger = stageModalTriggerRef.current;
-    if (trigger && trigger.isConnected) {
-      trigger.focus();
-    }
-    stageModalTriggerRef.current = null;
-  }
-
-  async function handleStageUpdate(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    if (!editingStageId || !stageEditDraft || stageEditDraft.stageId !== editingStageId) {
-      return;
-    }
-
-    const title = stageEditDraft.title.trim();
-    if (!title) {
-      setStageMutationSuccess(null);
-      setStageMutationError(copy.stageTitleRequired);
-      return;
-    }
-
-    const stageIndex = stages.findIndex((stage) => stage.id === editingStageId);
-    const fallbackPosition = stageIndex >= 0 ? stageIndex + 1 : 1;
-    const position = parsePositiveInteger(stageEditDraft.position, fallbackPosition);
-
-    setStageMutationError(null);
-    setStageMutationSuccess(null);
-    setUpdatingStageId(editingStageId);
-    try {
-      await updateRoadmapStage(editingStageId, {
-        title,
-        position
-      });
-      cancelStageEditing();
-      setStageMutationSuccess(copy.stageUpdateSuccess);
-      roadmap.reload();
-    } catch (error) {
-      setStageMutationError(error instanceof Error ? error.message : copy.stageUpdateFailed);
-    } finally {
-      setUpdatingStageId(null);
-    }
-  }
-
-  async function handleStageDelete(stage: (typeof stages)[number]) {
-    if (!window.confirm(copy.stageDeleteConfirm(stage.title))) {
-      return;
-    }
-
-    setStageMutationError(null);
-    setStageMutationSuccess(null);
-    setDeletingStageId(stage.id);
-    try {
-      await deleteRoadmapStage(stage.id);
-      if (editingStageId === stage.id) {
-        cancelStageEditing();
-      }
-      setStageMutationSuccess(copy.stageDeleteSuccess);
-      roadmap.reload();
-    } catch (error) {
-      setStageMutationError(error instanceof Error ? error.message : copy.stageDeleteFailed);
-    } finally {
-      setDeletingStageId(null);
-    }
-  }
-
   function startTopicEditing(topic: RoadmapTopic, triggerElement?: HTMLElement) {
     if (triggerElement) {
       topicModalTriggerRef.current = triggerElement;
@@ -1522,7 +1138,6 @@ export function RoadmapView() {
     setEditingTopicId(topic.id);
     setTopicEditDraft({
       topicId: topic.id,
-      stageId: topic.stageId,
       title: topic.title,
       description: topic.description,
       position: String(topic.position)
@@ -1547,34 +1162,20 @@ export function RoadmapView() {
       return;
     }
 
-    const stageId = topicEditDraft.stageId.trim();
     const title = topicEditDraft.title.trim();
-    if (!stageId) {
-      setTopicMutationError(copy.topicStageRequired);
-      return;
-    }
     if (!title) {
       setTopicMutationError(copy.topicTitleRequired);
       return;
     }
 
-    const selectedStage = stageById.get(stageId);
-    if (!selectedStage) {
-      setTopicMutationError(copy.topicStageRequired);
-      return;
-    }
     const currentTopic = topicById.get(editingTopicId) ?? null;
-    const fallbackPosition =
-      currentTopic && selectedStage && currentTopic.stageId === selectedStage.id
-        ? currentTopic.position
-        : (selectedStage?.topics.length ?? 0) + 1;
+    const fallbackPosition = currentTopic ? currentTopic.position : 1;
     const position = parsePositiveInteger(topicEditDraft.position, Math.max(fallbackPosition, 1));
 
     setTopicMutationError(null);
     setUpdatingTopicId(editingTopicId);
     try {
       await updateRoadmapTopic(editingTopicId, {
-        stageId,
         title,
         description: topicEditDraft.description.trim(),
         position
@@ -1800,29 +1401,6 @@ export function RoadmapView() {
     }
   }
 
-  function handleStageDraftTitleChange(value: string) {
-    setStageCreateDraft((current) => ({
-      ...current,
-      title: value
-    }));
-  }
-
-  function handleStageDraftPositionChange(value: string) {
-    setStageCreateDraft((current) => ({
-      ...current,
-      position: value
-    }));
-  }
-
-  function handleTopicCreateStageChange(stageId: string) {
-    const selectedStage = stageById.get(stageId);
-    setTopicCreateDraft((current) => ({
-      ...current,
-      stageId,
-      position: String((selectedStage?.topics.length ?? 0) + 1)
-    }));
-  }
-
   function handleTopicCreateTitleChange(value: string) {
     setTopicCreateDraft((current) => ({
       ...current,
@@ -1864,6 +1442,24 @@ export function RoadmapView() {
   const dependencyPreviewEnd = dependencyHoverTopicId
     ? getTopicAnchorPoint(dependencyHoverTopicId, "left")
     : dependencyPreviewPoint;
+  const dependencyEdgeControls = useMemo(
+    () =>
+      connections.map((connection) => {
+        const midpoint = getConnectionMidpoint(connection);
+        const fromTitle = topicById.get(connection.fromId)?.title ?? connection.fromId;
+        const toTitle = topicById.get(connection.toId)?.title ?? connection.toId;
+        return {
+          key: `${connection.toId}:${connection.fromId}`,
+          topicId: connection.toId,
+          dependencyTopicId: connection.fromId,
+          x: midpoint.x,
+          y: midpoint.y,
+          fromTitle,
+          toTitle
+        };
+      }),
+    [connections, topicById]
+  );
 
   return (
     <section className="roadmap-view">
@@ -1875,17 +1471,9 @@ export function RoadmapView() {
             <div className="roadmap-header-actions">
               <button
                 type="button"
-                className="button button-primary"
-                onClick={(event) => openStageCreateModal(event.currentTarget)}
-                disabled={isStageCreating || isTopicCreating || isDependencyMutating}
-              >
-                {copy.stageCreateButton}
-              </button>
-              <button
-                type="button"
                 className="button button-outline"
                 onClick={(event) => openTopicCreateModal(event.currentTarget)}
-                disabled={isTopicCreating || isStageCreating || isDependencyMutating}
+                disabled={isTopicCreating || isDependencyMutating}
               >
                 {copy.topicCreateButton}
               </button>
@@ -1923,42 +1511,6 @@ export function RoadmapView() {
       {roadmap.state.status === "success" ? (
         stages.length > 0 ? (
           <>
-            {isStageCreateModalOpen ? (
-              <div className="roadmap-modal-overlay" role="presentation">
-                <div
-                  className="roadmap-modal"
-                  role="dialog"
-                  aria-modal="true"
-                  aria-labelledby="roadmap-stage-create-modal-title"
-                >
-                  <div className="roadmap-modal-header">
-                    <h4 id="roadmap-stage-create-modal-title">{copy.stageManageTitle}</h4>
-                    <button
-                      type="button"
-                      className="roadmap-modal-close"
-                      onClick={closeStageCreateModal}
-                      aria-label={copy.stageCancelButton}
-                      disabled={isStageCreating}
-                    >
-                      ×
-                    </button>
-                  </div>
-
-                  <StageMutationPanel
-                    copy={copy}
-                    draft={stageCreateDraft}
-                    error={stageMutationError}
-                    isSubmitting={isStageCreating}
-                    onSubmit={handleStageCreate}
-                    onTitleChange={handleStageDraftTitleChange}
-                    onPositionChange={handleStageDraftPositionChange}
-                    onCancel={closeStageCreateModal}
-                    titleInputRef={stageCreateModalTitleInputRef}
-                  />
-                </div>
-              </div>
-            ) : null}
-
             {isTopicCreateModalOpen ? (
               <div className="roadmap-modal-overlay" role="presentation">
                 <div
@@ -1984,15 +1536,14 @@ export function RoadmapView() {
 
                   <TopicMutationPanel
                     copy={copy}
-                    stages={stages}
                     draft={topicCreateDraft}
                     error={topicMutationError}
                     title={childTopicParent ? copy.topicCreateChildTitle : copy.topicCreateTitle}
                     subtitle={
-                      childTopicParent && childTopicTargetStage
+                      childTopicParent
                         ? copy.topicCreateChildSubtitle(
                             childTopicParent.title,
-                            childTopicTargetStage.title
+                            stageById.get(childTopicParent.stageId ?? "")?.title ?? copy.defaultStageTitle
                           )
                         : copy.topicCreateSubtitle
                     }
@@ -2006,118 +1557,12 @@ export function RoadmapView() {
                     }
                     isSubmitting={isTopicCreating}
                     onSubmit={handleTopicCreate}
-                    onStageChange={handleTopicCreateStageChange}
                     onTitleChange={handleTopicCreateTitleChange}
                     onPositionChange={handleTopicCreatePositionChange}
                     onDescriptionChange={handleTopicCreateDescriptionChange}
                     onCancel={closeTopicCreateModal}
                     titleInputRef={topicCreateModalTitleInputRef}
                   />
-                </div>
-              </div>
-            ) : null}
-
-            {editingStageId && stageEditDraft && editingStage ? (
-              <div className="roadmap-modal-overlay" role="presentation">
-                <div
-                  className="roadmap-modal"
-                  role="dialog"
-                  aria-modal="true"
-                  aria-labelledby="roadmap-stage-modal-title"
-                >
-                  <div className="roadmap-modal-header">
-                    <h4 id="roadmap-stage-modal-title">
-                      {copy.stageEditButton}: {editingStage.title}
-                    </h4>
-                    <button
-                      type="button"
-                      className="roadmap-modal-close"
-                      onClick={cancelStageEditing}
-                      aria-label={copy.stageCancelButton}
-                    >
-                      ×
-                    </button>
-                  </div>
-
-                  {stageMutationError ? (
-                    <div className="dashboard-error roadmap-modal-error">
-                      <p>{stageMutationError}</p>
-                    </div>
-                  ) : null}
-
-                  <form className="roadmap-stage-edit-form" onSubmit={handleStageUpdate}>
-                    <label className="roadmap-topic-field roadmap-topic-field-title">
-                      <span>{copy.stageFieldTitle}</span>
-                      <input
-                        ref={stageModalTitleInputRef}
-                        type="text"
-                        className="input"
-                        value={stageEditDraft.title}
-                        onChange={(event) =>
-                          setStageEditDraft((current) =>
-                            current
-                              ? {
-                                  ...current,
-                                  title: event.target.value
-                                }
-                              : current
-                          )
-                        }
-                      />
-                    </label>
-
-                    <label className="roadmap-topic-field">
-                      <span>{copy.stageFieldPosition}</span>
-                      <input
-                        type="number"
-                        min={1}
-                        className="input"
-                        value={stageEditDraft.position}
-                        onChange={(event) =>
-                          setStageEditDraft((current) =>
-                            current
-                              ? {
-                                  ...current,
-                                  position: event.target.value
-                                }
-                              : current
-                          )
-                        }
-                      />
-                    </label>
-
-                    <div className="roadmap-stage-edit-actions roadmap-modal-actions">
-                      <button
-                        type="button"
-                        className="button button-outline roadmap-stage-delete-button"
-                        disabled={updatingStageId === editingStage.id || deletingStageId === editingStage.id}
-                        onClick={() => {
-                          void handleStageDelete(editingStage);
-                        }}
-                      >
-                        {deletingStageId === editingStage.id
-                          ? copy.stageDeletingButton
-                          : copy.stageDeleteButton}
-                      </button>
-                      <button
-                        type="button"
-                        className="button button-outline"
-                        disabled={updatingStageId === editingStage.id || deletingStageId === editingStage.id}
-                        onClick={cancelStageEditing}
-                      >
-                        {copy.stageCancelButton}
-                      </button>
-                      <button
-                        type="submit"
-                        className="button button-primary"
-                        disabled={updatingStageId === editingStage.id || deletingStageId === editingStage.id}
-                      >
-                        {updatingStageId === editingStage.id
-                          ? copy.stageUpdatingButton
-                          : copy.stageSaveButton}
-                      </button>
-                    </div>
-                  </form>
                 </div>
               </div>
             ) : null}
@@ -2152,30 +1597,6 @@ export function RoadmapView() {
                   ) : null}
 
                   <form className="roadmap-stage-edit-form" onSubmit={handleTopicUpdate}>
-                    <label className="roadmap-topic-field">
-                      <span>{copy.topicFieldStage}</span>
-                      <select
-                        className="input"
-                        value={topicEditDraft.stageId}
-                        onChange={(event) =>
-                          setTopicEditDraft((current) =>
-                            current
-                              ? {
-                                  ...current,
-                                  stageId: event.target.value
-                                }
-                              : current
-                          )
-                        }
-                      >
-                        {stages.map((stage) => (
-                          <option key={stage.id} value={stage.id}>
-                            {stage.title}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-
                     <label className="roadmap-topic-field roadmap-topic-field-title">
                       <span>{copy.topicFieldTitle}</span>
                       <input
@@ -2319,6 +1740,34 @@ export function RoadmapView() {
               </svg>
 
               <div
+                className="roadmap-connection-controls"
+                role="group"
+                aria-label={copy.dependencyControlsAria}
+              >
+                {dependencyEdgeControls.map((control) => {
+                  const isRemoving =
+                    removingDependencyKey === `${control.topicId}:${control.dependencyTopicId}`;
+                  return (
+                    <button
+                      key={control.key}
+                      type="button"
+                      className="roadmap-connection-remove"
+                      style={{ left: `${control.x}px`, top: `${control.y}px` }}
+                      aria-label={copy.dependencyRemoveEdgeAria(control.fromTitle, control.toTitle)}
+                      disabled={isRemoving || isDependencyMutating}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        void handleDependencyDelete(control.topicId, control.dependencyTopicId);
+                      }}
+                    >
+                      {isRemoving ? copy.dependencyRemovingButton : "×"}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div
                 className="roadmap-graph-scene"
                 aria-label={copy.stageAria}
               >
@@ -2329,9 +1778,10 @@ export function RoadmapView() {
                   }}
                 >
                   {allTopics.map((topic) => {
-                    const stage = stageById.get(topic.stageId) ?? null;
+                    const topicStageId = topic.stageId ?? stages[0]?.id ?? "";
+                    const stage = stageById.get(topicStageId) ?? null;
                     const stageTitle = stage?.title ?? copy.defaultStageTitle;
-                    const stagePosition = stagePositionById.get(topic.stageId) ?? 1;
+                    const stagePosition = stagePositionById.get(topicStageId) ?? 1;
 
                     return (
                       <li
@@ -2493,22 +1943,6 @@ export function RoadmapView() {
                                   {topic.prerequisiteTopicIds.map((dependencyId) => (
                                     <li key={dependencyId} className="roadmap-prerequisite-chip">
                                       <span>{topicById.get(dependencyId)?.title ?? dependencyId}</span>
-                                      <button
-                                        type="button"
-                                        className="roadmap-prerequisite-remove"
-                                        disabled={
-                                          removingDependencyKey === `${topic.id}:${dependencyId}`
-                                        }
-                                        onClick={(event) => {
-                                          event.preventDefault();
-                                          event.stopPropagation();
-                                          void handleDependencyDelete(topic.id, dependencyId);
-                                        }}
-                                      >
-                                        {removingDependencyKey === `${topic.id}:${dependencyId}`
-                                          ? copy.dependencyRemovingButton
-                                          : copy.dependencyRemoveButton}
-                                      </button>
                                     </li>
                                   ))}
                                 </ul>
@@ -2526,18 +1960,6 @@ export function RoadmapView() {
             {topicMutationError && !isTopicCreateModalOpen ? (
               <div className="dashboard-error">
                 <p>{topicMutationError}</p>
-              </div>
-            ) : null}
-
-            {stageMutationError && !editingStageId && !isStageCreateModalOpen ? (
-              <div className="dashboard-error">
-                <p>{stageMutationError}</p>
-              </div>
-            ) : null}
-
-            {stageMutationSuccess ? (
-              <div className="dashboard-success">
-                <p>{stageMutationSuccess}</p>
               </div>
             ) : null}
 
