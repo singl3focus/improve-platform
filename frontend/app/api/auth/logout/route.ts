@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     },
     { status: 200 }
   );
-  clearSessionCookies(response);
+  clearSessionCookies(request, response);
 
   return response;
 }

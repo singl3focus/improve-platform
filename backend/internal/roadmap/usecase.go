@@ -56,22 +56,18 @@ func (uc *UseCase) CreateRoadmap(ctx context.Context, userID string, req CreateR
 	})
 
 	return RoadmapResponse{
-		ID:        rm.ID,
-		Title:     rm.Title,
-		CreatedAt: rm.CreatedAt,
-		UpdatedAt: rm.UpdatedAt,
-		Stages:    []StageResponse{},
+		ID:           rm.ID,
+		Title:        rm.Title,
+		CreatedAt:    rm.CreatedAt,
+		UpdatedAt:    rm.UpdatedAt,
+		Topics:       []TopicResponse{},
+		Dependencies: []TopicDependencyResponse{},
 	}, nil
 }
 
 func (uc *UseCase) GetFullRoadmap(ctx context.Context, userID string) (RoadmapResponse, error) {
 	const op apperr.Op = "UseCase.GetFullRoadmap"
 	rm, err := uc.repo.GetRoadmapByUserID(ctx, userID)
-	if err != nil {
-		return RoadmapResponse{}, apperr.E(op, err)
-	}
-
-	stages, err := uc.repo.GetStagesByUserID(ctx, userID)
 	if err != nil {
 		return RoadmapResponse{}, apperr.E(op, err)
 	}
@@ -86,7 +82,12 @@ func (uc *UseCase) GetFullRoadmap(ctx context.Context, userID string) (RoadmapRe
 		return RoadmapResponse{}, apperr.E(op, err)
 	}
 
-	return uc.assembleRoadmap(rm, stages, topics, deps), nil
+	metricsByTopicID, err := uc.repo.GetTopicMetricsByUserID(ctx, userID)
+	if err != nil {
+		return RoadmapResponse{}, apperr.E(op, err)
+	}
+
+	return uc.assembleRoadmap(rm, topics, deps, metricsByTopicID), nil
 }
 
 func (uc *UseCase) UpdateRoadmap(ctx context.Context, userID string, req UpdateRoadmapRequest) error {
@@ -109,71 +110,11 @@ func (uc *UseCase) UpdateRoadmap(ctx context.Context, userID string, req UpdateR
 	return nil
 }
 
-// --- Stages ---
-
-func (uc *UseCase) CreateStage(ctx context.Context, userID string, req CreateStageRequest) (StageResponse, error) {
-	const op apperr.Op = "UseCase.CreateStage"
-	rm, err := uc.repo.GetRoadmapByUserID(ctx, userID)
-	if err != nil {
-		return StageResponse{}, apperr.E(op, err)
-	}
-
-	s, err := uc.repo.CreateStage(ctx, rm.ID, userID, req.Title, req.Position)
-	if err != nil {
-		return StageResponse{}, apperr.E(op, err)
-	}
-
-	uc.record(ctx, history.Event{
-		UserID: userID, EntityType: "stage", EntityID: s.ID,
-		EventType: "technical", EventName: "entity.created",
-		Payload: map[string]any{"title": s.Title},
-	})
-
-	return StageResponse{
-		ID:        s.ID,
-		Title:     s.Title,
-		Position:  s.Position,
-		CreatedAt: s.CreatedAt,
-		UpdatedAt: s.UpdatedAt,
-		Topics:    []TopicResponse{},
-	}, nil
-}
-
-func (uc *UseCase) UpdateStage(ctx context.Context, userID, stageID string, req UpdateStageRequest) error {
-	const op apperr.Op = "UseCase.UpdateStage"
-	if err := uc.repo.UpdateStage(ctx, stageID, userID, req.Title, req.Position); err != nil {
-		return apperr.E(op, err)
-	}
-
-	uc.record(ctx, history.Event{
-		UserID: userID, EntityType: "stage", EntityID: stageID,
-		EventType: "technical", EventName: "entity.updated",
-		Payload: map[string]any{"title": req.Title},
-	})
-
-	return nil
-}
-
-func (uc *UseCase) DeleteStage(ctx context.Context, userID, stageID string) error {
-	const op apperr.Op = "UseCase.DeleteStage"
-	if err := uc.repo.DeleteStage(ctx, stageID, userID); err != nil {
-		return apperr.E(op, err)
-	}
-
-	uc.record(ctx, history.Event{
-		UserID: userID, EntityType: "stage", EntityID: stageID,
-		EventType: "technical", EventName: "entity.deleted",
-		Payload: map[string]any{},
-	})
-
-	return nil
-}
-
 // --- Topics ---
 
 func (uc *UseCase) CreateTopic(ctx context.Context, userID string, req CreateTopicRequest) (TopicResponse, error) {
 	const op apperr.Op = "UseCase.CreateTopic"
-	t, err := uc.repo.CreateTopic(ctx, userID, req.StageID, req.Title, req.Description, req.Position)
+	t, err := uc.repo.CreateTopic(ctx, userID, req.Title, req.Description, req.Position)
 	if err != nil {
 		return TopicResponse{}, apperr.E(op, err)
 	}
@@ -181,10 +122,38 @@ func (uc *UseCase) CreateTopic(ctx context.Context, userID string, req CreateTop
 	uc.record(ctx, history.Event{
 		UserID: userID, EntityType: "topic", EntityID: t.ID,
 		EventType: "technical", EventName: "entity.created",
-		Payload: map[string]any{"title": t.Title, "stage_id": t.StageID},
+		Payload: map[string]any{"title": t.Title},
 	})
 
-	return buildTopicResponse(t, nil, false, nil), nil
+	return buildTopicResponse(t, nil, TopicMetrics{}, false, nil), nil
+}
+
+func (uc *UseCase) CreateTopicWithDependency(ctx context.Context, userID string, req CreateTopicWithDependencyRequest) (TopicResponse, error) {
+	const op apperr.Op = "UseCase.CreateTopicWithDependency"
+
+	if _, err := uc.repo.GetTopicByID(ctx, req.DependsOnTopicID, userID); err != nil {
+		return TopicResponse{}, apperr.E(op, err)
+	}
+
+	t, err := uc.repo.CreateTopicWithDependency(
+		ctx,
+		userID,
+		req.Title,
+		req.Description,
+		req.Position,
+		req.DependsOnTopicID,
+	)
+	if err != nil {
+		return TopicResponse{}, apperr.E(op, err)
+	}
+
+	uc.record(ctx, history.Event{
+		UserID: userID, EntityType: "topic", EntityID: t.ID,
+		EventType: "technical", EventName: "entity.created",
+		Payload: map[string]any{"title": t.Title},
+	})
+
+	return buildTopicResponse(t, []string{req.DependsOnTopicID}, TopicMetrics{}, false, nil), nil
 }
 
 func (uc *UseCase) GetTopic(ctx context.Context, userID, topicID string) (TopicResponse, error) {
@@ -208,12 +177,12 @@ func (uc *UseCase) GetTopic(ctx context.Context, userID, topicID string) (TopicR
 	depMap := buildDepMap(deps)
 	blocked, reasons := computeBlockage(t.ID, topicMap, depMap)
 
-	return buildTopicResponse(t, depMap[t.ID], blocked, reasons), nil
+	return buildTopicResponse(t, depMap[t.ID], TopicMetrics{}, blocked, reasons), nil
 }
 
 func (uc *UseCase) UpdateTopic(ctx context.Context, userID, topicID string, req UpdateTopicRequest) error {
 	const op apperr.Op = "UseCase.UpdateTopic"
-	old, err := uc.repo.GetTopicByID(ctx, topicID, userID)
+	_, err := uc.repo.GetTopicByID(ctx, topicID, userID)
 	if err != nil {
 		return apperr.E(op, err)
 	}
@@ -227,7 +196,7 @@ func (uc *UseCase) UpdateTopic(ctx context.Context, userID, topicID string, req 
 		return apperr.E(op, apperr.Fmt("target_date: %w", err))
 	}
 
-	if err := uc.repo.UpdateTopic(ctx, topicID, userID, req.StageID, req.Title, req.Description, startDate, targetDate, req.Position); err != nil {
+	if err := uc.repo.UpdateTopic(ctx, topicID, userID, req.Title, req.Description, startDate, targetDate, req.Position); err != nil {
 		return apperr.E(op, err)
 	}
 
@@ -236,14 +205,6 @@ func (uc *UseCase) UpdateTopic(ctx context.Context, userID, topicID string, req 
 		EventType: "technical", EventName: "entity.updated",
 		Payload: map[string]any{"title": req.Title},
 	})
-
-	if old.StageID != req.StageID {
-		uc.record(ctx, history.Event{
-			UserID: userID, EntityType: "topic", EntityID: topicID,
-			EventType: "business", EventName: "topic.stage_changed",
-			Payload: map[string]any{"old_stage_id": old.StageID, "new_stage_id": req.StageID},
-		})
-	}
 
 	return nil
 }
@@ -419,43 +380,27 @@ func isValidTransition(from, to string) bool {
 
 // --- Response builders ---
 
-func (uc *UseCase) assembleRoadmap(rm Roadmap, stages []Stage, topics []Topic, deps []TopicDep) RoadmapResponse {
+func (uc *UseCase) assembleRoadmap(rm Roadmap, topics []Topic, deps []TopicDep, metricsByTopicID map[string]TopicMetrics) RoadmapResponse {
 	topicMap := buildTopicMap(topics)
 	depMap := buildDepMap(deps)
 
-	topicsByStage := make(map[string][]Topic)
+	topicResponses := make([]TopicResponse, 0, len(topics))
 	for _, t := range topics {
-		topicsByStage[t.StageID] = append(topicsByStage[t.StageID], t)
-	}
-
-	stageResponses := make([]StageResponse, 0, len(stages))
-	for _, s := range stages {
-		stageTopics := topicsByStage[s.ID]
-		topicResponses := make([]TopicResponse, 0, len(stageTopics))
-		for _, t := range stageTopics {
-			blocked, reasons := computeBlockage(t.ID, topicMap, depMap)
-			topicResponses = append(topicResponses, buildTopicResponse(t, depMap[t.ID], blocked, reasons))
-		}
-		stageResponses = append(stageResponses, StageResponse{
-			ID:        s.ID,
-			Title:     s.Title,
-			Position:  s.Position,
-			CreatedAt: s.CreatedAt,
-			UpdatedAt: s.UpdatedAt,
-			Topics:    topicResponses,
-		})
+		blocked, reasons := computeBlockage(t.ID, topicMap, depMap)
+		topicResponses = append(topicResponses, buildTopicResponse(t, depMap[t.ID], metricsByTopicID[t.ID], blocked, reasons))
 	}
 
 	return RoadmapResponse{
-		ID:        rm.ID,
-		Title:     rm.Title,
-		CreatedAt: rm.CreatedAt,
-		UpdatedAt: rm.UpdatedAt,
-		Stages:    stageResponses,
+		ID:           rm.ID,
+		Title:        rm.Title,
+		CreatedAt:    rm.CreatedAt,
+		UpdatedAt:    rm.UpdatedAt,
+		Topics:       topicResponses,
+		Dependencies: buildDependencyResponses(deps),
 	}
 }
 
-func buildTopicResponse(t Topic, depIDs []string, blocked bool, reasons []string) TopicResponse {
+func buildTopicResponse(t Topic, depIDs []string, metrics TopicMetrics, blocked bool, reasons []string) TopicResponse {
 	if depIDs == nil {
 		depIDs = []string{}
 	}
@@ -463,21 +408,37 @@ func buildTopicResponse(t Topic, depIDs []string, blocked bool, reasons []string
 		reasons = []string{}
 	}
 	return TopicResponse{
-		ID:            t.ID,
-		StageID:       t.StageID,
-		Title:         t.Title,
-		Description:   t.Description,
-		Status:        t.Status,
-		StartDate:     formatDate(t.StartDate),
-		TargetDate:    formatDate(t.TargetDate),
-		CompletedDate: formatDate(t.CompletedDate),
-		Position:      t.Position,
-		IsBlocked:     blocked,
-		BlockReasons:  reasons,
-		Dependencies:  depIDs,
-		CreatedAt:     t.CreatedAt,
-		UpdatedAt:     t.UpdatedAt,
+		ID:              t.ID,
+		Title:           t.Title,
+		Description:     t.Description,
+		Status:          t.Status,
+		StartDate:       formatDate(t.StartDate),
+		TargetDate:      formatDate(t.TargetDate),
+		CompletedDate:   formatDate(t.CompletedDate),
+		Position:        t.Position,
+		TasksCount:      metrics.TasksCount,
+		MaterialsCount:  metrics.MaterialsCount,
+		ProgressPercent: metrics.ProgressPercent,
+		IsBlocked:       blocked,
+		BlockReasons:    reasons,
+		Dependencies:    depIDs,
+		CreatedAt:       t.CreatedAt,
+		UpdatedAt:       t.UpdatedAt,
 	}
+}
+
+func buildDependencyResponses(deps []TopicDep) []TopicDependencyResponse {
+	if deps == nil {
+		return []TopicDependencyResponse{}
+	}
+	resp := make([]TopicDependencyResponse, 0, len(deps))
+	for _, dep := range deps {
+		resp = append(resp, TopicDependencyResponse{
+			TopicID:          dep.TopicID,
+			DependsOnTopicID: dep.DependsOnTopicID,
+		})
+	}
+	return resp
 }
 
 func formatDate(t *time.Time) *string {

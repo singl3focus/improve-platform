@@ -94,3 +94,30 @@ func TestFrontendProtectedRoutes_RequireAuthorization(t *testing.T) {
 		})
 	}
 }
+
+func TestFrontendRoadmapStageRoutes_Removed(t *testing.T) {
+	router := newTestServer()
+
+	cases := []struct {
+		name   string
+		method string
+		path   string
+	}{
+		{name: "stages list removed", method: http.MethodGet, path: "/api/v1/roadmap/stages"},
+		{name: "stages create removed", method: http.MethodPost, path: "/api/v1/roadmap/stages"},
+		{name: "stage by id removed", method: http.MethodGet, path: "/api/v1/roadmap/stages/11111111-1111-1111-1111-111111111111"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(tc.method, tc.path, nil)
+			rec := httptest.NewRecorder()
+
+			router.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusNotFound {
+				t.Fatalf("expected %d, got %d", http.StatusNotFound, rec.Code)
+			}
+		})
+	}
+}

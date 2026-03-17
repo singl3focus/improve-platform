@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
   if (!response.ok) {
     const errorResponse = buildErrorResponse(response, payload);
     if (response.status === 401) {
-      clearSessionCookies(errorResponse);
+      clearSessionCookies(request, errorResponse);
     }
     return errorResponse;
   }
@@ -65,6 +65,6 @@ export async function POST(request: NextRequest) {
     },
     { status: 200 }
   );
-  setSessionCookies(authResponse, tokens);
+  setSessionCookies(request, authResponse, tokens);
   return authResponse;
 }

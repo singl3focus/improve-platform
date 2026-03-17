@@ -73,11 +73,7 @@ export function PrivateShell({ children }: { children: ReactNode }) {
     <div className="app-shell">
       <aside className="sidebar">
         <div className="brand">
-          <span className="brand-mark" aria-hidden="true" />
-          <div>
-            <strong>{copy.navigation.brand}</strong>
-            <p>{copy.navigation.appLabel}</p>
-          </div>
+          <strong>{copy.navigation.brand}</strong>
         </div>
         <nav className="nav-list nav-list-main" aria-label={copy.navigation.ariaPrimary}>
           {MAIN_NAV_ITEMS.map((item) => {
@@ -113,20 +109,20 @@ export function PrivateShell({ children }: { children: ReactNode }) {
               </Link>
             );
           })}
+          <button
+            type="button"
+            className="sidebar-text-action"
+            onClick={handleLogout}
+            disabled={isLoggingOut}
+          >
+            {isLoggingOut ? copy.navigation.signingOut : copy.navigation.signOut}
+          </button>
         </nav>
       </aside>
 
       <div className="content-column">
         <header className="header">
           <h1>{currentSection}</h1>
-          <button
-            type="button"
-            className="button button-outline"
-            onClick={handleLogout}
-            disabled={isLoggingOut}
-          >
-            {isLoggingOut ? copy.navigation.signingOut : copy.navigation.signOut}
-          </button>
         </header>
 
         <main className="main-content">{children}</main>

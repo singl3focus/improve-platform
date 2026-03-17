@@ -7,6 +7,11 @@ import type {
   MaterialsLibraryPayload,
   UpdateLibraryMaterialInput
 } from "@/lib/materials-library-types";
+import {
+  normalizeProgressPercent,
+  parsePositiveInteger,
+  parseProgressPercent
+} from "@/lib/materials-form";
 
 const MATERIALS_QUERY_KEY = "materials-library";
 const PROGRESS_COMMIT_DEBOUNCE_MS = 320;
@@ -138,37 +143,6 @@ async function removeMaterial(materialId: string): Promise<void> {
   }
 }
 
-function parsePositiveInteger(value: string, fallback: number): number {
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isInteger(parsed) || parsed < 1) {
-    return fallback;
-  }
-  return parsed;
-}
-
-function parseProgressPercent(value: string, fallback: number): number {
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isInteger(parsed) || parsed < 0 || parsed > 100) {
-    return fallback;
-  }
-  return parsed;
-}
-
-function normalizeProgressPercent(value: number): number {
-  if (!Number.isFinite(value)) {
-    return 0;
-  }
-
-  const rounded = Math.round(value);
-  if (rounded < 0) {
-    return 0;
-  }
-  if (rounded > 100) {
-    return 100;
-  }
-  return rounded;
-}
-
 function createDraftFromMaterial(material: LibraryMaterial): MaterialDraft {
   return {
     title: material.title,
@@ -191,6 +165,10 @@ export function useMaterialsLibraryViewModel(copy: MaterialsCopyForViewModel) {
   const [isCreating, setIsCreating] = useState(false);
   const [updatingMaterialId, setUpdatingMaterialId] = useState<string | null>(null);
   const [mutationError, setMutationError] = useState<string | null>(null);
+
+  function clearMutationError() {
+    setMutationError(null);
+  }
   const progressTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const queuedProgressRef = useRef<Map<string, number>>(new Map());
   const inFlightProgressRef = useRef<Set<string>>(new Set());
@@ -459,6 +437,7 @@ export function useMaterialsLibraryViewModel(copy: MaterialsCopyForViewModel) {
     isCreating,
     updatingMaterialId,
     mutationError,
+    clearMutationError,
     materialsQuery,
     availableTopics,
     handleCreate,

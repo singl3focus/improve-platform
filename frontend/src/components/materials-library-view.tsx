@@ -127,15 +127,15 @@ function MaterialsLibraryHeader({
   onCreateClick: (triggerElement: HTMLElement) => void;
 }) {
   return (
-    <header className="panel materials-library-header">
-      <div>
+    <header className="materials-library-header">
+      <div className="materials-library-intro">
         <h2>{copy.title}</h2>
         <p>{copy.subtitle}</p>
       </div>
 
-      <div className="materials-library-controls">
-        <div className="materials-library-filters">
-          <label className="materials-filter-item">
+      <div className="panel materials-library-controls-panel">
+        <div className="materials-library-controls">
+          <label className="materials-filter-item materials-filter-item-search">
             <span>{copy.search}</span>
             <input
               type="search"
@@ -146,7 +146,7 @@ function MaterialsLibraryHeader({
             />
           </label>
 
-          <label className="materials-filter-item">
+          <label className="materials-filter-item materials-filter-item-topic">
             <span>{copy.topic}</span>
             <select
               className="input materials-filter-select"
@@ -161,15 +161,15 @@ function MaterialsLibraryHeader({
               ))}
             </select>
           </label>
-        </div>
 
-        <button
-          type="button"
-          className="button button-primary"
-          onClick={(event) => onCreateClick(event.currentTarget)}
-        >
-          {copy.createButton}
-        </button>
+          <button
+            type="button"
+            className="button button-primary materials-create-trigger"
+            onClick={(event) => onCreateClick(event.currentTarget)}
+          >
+            {copy.createButton}
+          </button>
+        </div>
       </div>
     </header>
   );
@@ -543,6 +543,7 @@ export function MaterialsLibraryView() {
     isCreating,
     updatingMaterialId,
     mutationError,
+    clearMutationError,
     materialsQuery,
     availableTopics,
     handleCreate,
@@ -563,6 +564,7 @@ export function MaterialsLibraryView() {
       if (event.key !== "Escape" || isCreating) {
         return;
       }
+      clearMutationError();
       setIsCreateModalOpen(false);
       createModalTriggerRef.current?.focus();
       createModalTriggerRef.current = null;
@@ -570,9 +572,10 @@ export function MaterialsLibraryView() {
 
     document.addEventListener("keydown", handleEscClose);
     return () => document.removeEventListener("keydown", handleEscClose);
-  }, [isCreateModalOpen, isCreating]);
+  }, [isCreateModalOpen, isCreating, clearMutationError]);
 
   function openCreateModal(triggerElement: HTMLElement) {
+    clearMutationError();
     createModalTriggerRef.current = triggerElement;
     setIsCreateModalOpen(true);
   }
@@ -581,6 +584,7 @@ export function MaterialsLibraryView() {
     if (isCreating) {
       return;
     }
+    clearMutationError();
     setIsCreateModalOpen(false);
     createModalTriggerRef.current?.focus();
     createModalTriggerRef.current = null;
@@ -592,6 +596,7 @@ export function MaterialsLibraryView() {
       return;
     }
 
+    clearMutationError();
     setIsCreateModalOpen(false);
     createModalTriggerRef.current?.focus();
     createModalTriggerRef.current = null;
@@ -650,6 +655,12 @@ export function MaterialsLibraryView() {
               includePanelStyles={false}
             />
 
+            {mutationError ? (
+              <div className="dashboard-error">
+                <p>{mutationError}</p>
+              </div>
+            ) : null}
+
             <div className="roadmap-modal-actions">
               <button type="button" className="button button-outline" onClick={closeCreateModal}>
                 {copy.cancel}
@@ -659,7 +670,7 @@ export function MaterialsLibraryView() {
         </div>
       ) : null}
 
-      {mutationError ? (
+      {mutationError && !isCreateModalOpen ? (
         <div className="dashboard-error">
           <p>{mutationError}</p>
         </div>

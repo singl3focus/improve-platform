@@ -20,8 +20,12 @@ import type {
 
 const TASKS_COPY = {
   ru: {
-    title: "Личный Kanban обучения",
+    title: "Мой канбан",
     subtitle: "Отслеживайте задачи по статусам и перемещайте карточки через API-обновления.",
+    filterButton: "Фильтр",
+    filterModalTitle: "Фильтры задач",
+    closeFilterAria: "Закрыть окно фильтров",
+    clearFiltersButton: "Сбросить",
     topicFilter: "Тема",
     deadlineFilter: "Дедлайн",
     allTopics: "Все темы",
@@ -59,8 +63,12 @@ const TASKS_COPY = {
     deleteFailed: "Не удалось удалить задачу."
   },
   en: {
-    title: "Personal learning Kanban",
+    title: "My kanban",
     subtitle: "Track your tasks by status and move cards across columns via API updates.",
+    filterButton: "Filter",
+    filterModalTitle: "Task filters",
+    closeFilterAria: "Close task filters",
+    clearFiltersButton: "Reset",
     topicFilter: "Topic",
     deadlineFilter: "Deadline",
     allTopics: "All topics",
@@ -117,22 +125,38 @@ function TaskDeleteIcon() {
   );
 }
 
+function TaskCreateIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path
+        d="M12 4.5a.75.75 0 0 1 .75.75v6h6a.75.75 0 0 1 0 1.5h-6v6a.75.75 0 0 1-1.5 0v-6h-6a.75.75 0 0 1 0-1.5h6v-6A.75.75 0 0 1 12 4.5Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
+function TaskFilterIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path
+        d="M4.5 6.75A.75.75 0 0 1 5.25 6h13.5a.75.75 0 0 1 .53 1.28l-4.78 4.78V17.4a.75.75 0 0 1-.4.66l-3 1.58a.75.75 0 0 1-1.1-.66v-6.92L4.72 7.28a.75.75 0 0 1-.22-.53Zm2.56.75 4.5 4.5a.75.75 0 0 1 .22.53v5.2l1.5-.79v-4.4a.75.75 0 0 1 .22-.53l4.5-4.5H7.06Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
 function TasksBoardHeader({
   copy,
-  topics,
-  topicId,
-  due,
-  onTopicChange,
-  onDueChange,
-  onCreateClick
+  onCreateClick,
+  onFilterClick,
+  isFilterActive
 }: {
   copy: TasksCopy;
-  topics: TaskBoardTopicOption[];
-  topicId: string;
-  due: TaskBoardDueFilter;
-  onTopicChange: (topicId: string) => void;
-  onDueChange: (due: TaskBoardDueFilter) => void;
   onCreateClick: (triggerElement: HTMLElement) => void;
+  onFilterClick: (triggerElement: HTMLElement) => void;
+  isFilterActive: boolean;
 }) {
   return (
     <header className="tasks-board-header panel">
@@ -142,7 +166,74 @@ function TasksBoardHeader({
       </div>
 
       <div className="tasks-board-controls">
-        <div className="tasks-board-filters">
+        <button
+          type="button"
+          className={`button tasks-action-button tasks-filter-button ${
+            isFilterActive ? "tasks-filter-button-active" : ""
+          }`}
+          onClick={(event) => onFilterClick(event.currentTarget)}
+          aria-haspopup="dialog"
+        >
+          <TaskFilterIcon />
+          {copy.filterButton}
+        </button>
+
+        <button
+          type="button"
+          className="button button-primary tasks-action-button"
+          onClick={(event) => onCreateClick(event.currentTarget)}
+        >
+          <TaskCreateIcon />
+          {copy.createButton}
+        </button>
+      </div>
+    </header>
+  );
+}
+
+function TasksFiltersDrawer({
+  copy,
+  topics,
+  topicId,
+  due,
+  onTopicChange,
+  onDueChange,
+  onReset,
+  onClose,
+  titleId
+}: {
+  copy: TasksCopy;
+  topics: TaskBoardTopicOption[];
+  topicId: string;
+  due: TaskBoardDueFilter;
+  onTopicChange: (topicId: string) => void;
+  onDueChange: (due: TaskBoardDueFilter) => void;
+  onReset: () => void;
+  onClose: () => void;
+  titleId: string;
+}) {
+  return (
+    <div className="roadmap-modal-overlay tasks-filter-overlay" role="presentation" onClick={onClose}>
+      <section
+        className="tasks-filter-drawer"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <header className="tasks-filter-drawer-header">
+          <h4 id={titleId}>{copy.filterModalTitle}</h4>
+          <button
+            type="button"
+            className="roadmap-modal-close"
+            aria-label={copy.closeFilterAria}
+            onClick={onClose}
+          >
+            ×
+          </button>
+        </header>
+
+        <div className="tasks-filter-drawer-body">
           <label className="tasks-filter-item">
             <span>{copy.topicFilter}</span>
             <select
@@ -173,15 +264,16 @@ function TasksBoardHeader({
           </label>
         </div>
 
-        <button
-          type="button"
-          className="button button-primary"
-          onClick={(event) => onCreateClick(event.currentTarget)}
-        >
-          {copy.createButton}
-        </button>
-      </div>
-    </header>
+        <div className="tasks-filter-drawer-actions">
+          <button type="button" className="button button-outline" onClick={onReset}>
+            {copy.clearFiltersButton}
+          </button>
+          <button type="button" className="button button-primary" onClick={onClose}>
+            OK
+          </button>
+        </div>
+      </section>
+    </div>
   );
 }
 
@@ -415,8 +507,11 @@ export function TasksKanbanView() {
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [dragOverStatus, setDragOverStatus] = useState<TaskBoardStatus | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
   const createModalTitleId = "tasks-create-modal-title";
+  const filterModalTitleId = "tasks-filter-modal-title";
   const createModalTriggerRef = useRef<HTMLElement | null>(null);
+  const filterDrawerTriggerRef = useRef<HTMLElement | null>(null);
   const {
     filters,
     setFilters,
@@ -427,6 +522,7 @@ export function TasksKanbanView() {
     updatingTaskId,
     isCreating,
     mutationError,
+    clearMutationError,
     groupedTasks,
     handleCreate,
     handleStatusChange,
@@ -441,22 +537,33 @@ export function TasksKanbanView() {
   }, [state.data?.tasks]);
 
   useEffect(() => {
-    if (!isCreateModalOpen) {
+    if (!isCreateModalOpen && !isFilterDrawerOpen) {
       return;
     }
 
     function handleEscClose(event: KeyboardEvent) {
-      if (event.key !== "Escape" || isCreating) {
+      if (event.key !== "Escape") {
         return;
       }
-      setIsCreateModalOpen(false);
-      createModalTriggerRef.current?.focus();
-      createModalTriggerRef.current = null;
+
+      if (isCreateModalOpen && !isCreating) {
+        clearMutationError();
+        setIsCreateModalOpen(false);
+        createModalTriggerRef.current?.focus();
+        createModalTriggerRef.current = null;
+        return;
+      }
+
+      if (isFilterDrawerOpen) {
+        setIsFilterDrawerOpen(false);
+        filterDrawerTriggerRef.current?.focus();
+        filterDrawerTriggerRef.current = null;
+      }
     }
 
     document.addEventListener("keydown", handleEscClose);
     return () => document.removeEventListener("keydown", handleEscClose);
-  }, [isCreateModalOpen, isCreating]);
+  }, [isCreateModalOpen, isFilterDrawerOpen, isCreating, clearMutationError]);
 
   function handleCardDragStart(event: DragEvent<HTMLLIElement>, taskId: string) {
     if (updatingTaskId === taskId) {
@@ -490,14 +597,27 @@ export function TasksKanbanView() {
   }
 
   function openCreateModal(triggerElement: HTMLElement) {
+    clearMutationError();
     createModalTriggerRef.current = triggerElement;
     setIsCreateModalOpen(true);
+  }
+
+  function openFilterDrawer(triggerElement: HTMLElement) {
+    filterDrawerTriggerRef.current = triggerElement;
+    setIsFilterDrawerOpen(true);
+  }
+
+  function closeFilterDrawer() {
+    setIsFilterDrawerOpen(false);
+    filterDrawerTriggerRef.current?.focus();
+    filterDrawerTriggerRef.current = null;
   }
 
   function closeCreateModal() {
     if (isCreating) {
       return;
     }
+    clearMutationError();
     setIsCreateModalOpen(false);
     createModalTriggerRef.current?.focus();
     createModalTriggerRef.current = null;
@@ -509,6 +629,7 @@ export function TasksKanbanView() {
       return;
     }
 
+    clearMutationError();
     setIsCreateModalOpen(false);
     createModalTriggerRef.current?.focus();
     createModalTriggerRef.current = null;
@@ -518,23 +639,40 @@ export function TasksKanbanView() {
     <section className="tasks-board-view">
       <TasksBoardHeader
         copy={copy}
-        topics={state.data?.topics ?? []}
-        topicId={filters.topicId}
-        due={filters.due}
-        onTopicChange={(topicId) =>
-          setFilters((current) => ({
-            ...current,
-            topicId
-          }))
-        }
-        onDueChange={(due) =>
-          setFilters((current) => ({
-            ...current,
-            due
-          }))
-        }
         onCreateClick={openCreateModal}
+        onFilterClick={openFilterDrawer}
+        isFilterActive={Boolean(filters.topicId) || filters.due !== "all"}
       />
+
+      {isFilterDrawerOpen ? (
+        <TasksFiltersDrawer
+          copy={copy}
+          topics={state.data?.topics ?? []}
+          topicId={filters.topicId}
+          due={filters.due}
+          onTopicChange={(topicId) =>
+            setFilters((current) => ({
+              ...current,
+              topicId
+            }))
+          }
+          onDueChange={(due) =>
+            setFilters((current) => ({
+              ...current,
+              due
+            }))
+          }
+          onReset={() =>
+            setFilters((current) => ({
+              ...current,
+              topicId: "",
+              due: "all"
+            }))
+          }
+          onClose={closeFilterDrawer}
+          titleId={filterModalTitleId}
+        />
+      ) : null}
 
       {isCreateModalOpen ? (
         <div className="roadmap-modal-overlay" role="presentation" onClick={closeCreateModal}>
@@ -567,6 +705,12 @@ export function TasksKanbanView() {
               includePanelStyles={false}
             />
 
+            {mutationError ? (
+              <div className="dashboard-error">
+                <p>{mutationError}</p>
+              </div>
+            ) : null}
+
             <div className="roadmap-modal-actions">
               <button type="button" className="button button-outline" onClick={closeCreateModal}>
                 {copy.cancelButton}
@@ -576,7 +720,7 @@ export function TasksKanbanView() {
         </div>
       ) : null}
 
-      {mutationError ? (
+      {mutationError && !isCreateModalOpen ? (
         <div className="dashboard-error">
           <p>{mutationError}</p>
         </div>

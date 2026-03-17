@@ -70,99 +70,77 @@ func (r *Repo) UpdateRoadmapTitle(ctx context.Context, userID, title string) err
 	return nil
 }
 
-// --- Stages ---
-
-func (r *Repo) CreateStage(ctx context.Context, roadmapID, userID, title string, position int) (Stage, error) {
-	const op apperr.Op = "Repo.CreateStage"
-	var s Stage
-	err := r.pool.QueryRow(ctx,
-		`INSERT INTO stages (roadmap_id, user_id, title, position)
-		 VALUES ($1, $2, $3, $4)
-		 RETURNING id, roadmap_id, user_id, title, position, created_at, updated_at`,
-		roadmapID, userID, title, position,
-	).Scan(&s.ID, &s.RoadmapID, &s.UserID, &s.Title, &s.Position, &s.CreatedAt, &s.UpdatedAt)
-	return s, apperr.E(op, err)
-}
-
-func (r *Repo) GetStagesByUserID(ctx context.Context, userID string) ([]Stage, error) {
-	const op apperr.Op = "Repo.GetStagesByUserID"
-	rows, err := r.pool.Query(ctx,
-		`SELECT id, roadmap_id, user_id, title, position, created_at, updated_at
-		 FROM stages WHERE user_id = $1 ORDER BY position, created_at`,
-		userID,
-	)
-	if err != nil {
-		return nil, apperr.E(op, err)
-	}
-	defer rows.Close()
-
-	var stages []Stage
-	for rows.Next() {
-		var s Stage
-		if err := rows.Scan(&s.ID, &s.RoadmapID, &s.UserID, &s.Title, &s.Position, &s.CreatedAt, &s.UpdatedAt); err != nil {
-			return nil, apperr.E(op, err)
-		}
-		stages = append(stages, s)
-	}
-	return stages, apperr.E(op, rows.Err())
-}
-
-func (r *Repo) UpdateStage(ctx context.Context, id, userID, title string, position int) error {
-	const op apperr.Op = "Repo.UpdateStage"
-	tag, err := r.pool.Exec(ctx,
-		`UPDATE stages SET title = $1, position = $2, updated_at = now()
-		 WHERE id = $3 AND user_id = $4`,
-		title, position, id, userID,
-	)
-	if err != nil {
-		return apperr.E(op, err)
-	}
-	if tag.RowsAffected() == 0 {
-		return apperr.E(op, ErrStageNotFound)
-	}
-	return nil
-}
-
-func (r *Repo) DeleteStage(ctx context.Context, id, userID string) error {
-	const op apperr.Op = "Repo.DeleteStage"
-	tag, err := r.pool.Exec(ctx,
-		`DELETE FROM stages WHERE id = $1 AND user_id = $2`,
-		id, userID,
-	)
-	if err != nil {
-		return apperr.E(op, err)
-	}
-	if tag.RowsAffected() == 0 {
-		return apperr.E(op, ErrStageNotFound)
-	}
-	return nil
-}
-
 // --- Topics ---
 
-func (r *Repo) CreateTopic(ctx context.Context, userID, stageID, title, description string, position int) (Topic, error) {
+func (r *Repo) CreateTopic(ctx context.Context, userID, title, description string, position int) (Topic, error) {
 	const op apperr.Op = "Repo.CreateTopic"
 	var t Topic
 	err := r.pool.QueryRow(ctx,
-		`INSERT INTO topics (user_id, stage_id, title, description, position)
-		 VALUES ($1, $2, $3, $4, $5)
-		 RETURNING id, user_id, stage_id, title, description, status,
+		`INSERT INTO topics (user_id, title, description, position)
+		 VALUES ($1, $2, $3, $4)
+		 RETURNING id, user_id, title, description, status,
 		           start_date, target_date, completed_date, position, created_at, updated_at`,
-		userID, stageID, title, description, position,
-	).Scan(&t.ID, &t.UserID, &t.StageID, &t.Title, &t.Description, &t.Status,
+		userID, title, description, position,
+	).Scan(&t.ID, &t.UserID, &t.Title, &t.Description, &t.Status,
 		&t.StartDate, &t.TargetDate, &t.CompletedDate, &t.Position, &t.CreatedAt, &t.UpdatedAt)
 	return t, apperr.E(op, err)
+}
+
+func (r *Repo) CreateTopicWithDependency(ctx context.Context, userID, title, description string, position int, dependsOnTopicID string) (Topic, error) {
+	const op apperr.Op = "Repo.CreateTopicWithDependency"
+
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return Topic{}, apperr.E(op, err)
+	}
+	defer tx.Rollback(ctx)
+
+	if err := ensureTopicExistsInUserScope(ctx, tx, dependsOnTopicID, userID); err != nil {
+		return Topic{}, apperr.E(op, err)
+	}
+
+	var t Topic
+	err = tx.QueryRow(ctx,
+		`INSERT INTO topics (user_id, title, description, position)
+		 VALUES ($1, $2, $3, $4)
+		 RETURNING id, user_id, title, description, status,
+		           start_date, target_date, completed_date, position, created_at, updated_at`,
+		userID, title, description, position,
+	).Scan(&t.ID, &t.UserID, &t.Title, &t.Description, &t.Status,
+		&t.StartDate, &t.TargetDate, &t.CompletedDate, &t.Position, &t.CreatedAt, &t.UpdatedAt)
+	if err != nil {
+		return Topic{}, apperr.E(op, err)
+	}
+
+	_, err = tx.Exec(ctx,
+		`INSERT INTO topic_dependencies (topic_id, depends_on_topic_id, user_id)
+		 VALUES ($1, $2, $3)`,
+		t.ID, dependsOnTopicID, userID,
+	)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if apperr.As(err, &pgErr) && pgErr.Code == uniqueViolation {
+			return Topic{}, apperr.E(op, ErrDependencyExists)
+		}
+		return Topic{}, apperr.E(op, err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return Topic{}, apperr.E(op, err)
+	}
+
+	return t, nil
 }
 
 func (r *Repo) GetTopicByID(ctx context.Context, id, userID string) (Topic, error) {
 	const op apperr.Op = "Repo.GetTopicByID"
 	var t Topic
 	err := r.pool.QueryRow(ctx,
-		`SELECT id, user_id, stage_id, title, description, status,
+		`SELECT id, user_id, title, description, status,
 		        start_date, target_date, completed_date, position, created_at, updated_at
 		 FROM topics WHERE id = $1 AND user_id = $2`,
 		id, userID,
-	).Scan(&t.ID, &t.UserID, &t.StageID, &t.Title, &t.Description, &t.Status,
+	).Scan(&t.ID, &t.UserID, &t.Title, &t.Description, &t.Status,
 		&t.StartDate, &t.TargetDate, &t.CompletedDate, &t.Position, &t.CreatedAt, &t.UpdatedAt)
 	if apperr.Is(err, pgx.ErrNoRows) {
 		return Topic{}, apperr.E(op, ErrTopicNotFound)
@@ -173,7 +151,7 @@ func (r *Repo) GetTopicByID(ctx context.Context, id, userID string) (Topic, erro
 func (r *Repo) GetTopicsByUserID(ctx context.Context, userID string) ([]Topic, error) {
 	const op apperr.Op = "Repo.GetTopicsByUserID"
 	rows, err := r.pool.Query(ctx,
-		`SELECT id, user_id, stage_id, title, description, status,
+		`SELECT id, user_id, title, description, status,
 		        start_date, target_date, completed_date, position, created_at, updated_at
 		 FROM topics WHERE user_id = $1 ORDER BY position, created_at`,
 		userID,
@@ -186,7 +164,7 @@ func (r *Repo) GetTopicsByUserID(ctx context.Context, userID string) ([]Topic, e
 	var topics []Topic
 	for rows.Next() {
 		var t Topic
-		if err := rows.Scan(&t.ID, &t.UserID, &t.StageID, &t.Title, &t.Description, &t.Status,
+		if err := rows.Scan(&t.ID, &t.UserID, &t.Title, &t.Description, &t.Status,
 			&t.StartDate, &t.TargetDate, &t.CompletedDate, &t.Position, &t.CreatedAt, &t.UpdatedAt); err != nil {
 			return nil, apperr.E(op, err)
 		}
@@ -195,14 +173,14 @@ func (r *Repo) GetTopicsByUserID(ctx context.Context, userID string) ([]Topic, e
 	return topics, apperr.E(op, rows.Err())
 }
 
-func (r *Repo) UpdateTopic(ctx context.Context, id, userID, stageID, title, description string, startDate, targetDate *time.Time, position int) error {
+func (r *Repo) UpdateTopic(ctx context.Context, id, userID, title, description string, startDate, targetDate *time.Time, position int) error {
 	const op apperr.Op = "Repo.UpdateTopic"
 	tag, err := r.pool.Exec(ctx,
 		`UPDATE topics
-		 SET stage_id = $1, title = $2, description = $3,
-		     start_date = $4, target_date = $5, position = $6, updated_at = now()
-		 WHERE id = $7 AND user_id = $8`,
-		stageID, title, description, startDate, targetDate, position, id, userID,
+		 SET title = $1, description = $2,
+		     start_date = $3, target_date = $4, position = $5, updated_at = now()
+		 WHERE id = $6 AND user_id = $7`,
+		title, description, startDate, targetDate, position, id, userID,
 	)
 	if err != nil {
 		return apperr.E(op, err)
@@ -302,4 +280,73 @@ func (r *Repo) GetDependenciesByUserID(ctx context.Context, userID string) ([]To
 		deps = append(deps, d)
 	}
 	return deps, apperr.E(op, rows.Err())
+}
+
+func (r *Repo) GetTopicMetricsByUserID(ctx context.Context, userID string) (map[string]TopicMetrics, error) {
+	const op apperr.Op = "Repo.GetTopicMetricsByUserID"
+	rows, err := r.pool.Query(ctx,
+		`SELECT
+			t.id,
+			COALESCE(tc.tasks_count, 0) AS tasks_count,
+			COALESCE(mc.materials_count, 0) AS materials_count,
+			COALESCE(pc.progress_percent, 0) AS progress_percent
+		 FROM topics t
+		 LEFT JOIN (
+			SELECT topic_id, COUNT(*)::int AS tasks_count
+			FROM tasks
+			WHERE user_id = $1 AND topic_id IS NOT NULL
+			GROUP BY topic_id
+		 ) tc ON tc.topic_id = t.id
+		 LEFT JOIN (
+			SELECT topic_id, COUNT(*)::int AS materials_count
+			FROM materials
+			WHERE user_id = $1
+			GROUP BY topic_id
+		 ) mc ON mc.topic_id = t.id
+		 LEFT JOIN (
+			SELECT
+				topic_id,
+				(
+					COUNT(*) FILTER (WHERE status = 'done') * 100 /
+					NULLIF(COUNT(*), 0)
+				)::int AS progress_percent
+			FROM tasks
+			WHERE user_id = $1 AND topic_id IS NOT NULL
+			GROUP BY topic_id
+		 ) pc ON pc.topic_id = t.id
+		 WHERE t.user_id = $1`,
+		userID,
+	)
+	if err != nil {
+		return nil, apperr.E(op, err)
+	}
+	defer rows.Close()
+
+	metrics := make(map[string]TopicMetrics)
+	for rows.Next() {
+		var m TopicMetrics
+		if err := rows.Scan(&m.TopicID, &m.TasksCount, &m.MaterialsCount, &m.ProgressPercent); err != nil {
+			return nil, apperr.E(op, err)
+		}
+		metrics[m.TopicID] = m
+	}
+
+	return metrics, apperr.E(op, rows.Err())
+}
+
+func ensureTopicExistsInUserScope(ctx context.Context, tx pgx.Tx, topicID, userID string) error {
+	const op apperr.Op = "Repo.ensureTopicExistsInUserScope"
+	var exists bool
+	err := tx.QueryRow(ctx,
+		`SELECT EXISTS(SELECT 1 FROM topics WHERE id = $1 AND user_id = $2)`,
+		topicID,
+		userID,
+	).Scan(&exists)
+	if err != nil {
+		return apperr.E(op, err)
+	}
+	if !exists {
+		return apperr.E(op, ErrTopicNotFound)
+	}
+	return nil
 }

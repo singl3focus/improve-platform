@@ -211,10 +211,23 @@ export function extractUser(payload: unknown): AuthUser | undefined {
   return undefined;
 }
 
-export function setSessionCookies(response: NextResponse, tokens: SessionTokens): void {
+function isSecureCookieRequest(request: NextRequest): boolean {
+  const forwardedProto = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
+  if (forwardedProto) {
+    return forwardedProto === "https";
+  }
+
+  return request.nextUrl.protocol === "https:";
+}
+
+export function setSessionCookies(
+  request: NextRequest,
+  response: NextResponse,
+  tokens: SessionTokens
+): void {
   const common = {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: isSecureCookieRequest(request),
     sameSite: "lax" as const,
     path: "/"
   };
@@ -234,13 +247,15 @@ export function setSessionCookies(response: NextResponse, tokens: SessionTokens)
   });
 }
 
-export function clearSessionCookies(response: NextResponse): void {
+export function clearSessionCookies(request: NextRequest, response: NextResponse): void {
+  const secure = isSecureCookieRequest(request);
+
   response.cookies.set({
     name: ACCESS_TOKEN_COOKIE,
     value: "",
     maxAge: 0,
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure,
     sameSite: "lax",
     path: "/"
   });
@@ -250,7 +265,7 @@ export function clearSessionCookies(response: NextResponse): void {
     value: "",
     maxAge: 0,
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure,
     sameSite: "lax",
     path: "/"
   });

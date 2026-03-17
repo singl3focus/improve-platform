@@ -253,9 +253,15 @@ const server = createServer(async (request, response) => {
         return;
       }
 
-      if (!topic.dependencies.includes(dependencyTopicId)) {
-        topic.dependencies.push(dependencyTopicId);
+      if (topic.dependencies.includes(dependencyTopicId)) {
+        sendJson(response, 409, {
+          message: "Dependency already exists.",
+          code: "dependency_exists"
+        });
+        return;
       }
+
+      topic.dependencies.push(dependencyTopicId);
 
       sendJson(response, 201, {
         success: true,

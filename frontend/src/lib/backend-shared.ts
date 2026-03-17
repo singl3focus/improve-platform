@@ -9,7 +9,15 @@ export function sanitizeApiUrl(value: string | undefined): string {
 }
 
 export function getBackendApiUrl(path: string): string {
-  return `${sanitizeApiUrl(process.env.BACKEND_API_URL)}${path}`;
+  const baseUrl = sanitizeApiUrl(process.env.BACKEND_API_URL);
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+
+  if (baseUrl.endsWith("/api/v1") && normalizedPath.startsWith("/api/v1")) {
+    const suffix = normalizedPath.slice("/api/v1".length);
+    return `${baseUrl}${suffix}`;
+  }
+
+  return `${baseUrl}${normalizedPath}`;
 }
 
 export function isRecord(value: unknown): value is Record<string, unknown> {

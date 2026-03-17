@@ -1,8 +1,14 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import { Montserrat } from "next/font/google";
 import { AppQueryProvider } from "@/components/providers/app-query-provider";
 import { UserPreferencesProvider } from "@/components/providers/user-preferences-provider";
 import "./globals.css";
+
+const montserrat = Montserrat({
+  subsets: ["latin", "cyrillic"],
+  display: "swap"
+});
 
 export const metadata: Metadata = {
   title: "Improve Platform",
@@ -16,7 +22,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body>
+      <body className={montserrat.className}>
         <UserPreferencesProvider>
           <AppQueryProvider>{children}</AppQueryProvider>
         </UserPreferencesProvider>

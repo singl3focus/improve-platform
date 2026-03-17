@@ -96,86 +96,6 @@ func (h *Handler) UpdateRoadmap() http.HandlerFunc {
 	}
 }
 
-func (h *Handler) CreateStage() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		userID, ok := auth.UserIDFromContext(r.Context())
-		if !ok {
-			httpresp.Error(w, http.StatusUnauthorized, "unauthorized", "user not authenticated")
-			return
-		}
-
-		var req CreateStageRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			httpresp.Error(w, http.StatusBadRequest, "bad_request", "invalid request body")
-			return
-		}
-		if req.Title == "" {
-			httpresp.Error(w, http.StatusBadRequest, "validation_error", "title is required")
-			return
-		}
-
-		resp, err := h.svc.CreateStage(r.Context(), userID, req)
-		if err != nil {
-			handleError(w, err)
-			return
-		}
-
-		httpresp.JSON(w, http.StatusCreated, resp)
-	}
-}
-
-func (h *Handler) UpdateStage() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		userID, ok := auth.UserIDFromContext(r.Context())
-		if !ok {
-			httpresp.Error(w, http.StatusUnauthorized, "unauthorized", "user not authenticated")
-			return
-		}
-
-		stageID := chi.URLParam(r, "stageID")
-		if !validateUUIDPathParam(w, stageID, "stage_id") {
-			return
-		}
-		var req UpdateStageRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			httpresp.Error(w, http.StatusBadRequest, "bad_request", "invalid request body")
-			return
-		}
-		if req.Title == "" {
-			httpresp.Error(w, http.StatusBadRequest, "validation_error", "title is required")
-			return
-		}
-
-		if err := h.svc.UpdateStage(r.Context(), userID, stageID, req); err != nil {
-			handleError(w, err)
-			return
-		}
-
-		w.WriteHeader(http.StatusNoContent)
-	}
-}
-
-func (h *Handler) DeleteStage() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		userID, ok := auth.UserIDFromContext(r.Context())
-		if !ok {
-			httpresp.Error(w, http.StatusUnauthorized, "unauthorized", "user not authenticated")
-			return
-		}
-
-		stageID := chi.URLParam(r, "stageID")
-		if !validateUUIDPathParam(w, stageID, "stage_id") {
-			return
-		}
-		if err := h.svc.DeleteStage(r.Context(), userID, stageID); err != nil {
-			handleError(w, err)
-			return
-		}
-
-		w.WriteHeader(http.StatusNoContent)
-	}
-}
-
 func (h *Handler) CreateTopic() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID, ok := auth.UserIDFromContext(r.Context())
@@ -189,12 +109,40 @@ func (h *Handler) CreateTopic() http.HandlerFunc {
 			httpresp.Error(w, http.StatusBadRequest, "bad_request", "invalid request body")
 			return
 		}
-		if req.StageID == "" || req.Title == "" {
-			httpresp.Error(w, http.StatusBadRequest, "validation_error", "stage_id and title are required")
+		if req.Title == "" {
+			httpresp.Error(w, http.StatusBadRequest, "validation_error", "title is required")
 			return
 		}
 
 		resp, err := h.svc.CreateTopic(r.Context(), userID, req)
+		if err != nil {
+			handleError(w, err)
+			return
+		}
+
+		httpresp.JSON(w, http.StatusCreated, resp)
+	}
+}
+
+func (h *Handler) CreateTopicWithDependency() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := auth.UserIDFromContext(r.Context())
+		if !ok {
+			httpresp.Error(w, http.StatusUnauthorized, "unauthorized", "user not authenticated")
+			return
+		}
+
+		var req CreateTopicWithDependencyRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			httpresp.Error(w, http.StatusBadRequest, "bad_request", "invalid request body")
+			return
+		}
+		if req.Title == "" || req.DependsOnTopicID == "" {
+			httpresp.Error(w, http.StatusBadRequest, "validation_error", "title and depends_on_topic_id are required")
+			return
+		}
+
+		resp, err := h.svc.CreateTopicWithDependency(r.Context(), userID, req)
 		if err != nil {
 			handleError(w, err)
 			return
@@ -243,8 +191,8 @@ func (h *Handler) UpdateTopic() http.HandlerFunc {
 			httpresp.Error(w, http.StatusBadRequest, "bad_request", "invalid request body")
 			return
 		}
-		if req.StageID == "" || req.Title == "" {
-			httpresp.Error(w, http.StatusBadRequest, "validation_error", "stage_id and title are required")
+		if req.Title == "" {
+			httpresp.Error(w, http.StatusBadRequest, "validation_error", "title is required")
 			return
 		}
 
@@ -372,8 +320,6 @@ func handleError(w http.ResponseWriter, err error) {
 		httpresp.Error(w, http.StatusNotFound, "roadmap_not_found", "roadmap not found")
 	case apperr.Is(err, ErrRoadmapExists):
 		httpresp.Error(w, http.StatusConflict, "roadmap_exists", "roadmap already exists for this user")
-	case apperr.Is(err, ErrStageNotFound):
-		httpresp.Error(w, http.StatusNotFound, "stage_not_found", "stage not found")
 	case apperr.Is(err, ErrTopicNotFound):
 		httpresp.Error(w, http.StatusNotFound, "topic_not_found", "topic not found")
 	case apperr.Is(err, ErrCycleDetected):

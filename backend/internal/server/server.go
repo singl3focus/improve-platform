@@ -89,11 +89,8 @@ func (s *Server) routes() {
 		r.Post("/api/v1/roadmap", rmH.CreateRoadmap())
 		r.Put("/api/v1/roadmap", rmH.UpdateRoadmap())
 
-		r.Post("/api/v1/roadmap/stages", rmH.CreateStage())
-		r.Put("/api/v1/roadmap/stages/{stageID}", rmH.UpdateStage())
-		r.Delete("/api/v1/roadmap/stages/{stageID}", rmH.DeleteStage())
-
 		r.Post("/api/v1/roadmap/topics", rmH.CreateTopic())
+		r.Post("/api/v1/roadmap/topics/with-dependency", rmH.CreateTopicWithDependency())
 		r.Get("/api/v1/roadmap/topics/{topicID}", rmH.GetTopic())
 		r.Put("/api/v1/roadmap/topics/{topicID}", rmH.UpdateTopic())
 		r.Delete("/api/v1/roadmap/topics/{topicID}", rmH.DeleteTopic())

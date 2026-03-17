@@ -232,6 +232,10 @@ export function useTasksBoardViewModel(copy: TasksBoardCopyForViewModel) {
   const [isCreating, setIsCreating] = useState(false);
   const [mutationError, setMutationError] = useState<string | null>(null);
 
+  function clearMutationError() {
+    setMutationError(null);
+  }
+
   useEffect(() => {
     const controller = new AbortController();
 
@@ -461,6 +465,7 @@ export function useTasksBoardViewModel(copy: TasksBoardCopyForViewModel) {
     updatingTaskId,
     isCreating,
     mutationError,
+    clearMutationError,
     groupedTasks,
     handleCreate,
     handleStatusChange,

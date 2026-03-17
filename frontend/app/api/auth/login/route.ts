@@ -60,6 +60,6 @@ export async function POST(request: NextRequest) {
     { status: 200 }
   );
 
-  setSessionCookies(authResponse, tokens);
+  setSessionCookies(request, authResponse, tokens);
   return authResponse;
 }

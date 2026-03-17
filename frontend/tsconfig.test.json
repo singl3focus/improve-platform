@@ -1,0 +1,23 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "outDir": ".test-dist",
+    "rootDir": "src/lib",
+    "types": ["node"],
+    "isolatedModules": false,
+    "incremental": false
+  },
+  "include": [
+    "src/lib/roadmap-graph.ts",
+    "src/lib/roadmap-graph.test.ts",
+    "src/lib/roadmap-layout.ts",
+    "src/lib/roadmap-layout.test.ts",
+    "src/lib/backend-shared.ts",
+    "src/lib/backend-shared.test.ts",
+    "src/lib/materials-form.ts",
+    "src/lib/materials-form.test.ts"
+  ]
+}

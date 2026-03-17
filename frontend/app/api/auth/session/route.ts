@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
       },
       { status: 401 }
     );
-    clearSessionCookies(response);
+    clearSessionCookies(request, response);
     return response;
   }
 
@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
   if (!response.ok) {
     const errorResponse = buildErrorResponse(response, payload);
     if (response.status === 401) {
-      clearSessionCookies(errorResponse);
+      clearSessionCookies(request, errorResponse);
     }
     return errorResponse;
   }
@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
     },
     { status: 200 }
   );
-  setSessionCookies(authResponse, tokens);
+  setSessionCookies(request, authResponse, tokens);
 
   return authResponse;
 }

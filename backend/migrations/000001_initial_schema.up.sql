@@ -20,30 +20,12 @@ CREATE TABLE roadmaps (
     CONSTRAINT roadmaps_id_user UNIQUE (id, user_id)
 );
 
--- stages: UI-only grouping of topics within a roadmap
--- user_id denormalized for composite FK enforcement (cross-user isolation)
-CREATE TABLE stages (
-    id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-    roadmap_id  UUID        NOT NULL,
-    user_id     UUID        NOT NULL,
-    title       TEXT        NOT NULL,
-    position    INT         NOT NULL DEFAULT 0,
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-    CONSTRAINT stages_roadmap_user_fk FOREIGN KEY (roadmap_id, user_id)
-        REFERENCES roadmaps(id, user_id) ON DELETE CASCADE,
-    CONSTRAINT stages_id_user UNIQUE (id, user_id)
-);
-
-CREATE INDEX idx_stages_roadmap_id ON stages (roadmap_id);
-
--- topics: core learning unit inside a stage
+-- topics: core learning unit inside a roadmap
 CREATE TYPE topic_status AS ENUM ('not_started', 'in_progress', 'paused', 'completed');
 
 CREATE TABLE topics (
     id              UUID            PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id         UUID            NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    stage_id        UUID            NOT NULL,
     title           TEXT            NOT NULL,
     description     TEXT            NOT NULL DEFAULT '',
     status          topic_status    NOT NULL DEFAULT 'not_started',
@@ -53,13 +35,10 @@ CREATE TABLE topics (
     position        INT             NOT NULL DEFAULT 0,
     created_at      TIMESTAMPTZ     NOT NULL DEFAULT now(),
     updated_at      TIMESTAMPTZ     NOT NULL DEFAULT now(),
-    CONSTRAINT topics_stage_user_fk FOREIGN KEY (stage_id, user_id)
-        REFERENCES stages(id, user_id) ON DELETE CASCADE,
     CONSTRAINT topics_id_user UNIQUE (id, user_id)
 );
 
 CREATE INDEX idx_topics_user_id  ON topics (user_id);
-CREATE INDEX idx_topics_stage_id ON topics (stage_id);
 
 -- topic_dependencies: DAG edges (prerequisite relationships)
 -- user_id ensures both sides of the dependency belong to the same user
