@@ -14,7 +14,7 @@ type mockRepo struct {
 	createFn      func(ctx context.Context, m material.Material) (material.Material, error)
 	getByIDFn     func(ctx context.Context, id, userID string) (material.Material, error)
 	listByTopicFn func(ctx context.Context, topicID, userID string) ([]material.Material, error)
-	updateFn      func(ctx context.Context, id, userID, title, description string, progress, position int) error
+	updateFn      func(ctx context.Context, id, userID, title, description, materialType, unit string, totalAmount, completedAmount, position int) error
 	deleteFn      func(ctx context.Context, id, userID string) error
 }
 
@@ -27,8 +27,8 @@ func (m *mockRepo) GetByID(ctx context.Context, id, userID string) (material.Mat
 func (m *mockRepo) ListByTopic(ctx context.Context, topicID, userID string) ([]material.Material, error) {
 	return m.listByTopicFn(ctx, topicID, userID)
 }
-func (m *mockRepo) Update(ctx context.Context, id, userID, title, description string, progress, position int) error {
-	return m.updateFn(ctx, id, userID, title, description, progress, position)
+func (m *mockRepo) Update(ctx context.Context, id, userID, title, description, materialType, unit string, totalAmount, completedAmount, position int) error {
+	return m.updateFn(ctx, id, userID, title, description, materialType, unit, totalAmount, completedAmount, position)
 }
 func (m *mockRepo) Delete(ctx context.Context, id, userID string) error {
 	return m.deleteFn(ctx, id, userID)
@@ -48,10 +48,12 @@ func TestCreateMaterial_Success(t *testing.T) {
 	uc := material.NewUseCase(repo)
 
 	resp, err := uc.CreateMaterial(context.Background(), "user-1", material.CreateRequest{
-		TopicID:  "topic-1",
-		Title:    "Go Book",
-		Progress: 0,
-		Position: 1,
+		TopicID:         "topic-1",
+		Title:           "Go Book",
+		Type:            "book",
+		TotalAmount:     120,
+		CompletedAmount: 0,
+		Position:        1,
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -62,31 +64,38 @@ func TestCreateMaterial_Success(t *testing.T) {
 	if resp.Title != "Go Book" {
 		t.Errorf("expected title 'Go Book', got %s", resp.Title)
 	}
-}
-
-func TestCreateMaterial_InvalidProgress_Negative(t *testing.T) {
-	uc := material.NewUseCase(&mockRepo{})
-
-	_, err := uc.CreateMaterial(context.Background(), "user-1", material.CreateRequest{
-		TopicID:  "topic-1",
-		Title:    "Book",
-		Progress: -1,
-	})
-	if !errors.Is(err, material.ErrInvalidProgress) {
-		t.Errorf("expected ErrInvalidProgress, got %v", err)
+	if resp.Unit != "pages" {
+		t.Errorf("expected unit pages, got %s", resp.Unit)
 	}
 }
 
-func TestCreateMaterial_InvalidProgress_Over100(t *testing.T) {
+func TestCreateMaterial_InvalidType(t *testing.T) {
 	uc := material.NewUseCase(&mockRepo{})
 
 	_, err := uc.CreateMaterial(context.Background(), "user-1", material.CreateRequest{
-		TopicID:  "topic-1",
-		Title:    "Book",
-		Progress: 101,
+		TopicID:         "topic-1",
+		Title:           "Book",
+		Type:            "podcast",
+		TotalAmount:     10,
+		CompletedAmount: 1,
 	})
-	if !errors.Is(err, material.ErrInvalidProgress) {
-		t.Errorf("expected ErrInvalidProgress, got %v", err)
+	if !errors.Is(err, material.ErrInvalidMaterialType) {
+		t.Errorf("expected ErrInvalidMaterialType, got %v", err)
+	}
+}
+
+func TestCreateMaterial_InvalidAmount_CompletedOverTotal(t *testing.T) {
+	uc := material.NewUseCase(&mockRepo{})
+
+	_, err := uc.CreateMaterial(context.Background(), "user-1", material.CreateRequest{
+		TopicID:         "topic-1",
+		Title:           "Book",
+		Type:            "article",
+		TotalAmount:     10,
+		CompletedAmount: 11,
+	})
+	if !errors.Is(err, material.ErrInvalidAmount) {
+		t.Errorf("expected ErrInvalidAmount, got %v", err)
 	}
 }
 
@@ -99,8 +108,11 @@ func TestCreateMaterial_TopicNotFound(t *testing.T) {
 	uc := material.NewUseCase(repo)
 
 	_, err := uc.CreateMaterial(context.Background(), "user-1", material.CreateRequest{
-		TopicID: "bad-topic",
-		Title:   "Book",
+		TopicID:         "bad-topic",
+		Title:           "Book",
+		Type:            "book",
+		TotalAmount:     10,
+		CompletedAmount: 0,
 	})
 	if !errors.Is(err, material.ErrTopicNotFound) {
 		t.Errorf("expected ErrTopicNotFound, got %v", err)
@@ -112,7 +124,7 @@ func TestCreateMaterial_TopicNotFound(t *testing.T) {
 func TestGetMaterial_Success(t *testing.T) {
 	repo := &mockRepo{
 		getByIDFn: func(_ context.Context, id, _ string) (material.Material, error) {
-			return material.Material{ID: id, Title: "Go Book", Progress: 50}, nil
+			return material.Material{ID: id, Title: "Go Book", Type: "course", Unit: "lessons", TotalAmount: 8, CompletedAmount: 4}, nil
 		},
 	}
 	uc := material.NewUseCase(repo)
@@ -123,6 +135,9 @@ func TestGetMaterial_Success(t *testing.T) {
 	}
 	if resp.Progress != 50 {
 		t.Errorf("expected progress 50, got %d", resp.Progress)
+	}
+	if resp.Unit != "lessons" {
+		t.Errorf("expected unit lessons, got %s", resp.Unit)
 	}
 }
 
@@ -186,9 +201,15 @@ func TestListByTopic_Empty(t *testing.T) {
 
 func TestUpdateMaterial_Success(t *testing.T) {
 	repo := &mockRepo{
-		updateFn: func(_ context.Context, _, _, _, _ string, progress, _ int) error {
-			if progress != 75 {
-				t.Errorf("expected progress 75, got %d", progress)
+		updateFn: func(_ context.Context, _, _, _, _, materialType, unit string, totalAmount, completedAmount, _ int) error {
+			if materialType != "video" {
+				t.Errorf("expected type video, got %s", materialType)
+			}
+			if unit != "hours" {
+				t.Errorf("expected unit hours, got %s", unit)
+			}
+			if totalAmount != 10 || completedAmount != 7 {
+				t.Errorf("expected amounts 10/7, got %d/%d", totalAmount, completedAmount)
 			}
 			return nil
 		},
@@ -196,41 +217,61 @@ func TestUpdateMaterial_Success(t *testing.T) {
 	uc := material.NewUseCase(repo)
 
 	err := uc.UpdateMaterial(context.Background(), "user-1", "mat-1", material.UpdateRequest{
-		Title:    "Updated",
-		Progress: 75,
-		Position: 2,
+		Title:           "Updated",
+		Type:            "video",
+		TotalAmount:     10,
+		CompletedAmount: 7,
+		Position:        2,
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
-func TestUpdateMaterial_InvalidProgress(t *testing.T) {
+func TestUpdateMaterial_InvalidAmount(t *testing.T) {
 	uc := material.NewUseCase(&mockRepo{})
 
 	err := uc.UpdateMaterial(context.Background(), "user-1", "mat-1", material.UpdateRequest{
-		Title:    "X",
-		Progress: 200,
+		Title:           "X",
+		Type:            "book",
+		TotalAmount:     5,
+		CompletedAmount: 6,
 	})
-	if !errors.Is(err, material.ErrInvalidProgress) {
-		t.Errorf("expected ErrInvalidProgress, got %v", err)
+	if !errors.Is(err, material.ErrInvalidAmount) {
+		t.Errorf("expected ErrInvalidAmount, got %v", err)
 	}
 }
 
 func TestUpdateMaterial_NotFound(t *testing.T) {
 	repo := &mockRepo{
-		updateFn: func(_ context.Context, _, _, _, _ string, _, _ int) error {
+		updateFn: func(_ context.Context, _, _, _, _, _, _ string, _, _, _ int) error {
 			return material.ErrMaterialNotFound
 		},
 	}
 	uc := material.NewUseCase(repo)
 
 	err := uc.UpdateMaterial(context.Background(), "user-1", "nonexistent", material.UpdateRequest{
-		Title:    "X",
-		Progress: 10,
+		Title:           "X",
+		Type:            "book",
+		TotalAmount:     10,
+		CompletedAmount: 1,
 	})
 	if !errors.Is(err, material.ErrMaterialNotFound) {
 		t.Errorf("expected ErrMaterialNotFound, got %v", err)
+	}
+}
+
+func TestBuildResponse_ZeroTotalAmount_ProgressZero(t *testing.T) {
+	resp, err := material.NewUseCase(&mockRepo{
+		getByIDFn: func(_ context.Context, id, _ string) (material.Material, error) {
+			return material.Material{ID: id, Type: "book", Unit: "pages", TotalAmount: 0, CompletedAmount: 0}, nil
+		},
+	}).GetMaterial(context.Background(), "user-1", "mat-1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.Progress != 0 {
+		t.Errorf("expected progress 0, got %d", resp.Progress)
 	}
 }
 

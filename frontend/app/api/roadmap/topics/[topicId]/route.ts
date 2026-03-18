@@ -5,7 +5,7 @@ import {
   createBackendUnavailableResponse
 } from "@/lib/backend-api";
 import { getStringValue, isRecord } from "@/lib/backend-shared";
-import { normalizeText, parseInteger } from "@/lib/payload-parsers";
+import { normalizeText } from "@/lib/payload-parsers";
 
 interface RouteContext {
   params: {
@@ -16,7 +16,6 @@ interface RouteContext {
 interface TopicUpdatePayload {
   title?: unknown;
   description?: unknown;
-  position?: unknown;
 }
 
 export async function PUT(request: NextRequest, context: RouteContext) {
@@ -34,14 +33,6 @@ export async function PUT(request: NextRequest, context: RouteContext) {
 
   if (payload.description !== undefined && typeof payload.description !== "string") {
     return NextResponse.json({ message: "Description must be a string." }, { status: 422 });
-  }
-
-  const position = parseInteger(payload.position);
-  if (position === null || position < 1) {
-    return NextResponse.json(
-      { message: "Position must be an integer greater than or equal to 1." },
-      { status: 422 }
-    );
   }
 
   const description = typeof payload.description === "string" ? payload.description.trim() : "";
@@ -66,6 +57,10 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     const currentTopic = isRecord(currentTopicResult.payload) ? currentTopicResult.payload : null;
     const startDate = getStringValue(currentTopic, "start_date") ?? null;
     const targetDate = getStringValue(currentTopic, "target_date") ?? null;
+    const currentPositionValue = Number((currentTopic as { position?: unknown } | null)?.position ?? 1);
+    const position = Number.isFinite(currentPositionValue) && currentPositionValue > 0
+      ? Math.floor(currentPositionValue)
+      : 1;
 
     const updateResult = await client.call(`/api/v1/roadmap/topics/${encodeURIComponent(topicId)}`, {
       method: "PUT",

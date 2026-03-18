@@ -4,6 +4,12 @@ const FRONTEND_BASE_URL = process.env.FRONTEND_BASE_URL ?? "http://127.0.0.1:302
 const MOCK_BACKEND_PORT = Number(process.env.MOCK_BACKEND_PORT ?? "8080");
 const MOCK_BACKEND_HOST = process.env.MOCK_BACKEND_HOST ?? "127.0.0.1";
 const MOCK_BACKEND_BASE_URL = `http://${MOCK_BACKEND_HOST}:${MOCK_BACKEND_PORT}`;
+const MATERIAL_UNIT_BY_TYPE = {
+  book: "pages",
+  article: "pages",
+  course: "lessons",
+  video: "hours"
+};
 
 function invariant(condition, message) {
   if (!condition) {
@@ -13,6 +19,15 @@ function invariant(condition, message) {
 
 function nowIso(offsetDays = 0) {
   return new Date(Date.now() + offsetDays * 24 * 60 * 60 * 1000).toISOString();
+}
+
+function computeMaterialProgress(totalAmount, completedAmount) {
+  if (totalAmount <= 0) {
+    return 0;
+  }
+
+  const boundedCompleted = Math.max(0, Math.min(completedAmount, totalAmount));
+  return Math.round((boundedCompleted / totalAmount) * 100);
 }
 
 function createDefaultRoadmap() {
@@ -74,6 +89,10 @@ function createMockState() {
       topic_id: "topic-html-css",
       title: "MDN HTML reference",
       description: "Official HTML element documentation.",
+      type: "article",
+      unit: "pages",
+      total_amount: 100,
+      completed_amount: 30,
       progress: 30,
       position: 1,
       updated_at: nowIso(-1)
@@ -677,8 +696,31 @@ function createMockBackendServer() {
     if (method === "POST" && path === "/api/v1/materials") {
       const payload = await parseJsonBody(request);
       const topicId = typeof payload?.topic_id === "string" ? payload.topic_id : "";
+      const type = typeof payload?.type === "string" ? payload.type : "";
+      const totalAmount = Number(payload?.total_amount);
+      const completedAmount = Number(payload?.completed_amount);
+      const position = Number(payload?.position);
+
       if (!findTopicById(state, topicId)) {
         sendJson(response, 404, { message: "Topic not found.", code: "topic_not_found" });
+        return;
+      }
+
+      if (!(type in MATERIAL_UNIT_BY_TYPE)) {
+        sendJson(response, 400, { message: "type is required", code: "validation_error" });
+        return;
+      }
+
+      if (
+        !Number.isInteger(totalAmount) ||
+        !Number.isInteger(completedAmount) ||
+        !Number.isInteger(position) ||
+        totalAmount < 0 ||
+        completedAmount < 0 ||
+        completedAmount > totalAmount ||
+        position < 1
+      ) {
+        sendJson(response, 400, { message: "invalid material payload", code: "validation_error" });
         return;
       }
 
@@ -689,8 +731,12 @@ function createMockBackendServer() {
         topic_id: topicId,
         title: String(payload?.title ?? ""),
         description: String(payload?.description ?? ""),
-        progress: Number(payload?.progress ?? 0),
-        position: Number(payload?.position ?? 1),
+        type,
+        unit: MATERIAL_UNIT_BY_TYPE[type],
+        total_amount: totalAmount,
+        completed_amount: completedAmount,
+        progress: computeMaterialProgress(totalAmount, completedAmount),
+        position,
         updated_at: now
       };
       state.materials.push(created);
@@ -718,10 +764,32 @@ function createMockBackendServer() {
 
         if (method === "PUT") {
           const payload = await parseJsonBody(request);
+          const nextType =
+            typeof payload?.type === "string" && payload.type in MATERIAL_UNIT_BY_TYPE
+              ? payload.type
+              : material.type;
+          const nextTotalAmount =
+            Number.isInteger(Number(payload?.total_amount)) && Number(payload?.total_amount) >= 0
+              ? Number(payload?.total_amount)
+              : material.total_amount;
+          const nextCompletedAmount =
+            Number.isInteger(Number(payload?.completed_amount)) && Number(payload?.completed_amount) >= 0
+              ? Number(payload?.completed_amount)
+              : material.completed_amount;
+
+          if (nextCompletedAmount > nextTotalAmount) {
+            sendJson(response, 400, { message: "invalid material payload", code: "validation_error" });
+            return;
+          }
+
           material.title = String(payload?.title ?? material.title);
           material.description = String(payload?.description ?? material.description);
+          material.type = nextType;
+          material.unit = MATERIAL_UNIT_BY_TYPE[nextType];
+          material.total_amount = nextTotalAmount;
+          material.completed_amount = nextCompletedAmount;
           material.position = Number(payload?.position ?? material.position);
-          material.progress = Number(payload?.progress ?? material.progress);
+          material.progress = computeMaterialProgress(nextTotalAmount, nextCompletedAmount);
           material.updated_at = nowIso(0);
           sendJson(response, 200, material);
           return;
@@ -1046,6 +1114,16 @@ async function run() {
       invariant(Array.isArray(list.body?.materials), "Expected materials array.");
       invariant(Array.isArray(list.body?.topics), "Expected topics array.");
       invariant(list.body.topics.length > 0, "Expected non-empty topics list.");
+      invariant(typeof list.body.materials[0]?.type === "string", "Expected material type field.");
+      invariant(typeof list.body.materials[0]?.unit === "string", "Expected material unit field.");
+      invariant(
+        typeof list.body.materials[0]?.totalAmount === "number",
+        "Expected material totalAmount field."
+      );
+      invariant(
+        typeof list.body.materials[0]?.completedAmount === "number",
+        "Expected material completedAmount field."
+      );
 
       const topicId = list.body.topics[0].id;
       const create = await request("/api/materials", {
@@ -1054,21 +1132,29 @@ async function run() {
           title: "Smoke material",
           description: "Created by verification.",
           topicId,
+          type: "video",
+          totalAmount: 12,
+          completedAmount: 3,
           position: 7,
-          progressPercent: 10
         })
       });
       invariant(create.status === 201, `Create expected 201, got ${create.status}`);
       invariant(typeof create.body?.id === "string", "Expected created material id.");
+      invariant(create.body?.type === "video", "Expected created material type.");
+      invariant(create.body?.unit === "hours", "Expected created material unit mapped from type.");
+      invariant(create.body?.totalAmount === 12, "Expected created material totalAmount = 12.");
+      invariant(create.body?.completedAmount === 3, "Expected created material completedAmount = 3.");
 
       const invalid = await request("/api/materials", {
         method: "POST",
         body: JSON.stringify({
           title: "Invalid material",
-          description: "Invalid progress should fail",
+          description: "Invalid completed amount should fail",
           topicId,
+          type: "book",
+          totalAmount: 10,
+          completedAmount: 11,
           position: 1,
-          progressPercent: 101
         })
       });
       invariant(invalid.status === 422, `Invalid payload expected 422, got ${invalid.status}`);
@@ -1085,8 +1171,10 @@ async function run() {
           title: "Patch-delete material",
           description: "Created for patch/delete checks.",
           topicId,
+          type: "book",
+          totalAmount: 100,
+          completedAmount: 20,
           position: 8,
-          progressPercent: 0
         })
       });
       invariant(created.status === 201, `Create expected 201, got ${created.status}`);
@@ -1094,9 +1182,13 @@ async function run() {
 
       const updated = await request(`/api/materials/${encodeURIComponent(materialId)}`, {
         method: "PATCH",
-        body: JSON.stringify({ progressPercent: 35 })
+        body: JSON.stringify({ type: "course", totalAmount: 40, completedAmount: 14 })
       });
       invariant(updated.status === 200, `Patch expected 200, got ${updated.status}`);
+      invariant(updated.body?.type === "course", "Expected updated type = course.");
+      invariant(updated.body?.unit === "lessons", "Expected updated unit = lessons.");
+      invariant(updated.body?.totalAmount === 40, "Expected updated totalAmount = 40.");
+      invariant(updated.body?.completedAmount === 14, "Expected updated completedAmount = 14.");
       invariant(updated.body?.progressPercent === 35, "Expected updated progressPercent = 35.");
 
       const deleted = await request(`/api/materials/${encodeURIComponent(materialId)}`, {
@@ -1107,7 +1199,7 @@ async function run() {
 
       const missing = await request(`/api/materials/${encodeURIComponent(materialId)}`, {
         method: "PATCH",
-        body: JSON.stringify({ progressPercent: 40 })
+        body: JSON.stringify({ totalAmount: 50, completedAmount: 25 })
       });
       invariant(missing.status === 404, `Missing material expected 404, got ${missing.status}`);
     });
@@ -1163,8 +1255,7 @@ async function run() {
         method: "POST",
         body: JSON.stringify({
           title: "Smoke topic",
-          description: "Created in smoke test.",
-          position: 1
+          description: "Created in smoke test."
         })
       });
       invariant(topicCreate.status === 201, `Topic create expected 201, got ${topicCreate.status}`);
@@ -1175,8 +1266,7 @@ async function run() {
         method: "PUT",
         body: JSON.stringify({
           title: "Smoke topic updated",
-          description: "Updated in smoke test.",
-          position: 2
+          description: "Updated in smoke test."
         })
       });
       invariant(topicUpdate.status === 200, `Topic update expected 200, got ${topicUpdate.status}`);
@@ -1194,8 +1284,7 @@ async function run() {
         method: "POST",
         body: JSON.stringify({
           title: "Prerequisite topic",
-          description: "Source dependency topic",
-          position: 1
+          description: "Source dependency topic"
         })
       });
       invariant(
@@ -1209,8 +1298,7 @@ async function run() {
         method: "POST",
         body: JSON.stringify({
           title: "Dependent topic",
-          description: "Target dependency topic",
-          position: 2
+          description: "Target dependency topic"
         })
       });
       invariant(

@@ -12,6 +12,12 @@ import {
 } from "@/lib/backend-api";
 import { normalizeText, parseInteger } from "@/lib/payload-parsers";
 import { buildRoadmapTopicTitleMap } from "@/lib/roadmap-topic-helpers";
+import {
+  mapBackendMaterialToLibraryMaterial,
+  toBackendUpdateMaterialPayload
+} from "@/lib/materials-api-mapping";
+
+const ALLOWED_MATERIAL_TYPES = new Set(["book", "article", "course", "video"]);
 
 interface RouteContext {
   params: {
@@ -54,16 +60,20 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     title?: unknown;
     description?: unknown;
     topicId?: unknown;
+    type?: unknown;
+    totalAmount?: unknown;
+    completedAmount?: unknown;
     position?: unknown;
-    progressPercent?: unknown;
   };
   try {
     payload = (await request.json()) as {
       title?: unknown;
       description?: unknown;
       topicId?: unknown;
+      type?: unknown;
+      totalAmount?: unknown;
+      completedAmount?: unknown;
       position?: unknown;
-      progressPercent?: unknown;
     };
   } catch {
     return NextResponse.json({ message: "Invalid JSON body." }, { status: 400 });
@@ -109,15 +119,37 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     updates.position = position;
   }
 
-  if ("progressPercent" in payload) {
-    const progressPercent = parseInteger(payload.progressPercent);
-    if (progressPercent === null || progressPercent < 0 || progressPercent > 100) {
+  if ("type" in payload) {
+    const materialType = normalizeText(payload.type);
+    if (!materialType || !ALLOWED_MATERIAL_TYPES.has(materialType)) {
       return NextResponse.json(
-        { message: "Progress must be an integer between 0 and 100." },
+        { message: "Type must be one of: book, article, course, video." },
         { status: 422 }
       );
     }
-    updates.progressPercent = progressPercent;
+    updates.type = materialType as "book" | "article" | "course" | "video";
+  }
+
+  if ("totalAmount" in payload) {
+    const totalAmount = parseInteger(payload.totalAmount);
+    if (totalAmount === null || totalAmount < 0) {
+      return NextResponse.json(
+        { message: "totalAmount must be a non-negative integer." },
+        { status: 422 }
+      );
+    }
+    updates.totalAmount = totalAmount;
+  }
+
+  if ("completedAmount" in payload) {
+    const completedAmount = parseInteger(payload.completedAmount);
+    if (completedAmount === null || completedAmount < 0) {
+      return NextResponse.json(
+        { message: "completedAmount must be a non-negative integer." },
+        { status: 422 }
+      );
+    }
+    updates.completedAmount = completedAmount;
   }
 
   if (Object.keys(updates).length === 0) {
@@ -143,6 +175,18 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     }
 
     const currentMaterial = currentMaterialResult.payload as BackendMaterialResponse;
+    const nextTotalAmount = updates.totalAmount ?? currentMaterial.total_amount;
+    const nextCompletedAmount = updates.completedAmount ?? currentMaterial.completed_amount;
+    if (nextCompletedAmount > nextTotalAmount) {
+      return NextResponse.json(
+        {
+          message:
+            "totalAmount and completedAmount must be non-negative integers and completedAmount must be <= totalAmount."
+        },
+        { status: 422 }
+      );
+    }
+
     if (updates.topicId && updates.topicId !== currentMaterial.topic_id) {
       return NextResponse.json(
         { message: "Changing material topic is not supported by backend API." },
@@ -154,12 +198,14 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       `/api/v1/materials/${encodeURIComponent(context.params.materialId)}`,
       {
         method: "PUT",
-        body: {
+        body: toBackendUpdateMaterialPayload({
           title: updates.title ?? currentMaterial.title,
           description: updates.description ?? currentMaterial.description,
-          position: updates.position ?? currentMaterial.position,
-          progress: updates.progressPercent ?? currentMaterial.progress
-        }
+          type: updates.type ?? currentMaterial.type,
+          totalAmount: nextTotalAmount,
+          completedAmount: nextCompletedAmount,
+          position: updates.position ?? currentMaterial.position
+        })
       }
     );
 
@@ -195,15 +241,10 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 
     const material = updatedMaterialResult.payload as BackendMaterialResponse;
     const response = NextResponse.json(
-      {
-        id: material.id,
-        title: material.title,
-        description: material.description,
-        topicId: material.topic_id,
-        topicTitle: topicsResult.topicTitleMap.get(material.topic_id) ?? material.topic_id,
-        position: material.position,
-        progressPercent: material.progress
-      },
+      mapBackendMaterialToLibraryMaterial(
+        material,
+        topicsResult.topicTitleMap.get(material.topic_id) ?? material.topic_id
+      ),
       { status: 200 }
     );
     client.applyUpdatedSession(response);

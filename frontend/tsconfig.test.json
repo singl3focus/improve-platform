@@ -17,6 +17,8 @@
     "src/lib/roadmap-layout.test.ts",
     "src/lib/backend-shared.ts",
     "src/lib/backend-shared.test.ts",
+    "src/lib/materials-api-mapping.ts",
+    "src/lib/materials-api-mapping.test.ts",
     "src/lib/materials-form.ts",
     "src/lib/materials-form.test.ts"
   ]

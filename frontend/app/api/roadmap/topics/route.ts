@@ -5,12 +5,11 @@ import {
   createBackendErrorResponse,
   createBackendUnavailableResponse
 } from "@/lib/backend-api";
-import { normalizeText, parseInteger } from "@/lib/payload-parsers";
+import { normalizeText } from "@/lib/payload-parsers";
 
 interface TopicCreatePayload {
   title?: unknown;
   description?: unknown;
-  position?: unknown;
 }
 
 function getNextTopicPosition(roadmap: BackendRoadmapResponse): number {
@@ -38,17 +37,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: "Description must be a string." }, { status: 422 });
   }
 
-  let position: number | null = null;
-  if ("position" in payload && payload.position !== undefined) {
-    position = parseInteger(payload.position);
-    if (position === null || position < 1) {
-      return NextResponse.json(
-        { message: "Position must be an integer greater than or equal to 1." },
-        { status: 422 }
-      );
-    }
-  }
-
   const description = typeof payload.description === "string" ? payload.description.trim() : "";
   const client = createBackendClient(request);
 
@@ -72,7 +60,7 @@ export async function POST(request: NextRequest) {
       body: {
         title,
         description,
-        position: position ?? fallbackPosition
+        position: fallbackPosition
       }
     });
 

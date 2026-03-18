@@ -1,8 +1,11 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.parsePositiveInteger = parsePositiveInteger;
-exports.parseProgressPercent = parseProgressPercent;
+exports.parseNonNegativeInteger = parseNonNegativeInteger;
+exports.resolveUnitByType = resolveUnitByType;
+exports.computeProgressPercent = computeProgressPercent;
 exports.normalizeProgressPercent = normalizeProgressPercent;
+const materials_library_types_1 = require("./materials-library-types");
 function parsePositiveInteger(value, fallback) {
     const parsed = Number.parseInt(value, 10);
     if (!Number.isInteger(parsed) || parsed < 1) {
@@ -10,12 +13,22 @@ function parsePositiveInteger(value, fallback) {
     }
     return parsed;
 }
-function parseProgressPercent(value, fallback) {
+function parseNonNegativeInteger(value, fallback) {
     const parsed = Number.parseInt(value, 10);
-    if (!Number.isInteger(parsed) || parsed < 0 || parsed > 100) {
+    if (!Number.isInteger(parsed) || parsed < 0) {
         return fallback;
     }
     return parsed;
+}
+function resolveUnitByType(type) {
+    return materials_library_types_1.MATERIAL_TYPE_TO_UNIT[type];
+}
+function computeProgressPercent(totalAmount, completedAmount) {
+    if (!Number.isFinite(totalAmount) || totalAmount <= 0 || !Number.isFinite(completedAmount)) {
+        return 0;
+    }
+    const boundedCompleted = Math.min(Math.max(completedAmount, 0), totalAmount);
+    return normalizeProgressPercent((boundedCompleted / totalAmount) * 100);
 }
 function normalizeProgressPercent(value) {
     if (!Number.isFinite(value)) {

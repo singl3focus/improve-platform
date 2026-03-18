@@ -33,17 +33,24 @@ func (uc *UseCase) record(ctx context.Context, ev history.Event) {
 
 func (uc *UseCase) CreateMaterial(ctx context.Context, userID string, req CreateRequest) (MaterialResponse, error) {
 	const op apperr.Op = "UseCase.CreateMaterial"
-	if req.Progress < 0 || req.Progress > 100 {
-		return MaterialResponse{}, apperr.E(op, ErrInvalidProgress)
+	unit, ok := unitByType(req.Type)
+	if !ok {
+		return MaterialResponse{}, apperr.E(op, ErrInvalidMaterialType)
+	}
+	if req.TotalAmount < 0 || req.CompletedAmount < 0 || req.CompletedAmount > req.TotalAmount {
+		return MaterialResponse{}, apperr.E(op, ErrInvalidAmount)
 	}
 
 	m := Material{
-		UserID:      userID,
-		TopicID:     req.TopicID,
-		Title:       req.Title,
-		Description: req.Description,
-		Progress:    req.Progress,
-		Position:    req.Position,
+		UserID:          userID,
+		TopicID:         req.TopicID,
+		Title:           req.Title,
+		Description:     req.Description,
+		Type:            req.Type,
+		Unit:            unit,
+		TotalAmount:     req.TotalAmount,
+		CompletedAmount: req.CompletedAmount,
+		Position:        req.Position,
 	}
 
 	created, err := uc.repo.Create(ctx, m)
@@ -85,18 +92,33 @@ func (uc *UseCase) ListByTopic(ctx context.Context, userID, topicID string) ([]M
 
 func (uc *UseCase) UpdateMaterial(ctx context.Context, userID, materialID string, req UpdateRequest) error {
 	const op apperr.Op = "UseCase.UpdateMaterial"
-	if req.Progress < 0 || req.Progress > 100 {
-		return apperr.E(op, ErrInvalidProgress)
+	unit, ok := unitByType(req.Type)
+	if !ok {
+		return apperr.E(op, ErrInvalidMaterialType)
+	}
+	if req.TotalAmount < 0 || req.CompletedAmount < 0 || req.CompletedAmount > req.TotalAmount {
+		return apperr.E(op, ErrInvalidAmount)
 	}
 
-	if err := uc.repo.Update(ctx, materialID, userID, req.Title, req.Description, req.Progress, req.Position); err != nil {
+	if err := uc.repo.Update(
+		ctx,
+		materialID,
+		userID,
+		req.Title,
+		req.Description,
+		req.Type,
+		unit,
+		req.TotalAmount,
+		req.CompletedAmount,
+		req.Position,
+	); err != nil {
 		return apperr.E(op, err)
 	}
 
 	uc.record(ctx, history.Event{
 		UserID: userID, EntityType: "material", EntityID: materialID,
 		EventType: "technical", EventName: "entity.updated",
-		Payload: map[string]any{"title": req.Title, "progress": req.Progress},
+		Payload: map[string]any{"title": req.Title, "type": req.Type, "completed_amount": req.CompletedAmount, "total_amount": req.TotalAmount},
 	})
 
 	return nil
@@ -119,13 +141,17 @@ func (uc *UseCase) DeleteMaterial(ctx context.Context, userID, materialID string
 
 func buildResponse(m Material) MaterialResponse {
 	return MaterialResponse{
-		ID:          m.ID,
-		TopicID:     m.TopicID,
-		Title:       m.Title,
-		Description: m.Description,
-		Progress:    m.Progress,
-		Position:    m.Position,
-		CreatedAt:   m.CreatedAt,
-		UpdatedAt:   m.UpdatedAt,
+		ID:              m.ID,
+		TopicID:         m.TopicID,
+		Title:           m.Title,
+		Description:     m.Description,
+		Type:            m.Type,
+		Unit:            m.Unit,
+		TotalAmount:     m.TotalAmount,
+		CompletedAmount: m.CompletedAmount,
+		Progress:        computeProgress(m.TotalAmount, m.CompletedAmount),
+		Position:        m.Position,
+		CreatedAt:       m.CreatedAt,
+		UpdatedAt:       m.UpdatedAt,
 	}
 }

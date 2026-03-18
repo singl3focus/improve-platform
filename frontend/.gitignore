@@ -5,3 +5,8 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 out
+.test-dist
+*.tsbuildinfo
+review-*.err
+review-*.out
+.dev-*.log

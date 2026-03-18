@@ -8,9 +8,9 @@ import {
   Map,
   ListTodo,
   Library,
-  Settings,
   LucideIcon,
 } from "lucide-react";
+import { PreferencesControls } from "@/components/layout/preferences-controls";
 import { useUserPreferences } from "@/components/providers/user-preferences-provider";
 import { logout } from "@/lib/auth/client";
 
@@ -18,8 +18,7 @@ type NavItemKey =
   | "dashboardLabel"
   | "roadmapLabel"
   | "tasksLabel"
-  | "materialsLabel"
-  | "settingsLabel";
+  | "materialsLabel";
 
 type NavItem = {
   href: string;
@@ -32,10 +31,6 @@ const MAIN_NAV_ITEMS: ReadonlyArray<NavItem> = [
   { href: "/roadmap", key: "roadmapLabel", icon: Map },
   { href: "/tasks", key: "tasksLabel", icon: ListTodo },
   { href: "/materials", key: "materialsLabel", icon: Library },
-];
-
-const BOTTOM_NAV_ITEMS: ReadonlyArray<NavItem> = [
-  { href: "/settings", key: "settingsLabel", icon: Settings },
 ];
 
 function isItemActive(pathname: string, href: string): boolean {
@@ -84,21 +79,8 @@ export function PrivateShell({ children }: { children: ReactNode }) {
         
         <div className="sidebar-spacer" />
         
-        <nav className="nav-list nav-list-bottom" aria-label={copy.navigation.settingsLabel}>
-          {BOTTOM_NAV_ITEMS.map((item) => {
-            const isActive = isItemActive(pathname, item.href);
-            const Icon = item.icon;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={isActive ? "nav-link nav-link-active" : "nav-link"}
-              >
-                <Icon size={18} />
-                {copy.navigation[item.key]}
-              </Link>
-            );
-          })}
+        <div className="nav-list nav-list-bottom" aria-label={copy.settings.title}>
+          <PreferencesControls className="sidebar-preferences-mini" variant="mini" />
           <button
             type="button"
             className="sidebar-text-action"
@@ -107,7 +89,7 @@ export function PrivateShell({ children }: { children: ReactNode }) {
           >
             {isLoggingOut ? copy.navigation.signingOut : copy.navigation.signOut}
           </button>
-        </nav>
+        </div>
       </aside>
 
       <div className="content-column">

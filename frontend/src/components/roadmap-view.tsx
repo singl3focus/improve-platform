@@ -17,8 +17,7 @@ import { useUserPreferences } from "@/components/providers/user-preferences-prov
 import {
   buildConnectionPath,
   isDragGesture,
-  normalizeGraphPoint,
-  parsePositiveInteger
+  normalizeGraphPoint
 } from "@/lib/roadmap-graph";
 import type { AppLanguage } from "@/lib/ui-copy";
 import type {
@@ -43,14 +42,12 @@ interface QuickCreateDraft {
 interface TopicCreateDraft {
   title: string;
   description: string;
-  position: string;
 }
 
 interface TopicEditDraft {
   topicId: string;
   title: string;
   description: string;
-  position: string;
 }
 
 interface ApiErrorDetails {
@@ -120,14 +117,12 @@ const ROADMAP_COPY = {
     stageUpdateSuccess: "Этап обновлён.",
     stageDeleteSuccess: "Этап удалён.",
     topicCreateTitle: "Добавить тему",
-    topicCreateSubtitle: "Создайте новую тему в выбранном этапе текущего roadmap.",
+    topicCreateSubtitle: "Создайте новую тему в текущем roadmap.",
     topicCreateChildTitle: "Добавить дочернюю тему",
-    topicCreateChildSubtitle: (parentTitle: string, stageTitle: string) =>
-      `Новая тема будет создана после «${parentTitle}» в этапе «${stageTitle}» с автосвязью.`,
-    topicFieldStage: "Этап",
+    topicCreateChildSubtitle: (parentTitle: string) =>
+      `Новая тема будет создана после «${parentTitle}» с автосвязью.`,
     topicFieldTitle: "Название",
     topicFieldDescription: "Описание",
-    topicFieldPosition: "Позиция",
     topicTitlePlaceholder: "Например: Работа с формами",
     topicDescriptionPlaceholder: "Кратко: что изучаем в этой теме",
     topicCreateButton: "Добавить тему",
@@ -225,14 +220,12 @@ const ROADMAP_COPY = {
     stageUpdateSuccess: "Stage updated.",
     stageDeleteSuccess: "Stage removed.",
     topicCreateTitle: "Add topic",
-    topicCreateSubtitle: "Create a new topic in the selected stage of your current roadmap.",
+    topicCreateSubtitle: "Create a new topic in your current roadmap.",
     topicCreateChildTitle: "Add child topic",
-    topicCreateChildSubtitle: (parentTitle: string, stageTitle: string) =>
-      `The new topic will be created after "${parentTitle}" in stage "${stageTitle}" with auto-linking.`,
-    topicFieldStage: "Stage",
+    topicCreateChildSubtitle: (parentTitle: string) =>
+      `The new topic will be created after "${parentTitle}" with auto-linking.`,
     topicFieldTitle: "Title",
     topicFieldDescription: "Description",
-    topicFieldPosition: "Position",
     topicTitlePlaceholder: "For example: Working with forms",
     topicDescriptionPlaceholder: "Short note about what to learn in this topic",
     topicCreateButton: "Add topic",
@@ -318,8 +311,7 @@ function initialQuickCreateDraft(): QuickCreateDraft {
 function initialTopicCreateDraft(): TopicCreateDraft {
   return {
     title: "",
-    description: "",
-    position: "1"
+    description: ""
   };
 }
 
@@ -405,7 +397,6 @@ async function quickCreateFirstTopic(payload: {
 async function createRoadmapTopic(payload: {
   title: string;
   description: string;
-  position: number;
 }): Promise<TopicCreateResult> {
   const response = await fetch("/api/roadmap/topics", {
     method: "POST",
@@ -442,7 +433,6 @@ async function updateRoadmapTopic(
   payload: {
     title: string;
     description: string;
-    position: number;
   }
 ): Promise<void> {
   const response = await fetch(`/api/roadmap/topics/${encodeURIComponent(topicId)}`, {
@@ -617,7 +607,6 @@ function TopicMutationPanel(props: {
   isSubmitting: boolean;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onTitleChange: (value: string) => void;
-  onPositionChange: (value: string) => void;
   onDescriptionChange: (value: string) => void;
   onCancel?: () => void;
   titleInputRef?: { current: HTMLInputElement | null };
@@ -645,17 +634,6 @@ function TopicMutationPanel(props: {
             value={props.draft.title}
             onChange={(event) => props.onTitleChange(event.target.value)}
             placeholder={props.copy.topicTitlePlaceholder}
-          />
-        </label>
-
-        <label className="roadmap-topic-field roadmap-topic-field-position">
-          <span>{props.copy.topicFieldPosition}</span>
-          <input
-            type="number"
-            min={1}
-            className="input"
-            value={props.draft.position}
-            onChange={(event) => props.onPositionChange(event.target.value)}
           />
         </label>
 
@@ -795,13 +773,6 @@ export function RoadmapView() {
   );
 
   const stages = useMemo(() => roadmap.state.data?.stages ?? [], [roadmap.state.data]);
-  const stageById = useMemo(() => {
-    const map = new Map<string, (typeof stages)[number]>();
-    for (const stage of stages) {
-      map.set(stage.id, stage);
-    }
-    return map;
-  }, [stages]);
 
   const stagePositionById = useMemo(() => {
     const map = new Map<string, number>();
@@ -863,24 +834,6 @@ export function RoadmapView() {
       ) ?? null
     );
   }, [allTopics]);
-
-  useEffect(() => {
-    if (allTopics.length === 0) {
-      return;
-    }
-
-    setTopicCreateDraft((current) => {
-      const nextPosition = String(allTopics.length + 1);
-      if (current.position === nextPosition) {
-        return current;
-      }
-
-      return {
-        ...current,
-        position: nextPosition
-      };
-    });
-  }, [allTopics.length]);
 
   useEffect(() => {
     if (!editingTopicId) {
@@ -1000,8 +953,7 @@ export function RoadmapView() {
     topicCreateModalTriggerRef.current = triggerElement;
     setTopicCreateDraft({
       title: "",
-      description: "",
-      position: String(Math.max(parentTopic.position + 1, 1))
+      description: ""
     });
     setTopicMutationError(null);
     setTopicMenuTopicId(null);
@@ -1082,16 +1034,12 @@ export function RoadmapView() {
       return;
     }
 
-    const fallbackPosition = allTopics.length + 1;
-    const position = parsePositiveInteger(topicCreateDraft.position, fallbackPosition);
-
     setTopicMutationError(null);
     setIsTopicCreating(true);
     try {
       const createdTopic = await createRoadmapTopic({
         title,
-        description: topicCreateDraft.description.trim(),
-        position
+        description: topicCreateDraft.description.trim()
       });
 
       if (childTopicParentId) {
@@ -1114,10 +1062,9 @@ export function RoadmapView() {
         }
       }
 
-      setTopicCreateDraft((current) => ({
+      setTopicCreateDraft(() => ({
         title: "",
-        description: "",
-        position: String(parsePositiveInteger(current.position, fallbackPosition) + 1)
+        description: ""
       }));
       setIsTopicCreateModalOpen(false);
       setChildTopicParentId(null);
@@ -1139,8 +1086,7 @@ export function RoadmapView() {
     setTopicEditDraft({
       topicId: topic.id,
       title: topic.title,
-      description: topic.description,
-      position: String(topic.position)
+      description: topic.description
     });
     setTopicMutationError(null);
   }
@@ -1168,17 +1114,12 @@ export function RoadmapView() {
       return;
     }
 
-    const currentTopic = topicById.get(editingTopicId) ?? null;
-    const fallbackPosition = currentTopic ? currentTopic.position : 1;
-    const position = parsePositiveInteger(topicEditDraft.position, Math.max(fallbackPosition, 1));
-
     setTopicMutationError(null);
     setUpdatingTopicId(editingTopicId);
     try {
       await updateRoadmapTopic(editingTopicId, {
         title,
-        description: topicEditDraft.description.trim(),
-        position
+        description: topicEditDraft.description.trim()
       });
       cancelTopicEditing();
       roadmap.reload();
@@ -1408,13 +1349,6 @@ export function RoadmapView() {
     }));
   }
 
-  function handleTopicCreatePositionChange(value: string) {
-    setTopicCreateDraft((current) => ({
-      ...current,
-      position: value
-    }));
-  }
-
   function handleTopicCreateDescriptionChange(value: string) {
     setTopicCreateDraft((current) => ({
       ...current,
@@ -1541,10 +1475,7 @@ export function RoadmapView() {
                     title={childTopicParent ? copy.topicCreateChildTitle : copy.topicCreateTitle}
                     subtitle={
                       childTopicParent
-                        ? copy.topicCreateChildSubtitle(
-                            childTopicParent.title,
-                            stageById.get(childTopicParent.stageId ?? "")?.title ?? copy.defaultStageTitle
-                          )
+                        ? copy.topicCreateChildSubtitle(childTopicParent.title)
                         : copy.topicCreateSubtitle
                     }
                     submitLabel={
@@ -1558,7 +1489,6 @@ export function RoadmapView() {
                     isSubmitting={isTopicCreating}
                     onSubmit={handleTopicCreate}
                     onTitleChange={handleTopicCreateTitleChange}
-                    onPositionChange={handleTopicCreatePositionChange}
                     onDescriptionChange={handleTopicCreateDescriptionChange}
                     onCancel={closeTopicCreateModal}
                     titleInputRef={topicCreateModalTitleInputRef}
@@ -1610,26 +1540,6 @@ export function RoadmapView() {
                               ? {
                                   ...current,
                                   title: event.target.value
-                                }
-                              : current
-                          )
-                        }
-                      />
-                    </label>
-
-                    <label className="roadmap-topic-field">
-                      <span>{copy.topicFieldPosition}</span>
-                      <input
-                        type="number"
-                        min={1}
-                        className="input"
-                        value={topicEditDraft.position}
-                        onChange={(event) =>
-                          setTopicEditDraft((current) =>
-                            current
-                              ? {
-                                  ...current,
-                                  position: event.target.value
                                 }
                               : current
                           )
@@ -1779,8 +1689,6 @@ export function RoadmapView() {
                 >
                   {allTopics.map((topic) => {
                     const topicStageId = topic.stageId ?? stages[0]?.id ?? "";
-                    const stage = stageById.get(topicStageId) ?? null;
-                    const stageTitle = stage?.title ?? copy.defaultStageTitle;
                     const stagePosition = stagePositionById.get(topicStageId) ?? 1;
 
                     return (
@@ -1906,8 +1814,6 @@ export function RoadmapView() {
                             </div>
 
                             <div className="roadmap-topic-core">
-                              <span className="roadmap-topic-stage-tag">{stageTitle}</span>
-
                               <div className="roadmap-topic-center">
                                 <h4 className="roadmap-topic-title">{topic.title}</h4>
                                 <p className="roadmap-topic-description">{topic.description}</p>

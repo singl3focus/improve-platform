@@ -81,17 +81,29 @@ CREATE INDEX idx_tasks_deadline ON tasks (user_id, deadline) WHERE deadline IS N
 
 -- materials: learning resources attached to a topic
 -- composite FK (topic_id, user_id) → topics: prevents cross-user references
+CREATE TYPE material_type AS ENUM ('book', 'article', 'course', 'video');
+
 CREATE TABLE materials (
-    id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id     UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    topic_id    UUID        NOT NULL,
-    title       TEXT        NOT NULL,
-    description TEXT        NOT NULL DEFAULT '',
-    progress    INT         NOT NULL DEFAULT 0,
-    position    INT         NOT NULL DEFAULT 0,
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-    CONSTRAINT materials_progress_range CHECK (progress >= 0 AND progress <= 100),
+    id               UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id          UUID          NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    topic_id         UUID          NOT NULL,
+    title            TEXT          NOT NULL,
+    description      TEXT          NOT NULL DEFAULT '',
+    type             material_type NOT NULL,
+    unit             TEXT          NOT NULL,
+    total_amount     INT           NOT NULL DEFAULT 0,
+    completed_amount INT           NOT NULL DEFAULT 0,
+    position         INT           NOT NULL DEFAULT 0,
+    created_at       TIMESTAMPTZ   NOT NULL DEFAULT now(),
+    updated_at       TIMESTAMPTZ   NOT NULL DEFAULT now(),
+    CONSTRAINT materials_unit_by_type CHECK (
+        (type IN ('book', 'article') AND unit = 'pages') OR
+        (type = 'course' AND unit = 'lessons') OR
+        (type = 'video' AND unit = 'hours')
+    ),
+    CONSTRAINT materials_total_amount_non_negative CHECK (total_amount >= 0),
+    CONSTRAINT materials_completed_amount_non_negative CHECK (completed_amount >= 0),
+    CONSTRAINT materials_completed_lte_total CHECK (completed_amount <= total_amount),
     CONSTRAINT materials_topic_user_fk FOREIGN KEY (topic_id, user_id)
         REFERENCES topics(id, user_id) ON DELETE CASCADE
 );

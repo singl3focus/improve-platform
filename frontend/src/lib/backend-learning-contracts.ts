@@ -50,6 +50,10 @@ export interface BackendMaterialResponse {
   topic_id: string;
   title: string;
   description: string;
+  type: "book" | "article" | "course" | "video";
+  unit: "pages" | "lessons" | "hours";
+  total_amount: number;
+  completed_amount: number;
   progress: number;
   position: number;
   updated_at: string;

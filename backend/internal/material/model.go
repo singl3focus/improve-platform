@@ -7,53 +7,102 @@ import (
 )
 
 var (
-	ErrMaterialNotFound = errors.New("material not found")
-	ErrInvalidProgress  = errors.New("progress must be between 0 and 100")
-	ErrTopicNotFound    = errors.New("topic not found or does not belong to user")
+	ErrMaterialNotFound    = errors.New("material not found")
+	ErrInvalidMaterialType = errors.New("invalid material type")
+	ErrInvalidAmount       = errors.New("invalid material amount")
+	ErrTopicNotFound       = errors.New("topic not found or does not belong to user")
 )
+
+const (
+	MaterialTypeBook    = "book"
+	MaterialTypeArticle = "article"
+	MaterialTypeCourse  = "course"
+	MaterialTypeVideo   = "video"
+
+	MaterialUnitPages   = "pages"
+	MaterialUnitLessons = "lessons"
+	MaterialUnitHours   = "hours"
+)
+
+func unitByType(materialType string) (string, bool) {
+	switch materialType {
+	case MaterialTypeBook, MaterialTypeArticle:
+		return MaterialUnitPages, true
+	case MaterialTypeCourse:
+		return MaterialUnitLessons, true
+	case MaterialTypeVideo:
+		return MaterialUnitHours, true
+	default:
+		return "", false
+	}
+}
+
+func computeProgress(totalAmount, completedAmount int) int {
+	if totalAmount <= 0 {
+		return 0
+	}
+	if completedAmount <= 0 {
+		return 0
+	}
+	if completedAmount >= totalAmount {
+		return 100
+	}
+	return completedAmount * 100 / totalAmount
+}
 
 // Domain model
 
 type Material struct {
-	ID          string
-	UserID      string
-	TopicID     string
-	Title       string
-	Description string
-	Progress    int // 0-100
-	Position    int
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	ID              string
+	UserID          string
+	TopicID         string
+	Title           string
+	Description     string
+	Type            string
+	Unit            string
+	TotalAmount     int
+	CompletedAmount int
+	Position        int
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
 }
 
 // Request types
 
 type CreateRequest struct {
-	TopicID     string `json:"topic_id"`
-	Title       string `json:"title"`
-	Description string `json:"description"`
-	Progress    int    `json:"progress"`
-	Position    int    `json:"position"`
+	TopicID         string `json:"topic_id"`
+	Title           string `json:"title"`
+	Description     string `json:"description"`
+	Type            string `json:"type"`
+	TotalAmount     int    `json:"total_amount"`
+	CompletedAmount int    `json:"completed_amount"`
+	Position        int    `json:"position"`
 }
 
 type UpdateRequest struct {
-	Title       string `json:"title"`
-	Description string `json:"description"`
-	Progress    int    `json:"progress"`
-	Position    int    `json:"position"`
+	Title           string `json:"title"`
+	Description     string `json:"description"`
+	Type            string `json:"type"`
+	TotalAmount     int    `json:"total_amount"`
+	CompletedAmount int    `json:"completed_amount"`
+	Position        int    `json:"position"`
 }
 
 // Response types
 
 type MaterialResponse struct {
-	ID          string    `json:"id"`
-	TopicID     string    `json:"topic_id"`
-	Title       string    `json:"title"`
-	Description string    `json:"description"`
-	Progress    int       `json:"progress"`
-	Position    int       `json:"position"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID              string    `json:"id"`
+	TopicID         string    `json:"topic_id"`
+	Title           string    `json:"title"`
+	Description     string    `json:"description"`
+	Type            string    `json:"type"`
+	Unit            string    `json:"unit"`
+	TotalAmount     int       `json:"total_amount"`
+	CompletedAmount int       `json:"completed_amount"`
+	Progress        int       `json:"progress"`
+	Position        int       `json:"position"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
 }
 
 // Interfaces
@@ -62,7 +111,7 @@ type Repository interface {
 	Create(ctx context.Context, m Material) (Material, error)
 	GetByID(ctx context.Context, id, userID string) (Material, error)
 	ListByTopic(ctx context.Context, topicID, userID string) ([]Material, error)
-	Update(ctx context.Context, id, userID, title, description string, progress, position int) error
+	Update(ctx context.Context, id, userID, title, description, materialType, unit string, totalAmount, completedAmount, position int) error
 	Delete(ctx context.Context, id, userID string) error
 }
 

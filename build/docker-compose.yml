@@ -1,4 +1,5 @@
 # MVP local stack: frontend, backend (API + notification scheduler), postgres.
+# IMPORTANT: local runtime does destructive DB reset on startup to keep schema aligned with changed initial migration.
 # Usage: from repo root:
 #   cp build/.env.example .env   # in repo root, then edit .env
 #   docker compose -f build/docker-compose.yml up -d --build
@@ -21,11 +22,25 @@ services:
       timeout: 5s
       retries: 5
 
-  migrations:
-    image: migrate/migrate:v4.18.3
+  migrations_reset:
+    image: postgres:16-alpine
     depends_on:
       postgres:
         condition: service_healthy
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:-improve}
+    command:
+      - "sh"
+      - "-c"
+      - >
+        psql -h postgres -U ${POSTGRES_USER:-improve} -d ${POSTGRES_DB:-improve}
+        -c "DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;"
+
+  migrations:
+    image: migrate/migrate:v4.18.3
+    depends_on:
+      migrations_reset:
+        condition: service_completed_successfully
     command:
       - "-path=/migrations"
       - "-database=postgres://${POSTGRES_USER:-improve}:${POSTGRES_PASSWORD:-improve}@postgres:5432/${POSTGRES_DB:-improve}?sslmode=disable"

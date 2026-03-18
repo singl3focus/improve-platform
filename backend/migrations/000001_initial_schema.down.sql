@@ -6,5 +6,6 @@ DROP TABLE IF EXISTS topics;
 DROP TABLE IF EXISTS stages;
 DROP TABLE IF EXISTS roadmaps;
 DROP TABLE IF EXISTS users;
+DROP TYPE IF EXISTS material_type;
 DROP TYPE IF EXISTS topic_status;
 DROP TYPE IF EXISTS task_status;

@@ -8,7 +8,7 @@ import {
   type MaterialDraft,
   useMaterialsLibraryViewModel
 } from "@/components/hooks/use-materials-library-view-model";
-import type { LibraryMaterial } from "@/lib/materials-library-types";
+import type { LibraryMaterial, MaterialType } from "@/lib/materials-library-types";
 
 const MATERIALS_COPY = {
   ru: {
@@ -22,9 +22,16 @@ const MATERIALS_COPY = {
     createSubtitle: "Создайте новый элемент и задайте позицию в выбранной теме.",
     fieldTitle: "Название",
     fieldDescription: "Описание",
+    fieldType: "Тип",
+    fieldUnit: "Единица",
+    fieldTotalAmount: "Полная мера",
+    fieldCompletedAmount: "Выполнено",
     fieldPosition: "Позиция",
-    fieldProgress: "Прогресс (%)",
     fieldTopic: "Тема",
+    typeBook: "Книга",
+    typeArticle: "Статья",
+    typeCourse: "Курс",
+    typeVideo: "Видео",
     createPlaceholderTitle: "Название материала",
     createPlaceholderDescription: "Описание материала",
     noTopicsAvailable: "Нет доступных тем",
@@ -34,10 +41,10 @@ const MATERIALS_COPY = {
     creatingButton: "Создание...",
     topicRequired: "Для создания материала нужна тема.",
     titleDescriptionRequired: "Название и описание обязательны.",
+    amountInvalid: "Выполненная мера должна быть меньше или равна полной мере.",
     createFailed: "Не удалось создать материал.",
     updateFailed: "Не удалось обновить материал.",
     deleteFailed: "Не удалось удалить материал.",
-    progressFailed: "Не удалось обновить прогресс.",
     loading: "Загрузка библиотеки материалов...",
     loadFailed: "Не удалось загрузить библиотеку материалов.",
     retry: "Повторить",
@@ -60,9 +67,16 @@ const MATERIALS_COPY = {
     createSubtitle: "Create a new library item and place it at a position inside the selected topic.",
     fieldTitle: "Title",
     fieldDescription: "Description",
+    fieldType: "Type",
+    fieldUnit: "Unit",
+    fieldTotalAmount: "Total amount",
+    fieldCompletedAmount: "Completed amount",
     fieldPosition: "Position",
-    fieldProgress: "Progress (%)",
     fieldTopic: "Topic",
+    typeBook: "Book",
+    typeArticle: "Article",
+    typeCourse: "Course",
+    typeVideo: "Video",
     createPlaceholderTitle: "Material title",
     createPlaceholderDescription: "Material description",
     noTopicsAvailable: "No topics available",
@@ -72,10 +86,10 @@ const MATERIALS_COPY = {
     creatingButton: "Creating...",
     topicRequired: "Topic is required for material creation.",
     titleDescriptionRequired: "Title and description are required.",
+    amountInvalid: "Completed amount must be less than or equal to total amount.",
     createFailed: "Material creation failed.",
     updateFailed: "Material update failed.",
     deleteFailed: "Material removal failed.",
-    progressFailed: "Progress update failed.",
     loading: "Loading materials library...",
     loadFailed: "Materials library failed to load.",
     retry: "Retry",
@@ -91,17 +105,20 @@ const MATERIALS_COPY = {
 
 type MaterialsCopy = (typeof MATERIALS_COPY)[keyof typeof MATERIALS_COPY];
 
-function isSliderCommitKey(key: string): boolean {
-  return (
-    key === "ArrowLeft" ||
-    key === "ArrowRight" ||
-    key === "ArrowUp" ||
-    key === "ArrowDown" ||
-    key === "Home" ||
-    key === "End" ||
-    key === "PageUp" ||
-    key === "PageDown"
-  );
+const MATERIAL_TYPE_OPTIONS: MaterialType[] = ["book", "article", "course", "video"];
+
+function getMaterialTypeLabel(copy: MaterialsCopy, type: MaterialType): string {
+  if (type === "book") {
+    return copy.typeBook;
+  }
+  if (type === "article") {
+    return copy.typeArticle;
+  }
+  if (type === "course") {
+    return copy.typeCourse;
+  }
+
+  return copy.typeVideo;
 }
 
 interface TopicOption {
@@ -243,6 +260,65 @@ function MaterialsCreatePanel({
         </label>
 
         <label className="materials-form-field">
+          <span>{copy.fieldType}</span>
+          <select
+            className="input"
+            value={createDraft.type}
+            onChange={(event) => {
+              const nextType = event.target.value as MaterialType;
+              setCreateDraft((current) => ({
+                ...current,
+                type: nextType,
+                unit: nextType === "video" ? "hours" : nextType === "course" ? "lessons" : "pages"
+              }));
+            }}
+          >
+            {MATERIAL_TYPE_OPTIONS.map((type) => (
+              <option key={type} value={type}>
+                {getMaterialTypeLabel(copy, type)}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="materials-form-field">
+          <span>{copy.fieldUnit}</span>
+          <input type="text" className="input" value={createDraft.unit} readOnly disabled />
+        </label>
+
+        <label className="materials-form-field">
+          <span>{copy.fieldTotalAmount}</span>
+          <input
+            type="number"
+            min={0}
+            className="input"
+            value={createDraft.totalAmount}
+            onChange={(event) =>
+              setCreateDraft((current) => ({
+                ...current,
+                totalAmount: event.target.value
+              }))
+            }
+          />
+        </label>
+
+        <label className="materials-form-field">
+          <span>{copy.fieldCompletedAmount}</span>
+          <input
+            type="number"
+            min={0}
+            className="input"
+            value={createDraft.completedAmount}
+            onChange={(event) =>
+              setCreateDraft((current) => ({
+                ...current,
+                completedAmount: event.target.value
+              }))
+            }
+          />
+        </label>
+
+        <label className="materials-form-field">
           <span>{copy.fieldPosition}</span>
           <input
             type="number"
@@ -253,23 +329,6 @@ function MaterialsCreatePanel({
               setCreateDraft((current) => ({
                 ...current,
                 position: event.target.value
-              }))
-            }
-          />
-        </label>
-
-        <label className="materials-form-field">
-          <span>{copy.fieldProgress}</span>
-          <input
-            type="number"
-            min={0}
-            max={100}
-            className="input"
-            value={createDraft.progressPercent}
-            onChange={(event) =>
-              setCreateDraft((current) => ({
-                ...current,
-                progressPercent: event.target.value
               }))
             }
           />
@@ -307,8 +366,7 @@ function MaterialsCard({
   updatingMaterialId,
   onEditStart,
   onDelete,
-  onProgressPreview,
-  onProgressCommit,
+  computeProgressPercent,
   onEditSubmit,
   onCancelEdit
 }: {
@@ -321,11 +379,12 @@ function MaterialsCard({
   updatingMaterialId: string | null;
   onEditStart: (material: LibraryMaterial) => void;
   onDelete: (materialId: string) => void;
-  onProgressPreview: (materialId: string, progressPercent: number) => void;
-  onProgressCommit: (materialId: string, progressPercent?: number) => void;
+  computeProgressPercent: (totalAmount: number, completedAmount: number) => number;
   onEditSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onCancelEdit: () => void;
 }) {
+  const computedProgress = computeProgressPercent(material.totalAmount, material.completedAmount);
+
   return (
     <li className="materials-card">
       <div className="materials-card-head">
@@ -338,48 +397,23 @@ function MaterialsCard({
         </Link>
       </div>
 
+      <div className="materials-card-meta-head">
+        <span className="materials-type-badge">{getMaterialTypeLabel(copy, material.type)}</span>
+        <span className="materials-measure-badge">
+          {material.completedAmount}/{material.totalAmount} {material.unit}
+        </span>
+      </div>
+
       <h3>{material.title}</h3>
       <p>{material.description}</p>
 
       <div className="materials-card-progress-head">
         <span>{copy.progress}</span>
-        <strong>{material.progressPercent}%</strong>
+        <strong>{computedProgress}%</strong>
       </div>
       <div className="roadmap-progress-track">
-        <span className="roadmap-progress-fill" style={{ width: `${material.progressPercent}%` }} />
+        <span className="roadmap-progress-fill" style={{ width: `${computedProgress}%` }} />
       </div>
-
-      <label className="materials-progress-range-wrap">
-        <span className="materials-progress-range-head">
-          <span>{copy.updateProgress}</span>
-          <strong>{material.progressPercent}%</strong>
-        </span>
-        <input
-          type="range"
-          className="materials-progress-range"
-          min={0}
-          max={100}
-          step={1}
-          value={material.progressPercent}
-          aria-valuetext={`${material.progressPercent}%`}
-          onChange={(event) =>
-            onProgressPreview(material.id, Number.parseInt(event.target.value, 10))
-          }
-          onPointerUp={(event) =>
-            onProgressCommit(material.id, Number.parseInt(event.currentTarget.value, 10))
-          }
-          onBlur={(event) =>
-            onProgressCommit(material.id, Number.parseInt(event.currentTarget.value, 10))
-          }
-          onKeyUp={(event) => {
-            if (!isSliderCommitKey(event.key)) {
-              return;
-            }
-
-            onProgressCommit(material.id, Number.parseInt(event.currentTarget.value, 10));
-          }}
-        />
-      </label>
 
       <div className="materials-card-actions">
         <button
@@ -446,6 +480,81 @@ function MaterialsCard({
           </label>
 
           <label className="materials-form-field">
+            <span>{copy.fieldType}</span>
+            <select
+              className="input"
+              value={editDraft.type}
+              onChange={(event) =>
+                setEditDraft((current) =>
+                  current
+                    ? {
+                        ...current,
+                        type: event.target.value as MaterialType,
+                        unit:
+                          event.target.value === "video"
+                            ? "hours"
+                            : event.target.value === "course"
+                              ? "lessons"
+                              : "pages"
+                      }
+                    : current
+                )
+              }
+            >
+              {MATERIAL_TYPE_OPTIONS.map((type) => (
+                <option key={type} value={type}>
+                  {getMaterialTypeLabel(copy, type)}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="materials-form-field">
+            <span>{copy.fieldUnit}</span>
+            <input type="text" className="input" value={editDraft.unit} readOnly disabled />
+          </label>
+
+          <label className="materials-form-field">
+            <span>{copy.fieldTotalAmount}</span>
+            <input
+              type="number"
+              min={0}
+              className="input"
+              value={editDraft.totalAmount}
+              onChange={(event) =>
+                setEditDraft((current) =>
+                  current
+                    ? {
+                        ...current,
+                        totalAmount: event.target.value
+                      }
+                    : current
+                )
+              }
+            />
+          </label>
+
+          <label className="materials-form-field">
+            <span>{copy.fieldCompletedAmount}</span>
+            <input
+              type="number"
+              min={0}
+              className="input"
+              value={editDraft.completedAmount}
+              onChange={(event) =>
+                setEditDraft((current) =>
+                  current
+                    ? {
+                        ...current,
+                        completedAmount: event.target.value
+                      }
+                    : current
+                )
+              }
+            />
+          </label>
+
+          <label className="materials-form-field">
             <span>{copy.fieldPosition}</span>
             <input
               type="number"
@@ -458,27 +567,6 @@ function MaterialsCard({
                     ? {
                         ...current,
                         position: event.target.value
-                      }
-                    : current
-                )
-              }
-            />
-          </label>
-
-          <label className="materials-form-field">
-            <span>{copy.fieldProgress}</span>
-            <input
-              type="number"
-              min={0}
-              max={100}
-              className="input"
-              value={editDraft.progressPercent}
-              onChange={(event) =>
-                setEditDraft((current) =>
-                  current
-                    ? {
-                        ...current,
-                        progressPercent: event.target.value
                       }
                     : current
                 )
@@ -551,8 +639,7 @@ export function MaterialsLibraryView() {
     cancelEditing,
     handleEditSubmit,
     handleDelete,
-    handleProgressPreview,
-    handleProgressCommit
+    computeProgressPercent
   } = useMaterialsLibraryViewModel(copy);
 
   useEffect(() => {
@@ -719,8 +806,7 @@ export function MaterialsLibraryView() {
                 updatingMaterialId={updatingMaterialId}
                 onEditStart={startEditing}
                 onDelete={handleDelete}
-                onProgressPreview={handleProgressPreview}
-                onProgressCommit={handleProgressCommit}
+                computeProgressPercent={computeProgressPercent}
                 onEditSubmit={handleEditSubmit}
                 onCancelEdit={cancelEditing}
               />

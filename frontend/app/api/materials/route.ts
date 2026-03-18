@@ -15,6 +15,12 @@ import {
   extractTopicTitleOptions,
   type TopicTitleOption
 } from "@/lib/roadmap-topic-helpers";
+import {
+  mapBackendMaterialToLibraryMaterial,
+  toBackendCreateMaterialPayload
+} from "@/lib/materials-api-mapping";
+
+const ALLOWED_MATERIAL_TYPES = new Set(["book", "article", "course", "video"]);
 
 async function loadRoadmapTopics(
   client: ReturnType<typeof createBackendClient>
@@ -69,6 +75,10 @@ export async function GET(request: NextRequest) {
       description: string;
       topicId: string;
       topicTitle: string;
+      type: "book" | "article" | "course" | "video";
+      unit: "pages" | "lessons" | "hours";
+      totalAmount: number;
+      completedAmount: number;
       position: number;
       progressPercent: number;
     }> = [];
@@ -97,15 +107,12 @@ export async function GET(request: NextRequest) {
       }
 
       for (const material of (materialsResult.payload as BackendMaterialResponse[]) ?? []) {
-        materials.push({
-          id: material.id,
-          title: material.title,
-          description: material.description,
-          topicId: material.topic_id,
-          topicTitle: topicTitleMap.get(material.topic_id) ?? material.topic_id,
-          position: material.position,
-          progressPercent: material.progress
-        });
+        materials.push(
+          mapBackendMaterialToLibraryMaterial(
+            material,
+            topicTitleMap.get(material.topic_id) ?? material.topic_id
+          )
+        );
       }
     }
 
@@ -151,8 +158,10 @@ export async function POST(request: NextRequest) {
     title?: unknown;
     description?: unknown;
     topicId?: unknown;
+    type?: unknown;
+    totalAmount?: unknown;
+    completedAmount?: unknown;
     position?: unknown;
-    progressPercent?: unknown;
   };
 
   try {
@@ -160,8 +169,10 @@ export async function POST(request: NextRequest) {
       title?: unknown;
       description?: unknown;
       topicId?: unknown;
+      type?: unknown;
+      totalAmount?: unknown;
+      completedAmount?: unknown;
       position?: unknown;
-      progressPercent?: unknown;
     };
   } catch {
     return NextResponse.json({ message: "Invalid JSON body." }, { status: 400 });
@@ -170,15 +181,32 @@ export async function POST(request: NextRequest) {
   const title = normalizeText(payload.title);
   const description = normalizeText(payload.description);
   const topicId = normalizeText(payload.topicId);
+  const materialType = normalizeText(payload.type);
+  const totalAmount = parseInteger(payload.totalAmount);
+  const completedAmount = parseInteger(payload.completedAmount);
   const position = parseInteger(payload.position);
-  const progressPercent = parseInteger(payload.progressPercent);
 
-  if (!title || !description || !topicId || position === null || progressPercent === null) {
+  if (
+    !title ||
+    !description ||
+    !topicId ||
+    !materialType ||
+    totalAmount === null ||
+    completedAmount === null ||
+    position === null
+  ) {
     return NextResponse.json(
       {
         message:
-          "Invalid material payload. Required: title, description, topicId, position, progressPercent."
+          "Invalid material payload. Required: title, description, topicId, type, totalAmount, completedAmount, position."
       },
+      { status: 422 }
+    );
+  }
+
+  if (!ALLOWED_MATERIAL_TYPES.has(materialType)) {
+    return NextResponse.json(
+      { message: "Type must be one of: book, article, course, video." },
       { status: 422 }
     );
   }
@@ -190,9 +218,12 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (progressPercent < 0 || progressPercent > 100) {
+  if (totalAmount < 0 || completedAmount < 0 || completedAmount > totalAmount) {
     return NextResponse.json(
-      { message: "Progress must be an integer between 0 and 100." },
+      {
+        message:
+          "totalAmount and completedAmount must be non-negative integers and completedAmount must be <= totalAmount."
+      },
       { status: 422 }
     );
   }
@@ -209,13 +240,15 @@ export async function POST(request: NextRequest) {
 
     const createResult = await client.call("/api/v1/materials", {
       method: "POST",
-      body: {
-        topic_id: topicId,
+      body: toBackendCreateMaterialPayload({
+        topicId,
         title,
         description,
-        position,
-        progress: progressPercent
-      }
+        type: materialType as "book" | "article" | "course" | "video",
+        totalAmount,
+        completedAmount,
+        position
+      })
     });
 
     if (!createResult.response.ok) {
@@ -230,15 +263,10 @@ export async function POST(request: NextRequest) {
 
     const material = createResult.payload as BackendMaterialResponse;
     const response = NextResponse.json(
-      {
-        id: material.id,
-        title: material.title,
-        description: material.description,
-        topicId: material.topic_id,
-        topicTitle: topicTitleMap.get(material.topic_id) ?? material.topic_id,
-        position: material.position,
-        progressPercent: material.progress
-      },
+      mapBackendMaterialToLibraryMaterial(
+        material,
+        topicTitleMap.get(material.topic_id) ?? material.topic_id
+      ),
       { status: 201 }
     );
     client.applyUpdatedSession(response);

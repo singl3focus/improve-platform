@@ -1,20 +1,21 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { type FormEvent, useEffect, useRef, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import type {
   LibraryMaterial,
   MaterialsLibraryPayload,
+  MaterialType,
   UpdateLibraryMaterialInput
 } from "@/lib/materials-library-types";
 import {
-  normalizeProgressPercent,
+  computeProgressPercent,
   parsePositiveInteger,
-  parseProgressPercent
+  parseNonNegativeInteger,
+  resolveUnitByType
 } from "@/lib/materials-form";
 
 const MATERIALS_QUERY_KEY = "materials-library";
-const PROGRESS_COMMIT_DEBOUNCE_MS = 320;
 
 export interface MaterialsFilters {
   query: string;
@@ -25,16 +26,21 @@ export interface MaterialDraft {
   title: string;
   description: string;
   topicId: string;
+  type: MaterialType;
+  unit: string;
+  totalAmount: string;
+  completedAmount: string;
   position: string;
-  progressPercent: string;
 }
 
 interface CreateMaterialPayload {
   title: string;
   description: string;
   topicId: string;
+  type: MaterialType;
+  totalAmount: number;
+  completedAmount: number;
   position: number;
-  progressPercent: number;
 }
 
 interface PatchMaterialPayload {
@@ -45,19 +51,23 @@ interface PatchMaterialPayload {
 interface MaterialsCopyForViewModel {
   topicRequired: string;
   titleDescriptionRequired: string;
+  amountInvalid: string;
   createFailed: string;
   updateFailed: string;
   deleteFailed: string;
-  progressFailed: string;
 }
 
 function initialMaterialDraft(): MaterialDraft {
+  const type: MaterialType = "book";
   return {
     title: "",
     description: "",
     topicId: "",
+    type,
+    unit: resolveUnitByType(type),
+    totalAmount: "0",
+    completedAmount: "0",
     position: "1",
-    progressPercent: "0"
   };
 }
 
@@ -148,8 +158,11 @@ function createDraftFromMaterial(material: LibraryMaterial): MaterialDraft {
     title: material.title,
     description: material.description,
     topicId: material.topicId,
+    type: material.type,
+    unit: material.unit,
+    totalAmount: String(material.totalAmount),
+    completedAmount: String(material.completedAmount),
     position: String(material.position),
-    progressPercent: String(material.progressPercent)
   };
 }
 
@@ -169,9 +182,6 @@ export function useMaterialsLibraryViewModel(copy: MaterialsCopyForViewModel) {
   function clearMutationError() {
     setMutationError(null);
   }
-  const progressTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
-  const queuedProgressRef = useRef<Map<string, number>>(new Map());
-  const inFlightProgressRef = useRef<Set<string>>(new Set());
 
   const materialsQuery = useQuery<MaterialsLibraryPayload>({
     queryKey: [MATERIALS_QUERY_KEY, filters] as const,
@@ -206,100 +216,10 @@ export function useMaterialsLibraryViewModel(copy: MaterialsCopyForViewModel) {
     }));
   }, [createDraft.topicId, materialsQuery.data, materialsQuery.status]);
 
-  useEffect(() => {
-    const progressTimers = progressTimersRef.current;
-    const queuedProgress = queuedProgressRef.current;
-    const inFlightProgress = inFlightProgressRef.current;
-
-    return () => {
-      for (const timer of progressTimers.values()) {
-        clearTimeout(timer);
-      }
-      progressTimers.clear();
-      queuedProgress.clear();
-      inFlightProgress.clear();
-    };
-  }, []);
-
   async function invalidateMaterialsQuery(): Promise<void> {
     await queryClient.invalidateQueries({
       queryKey: [MATERIALS_QUERY_KEY]
     });
-  }
-
-  function updateProgressInCache(materialId: string, progressPercent: number) {
-    const queryKey = [MATERIALS_QUERY_KEY, filters] as const;
-    const cached = queryClient.getQueryData<MaterialsLibraryPayload>(queryKey);
-    if (!cached) {
-      return;
-    }
-
-    queryClient.setQueryData<MaterialsLibraryPayload>(queryKey, {
-      ...cached,
-      materials: cached.materials.map((material) =>
-        material.id === materialId
-          ? {
-              ...material,
-              progressPercent
-            }
-          : material
-      )
-    });
-  }
-
-  async function flushProgressCommit(materialId: string) {
-    const timer = progressTimersRef.current.get(materialId);
-    if (timer) {
-      clearTimeout(timer);
-      progressTimersRef.current.delete(materialId);
-    }
-
-    if (inFlightProgressRef.current.has(materialId)) {
-      return;
-    }
-
-    let shouldInvalidate = false;
-
-    while (queuedProgressRef.current.has(materialId)) {
-      const nextProgress = queuedProgressRef.current.get(materialId);
-      if (typeof nextProgress !== "number") {
-        queuedProgressRef.current.delete(materialId);
-        continue;
-      }
-
-      queuedProgressRef.current.delete(materialId);
-      inFlightProgressRef.current.add(materialId);
-
-      try {
-        await patchMaterialMutation.mutateAsync({
-          materialId,
-          payload: { progressPercent: nextProgress }
-        });
-        shouldInvalidate = true;
-      } catch (error) {
-        setMutationError(error instanceof Error ? error.message : copy.progressFailed);
-        shouldInvalidate = true;
-        break;
-      } finally {
-        inFlightProgressRef.current.delete(materialId);
-      }
-    }
-
-    if (shouldInvalidate) {
-      await invalidateMaterialsQuery();
-    }
-  }
-
-  function scheduleProgressCommit(materialId: string) {
-    const currentTimer = progressTimersRef.current.get(materialId);
-    if (currentTimer) {
-      clearTimeout(currentTimer);
-    }
-
-    const timer = setTimeout(() => {
-      void flushProgressCommit(materialId);
-    }, PROGRESS_COMMIT_DEBOUNCE_MS);
-    progressTimersRef.current.set(materialId, timer);
   }
 
   async function handleCreate(event: FormEvent<HTMLFormElement>): Promise<boolean> {
@@ -321,6 +241,13 @@ export function useMaterialsLibraryViewModel(copy: MaterialsCopyForViewModel) {
       return false;
     }
 
+    const totalAmount = parseNonNegativeInteger(createDraft.totalAmount, 0);
+    const completedAmount = parseNonNegativeInteger(createDraft.completedAmount, 0);
+    if (completedAmount > totalAmount) {
+      setMutationError(copy.amountInvalid);
+      return false;
+    }
+
     setMutationError(null);
     setIsCreating(true);
     try {
@@ -328,8 +255,10 @@ export function useMaterialsLibraryViewModel(copy: MaterialsCopyForViewModel) {
         title,
         description,
         topicId,
+        type: createDraft.type,
+        totalAmount,
+        completedAmount,
         position: parsePositiveInteger(createDraft.position, 1),
-        progressPercent: parseProgressPercent(createDraft.progressPercent, 0)
       });
 
       setCreateDraft({
@@ -370,6 +299,13 @@ export function useMaterialsLibraryViewModel(copy: MaterialsCopyForViewModel) {
       return;
     }
 
+    const totalAmount = parseNonNegativeInteger(editDraft.totalAmount, 0);
+    const completedAmount = parseNonNegativeInteger(editDraft.completedAmount, 0);
+    if (completedAmount > totalAmount) {
+      setMutationError(copy.amountInvalid);
+      return;
+    }
+
     setMutationError(null);
     setUpdatingMaterialId(editingId);
     try {
@@ -379,8 +315,10 @@ export function useMaterialsLibraryViewModel(copy: MaterialsCopyForViewModel) {
           title,
           description,
           topicId: editDraft.topicId,
+          type: editDraft.type,
+          totalAmount,
+          completedAmount,
           position: parsePositiveInteger(editDraft.position, 1),
-          progressPercent: parseProgressPercent(editDraft.progressPercent, 0)
         }
       });
       cancelEditing();
@@ -408,24 +346,6 @@ export function useMaterialsLibraryViewModel(copy: MaterialsCopyForViewModel) {
     }
   }
 
-  function handleProgressPreview(materialId: string, progressPercent: number) {
-    const normalizedProgress = normalizeProgressPercent(progressPercent);
-    setMutationError(null);
-    queuedProgressRef.current.set(materialId, normalizedProgress);
-    updateProgressInCache(materialId, normalizedProgress);
-    scheduleProgressCommit(materialId);
-  }
-
-  function handleProgressCommit(materialId: string, progressPercent?: number) {
-    if (typeof progressPercent === "number") {
-      const normalizedProgress = normalizeProgressPercent(progressPercent);
-      queuedProgressRef.current.set(materialId, normalizedProgress);
-      updateProgressInCache(materialId, normalizedProgress);
-    }
-
-    void flushProgressCommit(materialId);
-  }
-
   return {
     filters,
     setFilters,
@@ -445,7 +365,6 @@ export function useMaterialsLibraryViewModel(copy: MaterialsCopyForViewModel) {
     cancelEditing,
     handleEditSubmit,
     handleDelete,
-    handleProgressPreview,
-    handleProgressCommit
+    computeProgressPercent
   };
 }

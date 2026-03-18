@@ -36,8 +36,8 @@ func (h *Handler) CreateMaterial() http.HandlerFunc {
 			httpresp.Error(w, http.StatusBadRequest, "bad_request", "invalid request body")
 			return
 		}
-		if req.TopicID == "" || req.Title == "" {
-			httpresp.Error(w, http.StatusBadRequest, "validation_error", "topic_id and title are required")
+		if req.TopicID == "" || req.Title == "" || req.Type == "" {
+			httpresp.Error(w, http.StatusBadRequest, "validation_error", "topic_id, title and type are required")
 			return
 		}
 
@@ -112,8 +112,8 @@ func (h *Handler) UpdateMaterial() http.HandlerFunc {
 			httpresp.Error(w, http.StatusBadRequest, "bad_request", "invalid request body")
 			return
 		}
-		if req.Title == "" {
-			httpresp.Error(w, http.StatusBadRequest, "validation_error", "title is required")
+		if req.Title == "" || req.Type == "" {
+			httpresp.Error(w, http.StatusBadRequest, "validation_error", "title and type are required")
 			return
 		}
 
@@ -151,8 +151,10 @@ func handleError(w http.ResponseWriter, err error) {
 	switch {
 	case apperr.Is(err, ErrMaterialNotFound):
 		httpresp.Error(w, http.StatusNotFound, "material_not_found", "material not found")
-	case apperr.Is(err, ErrInvalidProgress):
-		httpresp.Error(w, http.StatusBadRequest, "invalid_progress", "progress must be between 0 and 100")
+	case apperr.Is(err, ErrInvalidMaterialType):
+		httpresp.Error(w, http.StatusBadRequest, "invalid_material_type", "type must be one of: book, article, course, video")
+	case apperr.Is(err, ErrInvalidAmount):
+		httpresp.Error(w, http.StatusBadRequest, "invalid_amount", "total_amount and completed_amount must be valid non-negative values, and completed_amount must be <= total_amount")
 	case apperr.Is(err, ErrTopicNotFound):
 		httpresp.Error(w, http.StatusNotFound, "topic_not_found", "topic not found or does not belong to user")
 	default:
