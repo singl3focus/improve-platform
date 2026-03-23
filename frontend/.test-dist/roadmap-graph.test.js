@@ -17,6 +17,32 @@ const roadmap_graph_1 = require("./roadmap-graph");
 (0, node_test_1.default)("buildConnectionPath generates cubic bezier path for top-down graph", () => {
     strict_1.default.equal((0, roadmap_graph_1.buildConnectionPath)(10, 20, 110, 220), "M 10 20 C 10 120, 110 120, 110 220");
 });
+(0, node_test_1.default)("buildConnectionPath generates cubic bezier path for side-to-side graph", () => {
+    strict_1.default.equal((0, roadmap_graph_1.buildConnectionPath)(10, 20, 210, 40), "M 10 20 C 110 20, 110 40, 210 40");
+});
+(0, node_test_1.default)("getConnectionAnchorSides prefers horizontal anchors when topics are side by side", () => {
+    strict_1.default.deepEqual((0, roadmap_graph_1.getConnectionAnchorSides)({ x: 120, y: 90 }, { x: 320, y: 110 }), {
+        sourceSide: "right",
+        targetSide: "left"
+    });
+});
+(0, node_test_1.default)("getConnectionAnchorSides prefers vertical anchors when topics are stacked", () => {
+    strict_1.default.deepEqual((0, roadmap_graph_1.getConnectionAnchorSides)({ x: 120, y: 90 }, { x: 150, y: 280 }), {
+        sourceSide: "bottom",
+        targetSide: "top"
+    });
+});
+(0, node_test_1.default)("offsetConnectionAnchorPoint moves roadmap arrow anchors away from cards", () => {
+    strict_1.default.deepEqual((0, roadmap_graph_1.offsetConnectionAnchorPoint)({ x: 120, y: 90 }, "left", 12), { x: 108, y: 90 });
+    strict_1.default.deepEqual((0, roadmap_graph_1.offsetConnectionAnchorPoint)({ x: 120, y: 90 }, "right", 12), { x: 132, y: 90 });
+    strict_1.default.deepEqual((0, roadmap_graph_1.offsetConnectionAnchorPoint)({ x: 120, y: 90 }, "top", 12), { x: 120, y: 78 });
+});
+(0, node_test_1.default)("getConnectionAnchorOffsetDistance reserves extra space on the right side for the link handle", () => {
+    strict_1.default.equal((0, roadmap_graph_1.getConnectionAnchorOffsetDistance)("left"), 18);
+    strict_1.default.equal((0, roadmap_graph_1.getConnectionAnchorOffsetDistance)("top"), 18);
+    strict_1.default.equal((0, roadmap_graph_1.getConnectionAnchorOffsetDistance)("bottom"), 18);
+    strict_1.default.equal((0, roadmap_graph_1.getConnectionAnchorOffsetDistance)("right"), 32);
+});
 (0, node_test_1.default)("normalizeGraphPoint converts client coordinates into graph-relative point", () => {
     const point = (0, roadmap_graph_1.normalizeGraphPoint)(160, 210, { left: 40, top: 120 });
     strict_1.default.deepEqual(point, { x: 120, y: 90 });
@@ -46,4 +72,34 @@ const roadmap_graph_1 = require("./roadmap-graph");
         offsetY: 0
     }, 1.2);
     strict_1.default.deepEqual(nextOffset, { x: -60, y: -44 });
+});
+(0, node_test_1.default)("getRoadmapWheelZoomBehavior blocks page scroll and zooms only on desktop", () => {
+    strict_1.default.deepEqual((0, roadmap_graph_1.getRoadmapWheelZoomBehavior)(120, 1280, 960), {
+        preventPageScroll: true,
+        scaleDelta: -0.12
+    });
+    strict_1.default.deepEqual((0, roadmap_graph_1.getRoadmapWheelZoomBehavior)(-120, 1280, 960), {
+        preventPageScroll: true,
+        scaleDelta: 0.12
+    });
+});
+(0, node_test_1.default)("getRoadmapWheelZoomBehavior keeps default page scroll on tablet/mobile", () => {
+    strict_1.default.deepEqual((0, roadmap_graph_1.getRoadmapWheelZoomBehavior)(120, 960, 960), {
+        preventPageScroll: false,
+        scaleDelta: 0
+    });
+    strict_1.default.deepEqual((0, roadmap_graph_1.getRoadmapWheelZoomBehavior)(120, 768, 960), {
+        preventPageScroll: false,
+        scaleDelta: 0
+    });
+});
+(0, node_test_1.default)("getRoadmapWheelZoomBehavior ignores zero and invalid wheel deltas", () => {
+    strict_1.default.deepEqual((0, roadmap_graph_1.getRoadmapWheelZoomBehavior)(0, 1280, 960), {
+        preventPageScroll: false,
+        scaleDelta: 0
+    });
+    strict_1.default.deepEqual((0, roadmap_graph_1.getRoadmapWheelZoomBehavior)(Number.NaN, 1280, 960), {
+        preventPageScroll: false,
+        scaleDelta: 0
+    });
 });

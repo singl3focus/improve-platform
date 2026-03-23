@@ -6,6 +6,10 @@ import {
 } from "@/lib/backend-api";
 import { getStringValue, isRecord } from "@/lib/backend-shared";
 import { normalizeText } from "@/lib/payload-parsers";
+import {
+  isRoadmapTopicStatus
+} from "@/lib/roadmap-topic-status";
+import { buildRoadmapTopicUpdatePlan } from "@/lib/roadmap-topic-update-flow";
 
 interface RouteContext {
   params: {
@@ -16,6 +20,19 @@ interface RouteContext {
 interface TopicUpdatePayload {
   title?: unknown;
   description?: unknown;
+  status?: unknown;
+}
+
+function getBlockedReason(currentTopic: Record<string, unknown> | null): string | null {
+  const blockReasons = (currentTopic as { block_reasons?: unknown } | null)?.block_reasons;
+  if (!Array.isArray(blockReasons) || blockReasons.length === 0) {
+    return null;
+  }
+
+  const normalizedReasons = blockReasons.filter(
+    (value): value is string => typeof value === "string" && value.trim().length > 0
+  );
+  return normalizedReasons.length > 0 ? normalizedReasons.join(". ") : null;
 }
 
 export async function PUT(request: NextRequest, context: RouteContext) {
@@ -34,8 +51,17 @@ export async function PUT(request: NextRequest, context: RouteContext) {
   if (payload.description !== undefined && typeof payload.description !== "string") {
     return NextResponse.json({ message: "Description must be a string." }, { status: 422 });
   }
+  if (payload.status !== undefined && (typeof payload.status !== "string" || !isRoadmapTopicStatus(payload.status))) {
+    return NextResponse.json(
+      {
+        message: "Invalid topic status. Allowed: not_started, in_progress, paused, completed."
+      },
+      { status: 422 }
+    );
+  }
 
   const description = typeof payload.description === "string" ? payload.description.trim() : "";
+  const nextStatus = typeof payload.status === "string" ? payload.status : null;
   const client = createBackendClient(request);
   const topicId = context.params.topicId;
 
@@ -55,22 +81,70 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     }
 
     const currentTopic = isRecord(currentTopicResult.payload) ? currentTopicResult.payload : null;
+    const currentStatusValue = getStringValue(currentTopic, "status");
+    if (!currentStatusValue || !isRoadmapTopicStatus(currentStatusValue)) {
+      return NextResponse.json(
+        {
+          message: "Roadmap topic status is missing in backend response.",
+          code: "invalid_status"
+        },
+        { status: 502 }
+      );
+    }
+
     const startDate = getStringValue(currentTopic, "start_date") ?? null;
     const targetDate = getStringValue(currentTopic, "target_date") ?? null;
     const currentPositionValue = Number((currentTopic as { position?: unknown } | null)?.position ?? 1);
     const position = Number.isFinite(currentPositionValue) && currentPositionValue > 0
       ? Math.floor(currentPositionValue)
       : 1;
+    const updatePlan = buildRoadmapTopicUpdatePlan({
+      currentTopic: {
+        status: currentStatusValue,
+        isBlocked: (currentTopic as { is_blocked?: unknown } | null)?.is_blocked === true,
+        blockedReason: getBlockedReason(currentTopic),
+        position,
+        startDate,
+        targetDate
+      },
+      request: {
+        title,
+        description,
+        status: nextStatus
+      }
+    });
+    if (!updatePlan.ok) {
+      return NextResponse.json(
+        {
+          message: updatePlan.message,
+          code: updatePlan.code
+        },
+        { status: updatePlan.httpStatus }
+      );
+    }
+
+    if (updatePlan.statusPayload) {
+      const statusUpdateResult = await client.call(
+        `/api/v1/roadmap/topics/${encodeURIComponent(topicId)}/status`,
+        {
+          method: "PATCH",
+          body: updatePlan.statusPayload
+        }
+      );
+      if (!statusUpdateResult.response.ok) {
+        const errorResponse = createBackendErrorResponse(
+          statusUpdateResult.response,
+          statusUpdateResult.payload,
+          "Roadmap topic status update failed."
+        );
+        client.applyUpdatedSession(errorResponse);
+        return errorResponse;
+      }
+    }
 
     const updateResult = await client.call(`/api/v1/roadmap/topics/${encodeURIComponent(topicId)}`, {
       method: "PUT",
-      body: {
-        title,
-        description,
-        position,
-        start_date: startDate,
-        target_date: targetDate
-      }
+      body: updatePlan.topicPayload
     });
     if (!updateResult.response.ok) {
       const errorResponse = createBackendErrorResponse(
@@ -87,7 +161,8 @@ export async function PUT(request: NextRequest, context: RouteContext) {
         id: topicId,
         title,
         description,
-        position
+        position: updatePlan.topicPayload.position,
+        status: updatePlan.responseStatus
       },
       { status: 200 }
     );

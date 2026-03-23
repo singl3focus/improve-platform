@@ -10,7 +10,6 @@ import {
   Library,
   LucideIcon,
 } from "lucide-react";
-import { PreferencesControls } from "@/components/layout/preferences-controls";
 import { useUserPreferences } from "@/components/providers/user-preferences-provider";
 import { logout } from "@/lib/auth/client";
 
@@ -80,7 +79,6 @@ export function PrivateShell({ children }: { children: ReactNode }) {
         <div className="sidebar-spacer" />
         
         <div className="nav-list nav-list-bottom" aria-label={copy.settings.title}>
-          <PreferencesControls className="sidebar-preferences-mini" variant="mini" />
           <button
             type="button"
             className="sidebar-text-action"

@@ -23,31 +23,6 @@
   --chip-text: #1f5fb8;
 }
 
-:root[data-theme="dark"] {
-  color-scheme: dark;
-  --bg: #0b1424;
-  --surface: #121d32;
-  --text: #e5ecfa;
-  --muted: #a8b5cf;
-  --border: #2f425f;
-  --accent: #2563eb;
-  --accent-soft: #2a446b;
-  --danger-bg: #3a1f29;
-  --danger-text: #ffbfcb;
-  --bg-gradient-start: #1a2942;
-  --sidebar-gradient-start: #0f182c;
-  --sidebar-gradient-end: #13203a;
-  --header-bg: rgba(10, 18, 34, 0.78);
-  --surface-elevated: #172743;
-  --surface-muted: #182943;
-  --surface-overlay: rgba(16, 27, 46, 0.9);
-  --text-strong-accent: #b3d3ff;
-  --border-soft: #365073;
-  --chip-bg: #233b60;
-  --chip-border: #3f5d87;
-  --chip-text: #c7deff;
-}
-
 * {
   box-sizing: border-box;
 }
@@ -1160,14 +1135,36 @@ a {
 
 .roadmap-graph {
   position: relative;
-  overflow: auto;
+  overflow: hidden;
+  overscroll-behavior: contain;
   border-radius: 20px;
   border: 1px solid var(--border);
   padding: 20px;
+  min-height: 520px;
+  cursor: grab;
   background:
     radial-gradient(circle at 8% 10%, rgba(69, 122, 214, 0.09), transparent 36%),
     radial-gradient(circle at 92% 84%, rgba(31, 160, 113, 0.1), transparent 36%),
     linear-gradient(180deg, #f9fbff 0%, #f3f7ff 55%, #f8fbff 100%);
+}
+
+.roadmap-graph[data-panning="true"] {
+  cursor: grabbing;
+}
+
+.roadmap-graph-canvas {
+  position: relative;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+.roadmap-canvas-controls {
+  display: inline-flex;
+  gap: 8px;
+}
+
+.roadmap-canvas-controls .button {
+  min-width: 36px;
 }
 
 .roadmap-connections {
@@ -1176,6 +1173,7 @@ a {
   width: 100%;
   height: 100%;
   pointer-events: none;
+  overflow: visible;
   z-index: 0;
 }
 
@@ -2452,6 +2450,12 @@ a {
   align-items: center;
 }
 
+.tasks-card-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .tasks-card-head a,
 .tasks-card-head span {
   font-size: 0.69rem;
@@ -2477,6 +2481,35 @@ a {
   justify-content: center;
   cursor: pointer;
   transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+.tasks-edit-button {
+  width: 28px;
+  height: 28px;
+  border: 1px solid #b8d2f8;
+  border-radius: 8px;
+  background: #f3f8ff;
+  color: #1f4db4;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+.tasks-edit-button svg {
+  width: 14px;
+  height: 14px;
+}
+
+.tasks-edit-button:hover:not(:disabled) {
+  border-color: #93b8f3;
+  background: #eaf2ff;
+}
+
+.tasks-edit-button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
 }
 
 .tasks-delete-button svg {
@@ -2829,145 +2862,6 @@ a {
   grid-column: 1 / -1;
 }
 
-:root[data-theme="dark"] .dashboard-error {
-  border-color: #7a3f4d;
-  background: #301b26;
-}
-
-:root[data-theme="dark"] .dashboard-error p {
-  color: #ffd4de;
-}
-
-:root[data-theme="dark"] .dashboard-success {
-  border-color: #3f7b57;
-  background: #1a3124;
-}
-
-:root[data-theme="dark"] .dashboard-success p {
-  color: #bdf3ce;
-}
-
-:root[data-theme="dark"] .dashboard-badge-overdue {
-  border-color: #8f5664;
-  background: #492632;
-  color: #ffd5de;
-}
-
-:root[data-theme="dark"] .dashboard-badge-blocked,
-:root[data-theme="dark"] .roadmap-blocked-badge,
-:root[data-theme="dark"] .roadmap-blocked-reason {
-  border-color: #7f6a3d;
-  background: #3b321f;
-  color: #ffdfaa;
-}
-
-:root[data-theme="dark"] .dashboard-loading span {
-  background: linear-gradient(90deg, #1e2e4a, #2a4164, #1e2e4a);
-}
-
-:root[data-theme="dark"] .roadmap-topic-delete-button {
-  border-color: #86515f;
-  color: #ffc9d4;
-  background: #3a222e;
-}
-
-:root[data-theme="dark"] .roadmap-topic-delete-button:hover {
-  border-color: #a66a7a;
-  background: #432637;
-}
-
-:root[data-theme="dark"] .roadmap-stage-delete-button {
-  border-color: #86515f;
-  color: #ffc9d4;
-  background: #3a222e;
-}
-
-:root[data-theme="dark"] .roadmap-stage-delete-button:hover {
-  border-color: #a66a7a;
-  background: #432637;
-}
-
-:root[data-theme="dark"] .roadmap-stage-edit-trigger {
-  border-color: #415270;
-  color: #cfd9ee;
-  background: #1e2b45;
-}
-
-:root[data-theme="dark"] .roadmap-stage-edit-trigger:hover:not(:disabled) {
-  border-color: #5f7fb6;
-  color: #f2f6ff;
-  background: #273a5c;
-}
-
-:root[data-theme="dark"] .roadmap-modal {
-  background: #16253f;
-  border-color: #39517a;
-}
-
-:root[data-theme="dark"] .roadmap-modal-close {
-  border-color: #425775;
-  background: #22314f;
-  color: #d2d9e8;
-}
-
-:root[data-theme="dark"] .roadmap-modal-close:hover {
-  border-color: #637fa8;
-  color: #f0f4fb;
-  background: #2a3a5c;
-}
-
-:root[data-theme="dark"] .roadmap-connection-remove {
-  border-color: #a66a7a;
-  color: #ffc9d4;
-  background: #432637;
-}
-
-:root[data-theme="dark"] .roadmap-connection-remove:hover:not(:disabled) {
-  border-color: #c78392;
-  background: #5b3145;
-}
-
-:root[data-theme="dark"] .materials-delete-button {
-  border-color: #86515f;
-  color: #ffc9d4;
-}
-
-:root[data-theme="dark"] .materials-delete-button:hover {
-  border-color: #a66a7a;
-  background: #3d2130;
-}
-
-:root[data-theme="dark"] .tasks-delete-button {
-  border-color: #86515f;
-  color: #ffc9d4;
-  background: #3a222e;
-}
-
-:root[data-theme="dark"] .tasks-delete-button:hover:not(:disabled) {
-  border-color: #a66a7a;
-  background: #432637;
-}
-
-:root[data-theme="dark"] .tasks-column-drop-target {
-  border-color: #4f76b5;
-  box-shadow: 0 0 0 2px rgba(79, 118, 181, 0.35);
-}
-
-:root[data-theme="dark"] .nav-link-active {
-  color: #e3eeff;
-  background: #1d3557;
-}
-
-:root[data-theme="dark"] .roadmap-header {
-  background: linear-gradient(132deg, #13213a, #1b2e4e 42%, #15263f);
-}
-
-:root[data-theme="dark"] .roadmap-stage-mutation-panel,
-:root[data-theme="dark"] .roadmap-topic-mutation-panel {
-  background: linear-gradient(180deg, #15263f, #162b48);
-  border-color: #314a6f;
-}
-
 @keyframes dashboard-loading-wave {
   from {
     background-position: 200% 0;
@@ -3077,7 +2971,23 @@ a {
   }
 
   .roadmap-graph {
+    overflow: auto;
+    overscroll-behavior: auto;
+    min-height: 0;
+    cursor: default;
     padding: 12px;
+  }
+
+  .roadmap-canvas-controls {
+    width: 100%;
+  }
+
+  .roadmap-canvas-controls .button {
+    flex: 1 1 auto;
+  }
+
+  .roadmap-graph-canvas {
+    transform: none !important;
   }
 
   .roadmap-graph-scene {

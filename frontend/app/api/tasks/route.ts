@@ -60,6 +60,31 @@ function toTaskBoardItem(
   };
 }
 
+function getNextTaskPosition(tasks: BackendTaskResponse[]): number {
+  const maxPosition = tasks.reduce((max, task) => {
+    if (typeof task.position !== "number" || !Number.isFinite(task.position)) {
+      return max;
+    }
+    return Math.max(max, task.position);
+  }, 0);
+
+  return maxPosition + 1;
+}
+
+async function resolveTaskCreatePosition(
+  client: ReturnType<typeof createBackendClient>
+): Promise<number> {
+  const tasksResult = await client.call("/api/v1/tasks", { method: "GET" });
+  if (!tasksResult.response.ok) {
+    return 1;
+  }
+
+  const existingTasks = Array.isArray(tasksResult.payload)
+    ? (tasksResult.payload as BackendTaskResponse[])
+    : [];
+  return getNextTaskPosition(existingTasks);
+}
+
 export async function GET(request: NextRequest) {
   const client = createBackendClient(request);
 
@@ -181,13 +206,16 @@ export async function POST(request: NextRequest) {
   const client = createBackendClient(request);
 
   try {
+    const position = await resolveTaskCreatePosition(client);
+
     const createResult = await client.call("/api/v1/tasks", {
       method: "POST",
       body: {
         title,
         description,
-        ...(topicId ? { topic_id: topicId } : {}),
-        ...(deadline ? { deadline } : {})
+        topic_id: topicId,
+        ...(deadline ? { deadline } : {}),
+        position
       }
     });
 

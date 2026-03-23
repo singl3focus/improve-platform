@@ -14,7 +14,8 @@ interface CalendarDay {
 export function DashboardCalendarRibbon({ locale }: DashboardCalendarRibbonProps) {
   const days = useMemo<CalendarDay[]>(() => {
     const today = new Date();
-    const uiLocale = locale === "ru" ? "ru-RU" : "en-US";
+    const normalizedLocale = locale.trim().toLowerCase();
+    const uiLocale = normalizedLocale.startsWith("ru") ? "ru-RU" : "en-US";
     const weekdayFormatter = new Intl.DateTimeFormat(uiLocale, { weekday: "short" });
     const titleFormatter = new Intl.DateTimeFormat(uiLocale, {
       day: "2-digit",
@@ -41,7 +42,7 @@ export function DashboardCalendarRibbon({ locale }: DashboardCalendarRibbonProps
   }, [locale]);
 
   return (
-    <section className="dashboard-calendar-ribbon" aria-label="Calendar ribbon">
+    <section className="dashboard-calendar-ribbon" aria-label="Лента календаря">
       <div className="dashboard-calendar-ribbon-scroll" role="list">
         {days.map((day) => (
           <div

@@ -3,9 +3,13 @@ import assert from "node:assert/strict";
 import {
   buildConnectionPath,
   clampGraphScale,
+  getConnectionAnchorOffsetDistance,
+  getConnectionAnchorSides,
   getGraphOffsetForScale,
+  getRoadmapWheelZoomBehavior,
   isDragGesture,
   normalizeGraphPoint,
+  offsetConnectionAnchorPoint,
   parsePositiveInteger
 } from "./roadmap-graph";
 
@@ -24,6 +28,55 @@ test("buildConnectionPath generates cubic bezier path for top-down graph", () =>
     buildConnectionPath(10, 20, 110, 220),
     "M 10 20 C 10 120, 110 120, 110 220"
   );
+});
+
+test("buildConnectionPath generates cubic bezier path for side-to-side graph", () => {
+  assert.equal(
+    buildConnectionPath(10, 20, 210, 40),
+    "M 10 20 C 110 20, 110 40, 210 40"
+  );
+});
+
+test("getConnectionAnchorSides prefers horizontal anchors when topics are side by side", () => {
+  assert.deepEqual(
+    getConnectionAnchorSides({ x: 120, y: 90 }, { x: 320, y: 110 }),
+    {
+      sourceSide: "right",
+      targetSide: "left"
+    }
+  );
+});
+
+test("getConnectionAnchorSides prefers vertical anchors when topics are stacked", () => {
+  assert.deepEqual(
+    getConnectionAnchorSides({ x: 120, y: 90 }, { x: 150, y: 280 }),
+    {
+      sourceSide: "bottom",
+      targetSide: "top"
+    }
+  );
+});
+
+test("offsetConnectionAnchorPoint moves roadmap arrow anchors away from cards", () => {
+  assert.deepEqual(
+    offsetConnectionAnchorPoint({ x: 120, y: 90 }, "left", 12),
+    { x: 108, y: 90 }
+  );
+  assert.deepEqual(
+    offsetConnectionAnchorPoint({ x: 120, y: 90 }, "right", 12),
+    { x: 132, y: 90 }
+  );
+  assert.deepEqual(
+    offsetConnectionAnchorPoint({ x: 120, y: 90 }, "top", 12),
+    { x: 120, y: 78 }
+  );
+});
+
+test("getConnectionAnchorOffsetDistance reserves extra space on the right side for the link handle", () => {
+  assert.equal(getConnectionAnchorOffsetDistance("left"), 18);
+  assert.equal(getConnectionAnchorOffsetDistance("top"), 18);
+  assert.equal(getConnectionAnchorOffsetDistance("bottom"), 18);
+  assert.equal(getConnectionAnchorOffsetDistance("right"), 32);
 });
 
 test("normalizeGraphPoint converts client coordinates into graph-relative point", () => {
@@ -75,4 +128,40 @@ test("getGraphOffsetForScale keeps anchor point stable when zooming", () => {
   );
 
   assert.deepEqual(nextOffset, { x: -60, y: -44 });
+});
+
+test("getRoadmapWheelZoomBehavior blocks page scroll and zooms only on desktop", () => {
+  assert.deepEqual(getRoadmapWheelZoomBehavior(120, 1280, 960), {
+    preventPageScroll: true,
+    scaleDelta: -0.12
+  });
+
+  assert.deepEqual(getRoadmapWheelZoomBehavior(-120, 1280, 960), {
+    preventPageScroll: true,
+    scaleDelta: 0.12
+  });
+});
+
+test("getRoadmapWheelZoomBehavior keeps default page scroll on tablet/mobile", () => {
+  assert.deepEqual(getRoadmapWheelZoomBehavior(120, 960, 960), {
+    preventPageScroll: false,
+    scaleDelta: 0
+  });
+
+  assert.deepEqual(getRoadmapWheelZoomBehavior(120, 768, 960), {
+    preventPageScroll: false,
+    scaleDelta: 0
+  });
+});
+
+test("getRoadmapWheelZoomBehavior ignores zero and invalid wheel deltas", () => {
+  assert.deepEqual(getRoadmapWheelZoomBehavior(0, 1280, 960), {
+    preventPageScroll: false,
+    scaleDelta: 0
+  });
+
+  assert.deepEqual(getRoadmapWheelZoomBehavior(Number.NaN, 1280, 960), {
+    preventPageScroll: false,
+    scaleDelta: 0
+  });
 });

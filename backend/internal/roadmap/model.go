@@ -10,6 +10,7 @@ var (
 	ErrRoadmapNotFound    = errors.New("roadmap not found")
 	ErrRoadmapExists      = errors.New("roadmap already exists")
 	ErrTopicNotFound      = errors.New("topic not found")
+	ErrInvalidDirection   = errors.New("invalid create direction")
 	ErrCycleDetected      = errors.New("dependency would create a cycle")
 	ErrTopicBlocked       = errors.New("topic is blocked by incomplete prerequisites")
 	ErrInvalidStatus      = errors.New("invalid status transition")
@@ -66,16 +67,32 @@ type UpdateRoadmapRequest struct {
 }
 
 type CreateTopicRequest struct {
-	Title       string `json:"title"`
-	Description string `json:"description"`
-	Position    int    `json:"position"`
+	Title             string               `json:"title"`
+	Description       string               `json:"description"`
+	Position          int                  `json:"position"`
+	Direction         TopicCreateDirection `json:"direction"`
+	RelativeToTopicID string               `json:"relative_to_topic_id"`
 }
 
-type CreateTopicWithDependencyRequest struct {
-	Title            string `json:"title"`
-	Description      string `json:"description"`
-	Position         int    `json:"position"`
-	DependsOnTopicID string `json:"depends_on_topic_id"`
+type TopicCreateDirection string
+
+const (
+	TopicCreateDirectionLeft  TopicCreateDirection = "left"
+	TopicCreateDirectionRight TopicCreateDirection = "right"
+	TopicCreateDirectionBelow TopicCreateDirection = "below"
+)
+
+func (d TopicCreateDirection) IsValid() bool {
+	switch d {
+	case TopicCreateDirectionLeft, TopicCreateDirectionRight, TopicCreateDirectionBelow:
+		return true
+	default:
+		return false
+	}
+}
+
+func (r CreateTopicRequest) IsDirectional() bool {
+	return r.Direction != "" || r.RelativeToTopicID != ""
 }
 
 type UpdateTopicRequest struct {
@@ -137,7 +154,7 @@ type Repository interface {
 	UpdateRoadmapTitle(ctx context.Context, userID, title string) error
 
 	CreateTopic(ctx context.Context, userID, title, description string, position int) (Topic, error)
-	CreateTopicWithDependency(ctx context.Context, userID, title, description string, position int, dependsOnTopicID string) (Topic, error)
+	CreateTopicDirectional(ctx context.Context, userID, currentTopicID, title, description string, direction TopicCreateDirection) (Topic, error)
 	GetTopicByID(ctx context.Context, id, userID string) (Topic, error)
 	GetTopicsByUserID(ctx context.Context, userID string) ([]Topic, error)
 	UpdateTopic(ctx context.Context, id, userID, title, description string, startDate, targetDate *time.Time, position int) error
@@ -156,7 +173,6 @@ type Service interface {
 	UpdateRoadmap(ctx context.Context, userID string, req UpdateRoadmapRequest) error
 
 	CreateTopic(ctx context.Context, userID string, req CreateTopicRequest) (TopicResponse, error)
-	CreateTopicWithDependency(ctx context.Context, userID string, req CreateTopicWithDependencyRequest) (TopicResponse, error)
 	GetTopic(ctx context.Context, userID, topicID string) (TopicResponse, error)
 	UpdateTopic(ctx context.Context, userID, topicID string, req UpdateTopicRequest) error
 	UpdateTopicStatus(ctx context.Context, userID, topicID string, req UpdateStatusRequest) error

@@ -108,7 +108,17 @@ func (uc *UseCase) UpdateTask(ctx context.Context, userID, taskID string, req Up
 		return apperr.E(op, apperr.Fmt("deadline: %w", err))
 	}
 
-	if err := uc.repo.Update(ctx, taskID, userID, req.Title, req.Description, deadline, req.Position); err != nil {
+	if err := uc.repo.Update(
+		ctx,
+		taskID,
+		userID,
+		req.Title,
+		req.Description,
+		deadline,
+		req.Position,
+		req.TopicID,
+		req.topicIDProvided,
+	); err != nil {
 		return apperr.E(op, err)
 	}
 

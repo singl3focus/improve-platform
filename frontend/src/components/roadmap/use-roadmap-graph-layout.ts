@@ -1,6 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { RoadmapResponse } from "@/lib/roadmap-types";
-import type { GraphSize, RoadmapConnection } from "@/lib/roadmap-graph";
+import {
+  normalizeGraphPoint,
+  type GraphSceneTransform,
+  type GraphSize,
+  type RoadmapConnection
+} from "@/lib/roadmap-graph";
 import { buildRoadmapConnections, readGraphSize } from "@/lib/roadmap-layout";
 
 interface UseRoadmapGraphLayoutParams {
@@ -8,14 +13,20 @@ interface UseRoadmapGraphLayoutParams {
   data: RoadmapResponse | null;
   graphRef: { current: HTMLDivElement | null };
   topicRefs: { current: Map<string, HTMLElement> };
+  transform: GraphSceneTransform;
 }
 
 export function useRoadmapGraphLayout(params: UseRoadmapGraphLayoutParams) {
+  const transformRef = useRef(params.transform);
   const [connections, setConnections] = useState<RoadmapConnection[]>([]);
   const [graphSize, setGraphSize] = useState<GraphSize>({
     width: 1,
     height: 1
   });
+
+  useEffect(() => {
+    transformRef.current = params.transform;
+  }, [params.transform]);
 
   useEffect(() => {
     if (params.status !== "success" || !params.data) {
@@ -35,10 +46,23 @@ export function useRoadmapGraphLayout(params: UseRoadmapGraphLayoutParams) {
       const containerRect = graphElement.getBoundingClientRect();
       const topicRects = new Map<string, DOMRect>();
       for (const [topicId, topicElement] of params.topicRefs.current.entries()) {
-        topicRects.set(topicId, topicElement.getBoundingClientRect());
+        const topicRect = topicElement.getBoundingClientRect();
+        const transform = transformRef.current;
+        const topLeft = normalizeGraphPoint(
+          topicRect.left,
+          topicRect.top,
+          containerRect,
+          transform
+        );
+        topicRects.set(topicId, {
+          left: topLeft.x,
+          top: topLeft.y,
+          width: topicRect.width / transform.scale,
+          bottom: topLeft.y + topicRect.height / transform.scale
+        } as DOMRect);
       }
 
-      setConnections(buildRoadmapConnections(roadmapData, containerRect, topicRects));
+      setConnections(buildRoadmapConnections(roadmapData, { left: 0, top: 0 }, topicRects));
       setGraphSize(readGraphSize(graphElement));
     };
 

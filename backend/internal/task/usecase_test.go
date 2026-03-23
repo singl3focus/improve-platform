@@ -14,7 +14,7 @@ type mockRepo struct {
 	createFn       func(ctx context.Context, t task.Task) (task.Task, error)
 	getByIDFn      func(ctx context.Context, id, userID string) (task.Task, error)
 	listByUserFn   func(ctx context.Context, userID string, topicID *string) ([]task.Task, error)
-	updateFn       func(ctx context.Context, id, userID, title, description string, deadline *time.Time, position int) error
+	updateFn       func(ctx context.Context, id, userID, title, description string, deadline *time.Time, position int, topicID *string, updateTopicID bool) error
 	updateStatusFn func(ctx context.Context, id, userID, status string) error
 	deleteFn       func(ctx context.Context, id, userID string) error
 	countByTopicFn func(ctx context.Context, topicID, userID string) (int, int, error)
@@ -29,8 +29,18 @@ func (m *mockRepo) GetByID(ctx context.Context, id, userID string) (task.Task, e
 func (m *mockRepo) ListByUser(ctx context.Context, userID string, topicID *string) ([]task.Task, error) {
 	return m.listByUserFn(ctx, userID, topicID)
 }
-func (m *mockRepo) Update(ctx context.Context, id, userID, title, description string, deadline *time.Time, position int) error {
-	return m.updateFn(ctx, id, userID, title, description, deadline, position)
+func (m *mockRepo) Update(
+	ctx context.Context,
+	id,
+	userID,
+	title,
+	description string,
+	deadline *time.Time,
+	position int,
+	topicID *string,
+	updateTopicID bool,
+) error {
+	return m.updateFn(ctx, id, userID, title, description, deadline, position, topicID, updateTopicID)
 }
 func (m *mockRepo) UpdateStatus(ctx context.Context, id, userID, status string) error {
 	return m.updateStatusFn(ctx, id, userID, status)
@@ -44,9 +54,9 @@ func (m *mockRepo) CountByTopic(ctx context.Context, topicID, userID string) (in
 
 // mockTopicUpdater implements task.TopicStatusUpdater for unit tests.
 type mockTopicUpdater struct {
-	getTopicStatusFn      func(ctx context.Context, topicID, userID string) (string, error)
-	setTopicInProgressFn  func(ctx context.Context, topicID, userID string) error
-	setTopicCompletedFn   func(ctx context.Context, topicID, userID string) error
+	getTopicStatusFn     func(ctx context.Context, topicID, userID string) (string, error)
+	setTopicInProgressFn func(ctx context.Context, topicID, userID string) error
+	setTopicCompletedFn  func(ctx context.Context, topicID, userID string) error
 }
 
 func (m *mockTopicUpdater) GetTopicStatus(ctx context.Context, topicID, userID string) (string, error) {

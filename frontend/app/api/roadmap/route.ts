@@ -36,6 +36,10 @@ interface BackendFlatRoadmapResponse {
   topics: BackendFlatRoadmapTopic[];
 }
 
+function canSkipTopicMetricsError(status: number): boolean {
+  return status >= 500;
+}
+
 function getBlockedReason(topic: { block_reasons?: string[] }): string | null {
   if (!Array.isArray(topic.block_reasons) || topic.block_reasons.length === 0) {
     return null;
@@ -53,7 +57,11 @@ async function loadTopicMetrics(
   });
 
   if (!tasksResult.response.ok) {
-    if (tasksResult.response.status !== 404 || !isBackendErrorCode(tasksResult.payload, "topic_not_found")) {
+    const topicNotFound =
+      tasksResult.response.status === 404 &&
+      isBackendErrorCode(tasksResult.payload, "topic_not_found");
+
+    if (!topicNotFound && !canSkipTopicMetricsError(tasksResult.response.status)) {
       return {
         metrics: null,
         errorResponse: createBackendErrorResponse(
@@ -73,10 +81,11 @@ async function loadTopicMetrics(
   );
 
   if (!materialsResult.response.ok) {
-    if (
-      materialsResult.response.status !== 404 ||
-      !isBackendErrorCode(materialsResult.payload, "topic_not_found")
-    ) {
+    const topicNotFound =
+      materialsResult.response.status === 404 &&
+      isBackendErrorCode(materialsResult.payload, "topic_not_found");
+
+    if (!topicNotFound && !canSkipTopicMetricsError(materialsResult.response.status)) {
       return {
         metrics: null,
         errorResponse: createBackendErrorResponse(

@@ -113,36 +113,22 @@ func (h *Handler) CreateTopic() http.HandlerFunc {
 			httpresp.Error(w, http.StatusBadRequest, "validation_error", "title is required")
 			return
 		}
+		if req.IsDirectional() {
+			if req.RelativeToTopicID == "" {
+				httpresp.Error(w, http.StatusBadRequest, "validation_error", "relative_to_topic_id is required for directional create")
+				return
+			}
+			if !uuidPathParamPattern.MatchString(req.RelativeToTopicID) {
+				httpresp.Error(w, http.StatusBadRequest, "validation_error", "relative_to_topic_id must be a valid UUID")
+				return
+			}
+			if !req.Direction.IsValid() {
+				httpresp.Error(w, http.StatusBadRequest, "validation_error", "direction must be one of: left, right, below")
+				return
+			}
+		}
 
 		resp, err := h.svc.CreateTopic(r.Context(), userID, req)
-		if err != nil {
-			handleError(w, err)
-			return
-		}
-
-		httpresp.JSON(w, http.StatusCreated, resp)
-	}
-}
-
-func (h *Handler) CreateTopicWithDependency() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		userID, ok := auth.UserIDFromContext(r.Context())
-		if !ok {
-			httpresp.Error(w, http.StatusUnauthorized, "unauthorized", "user not authenticated")
-			return
-		}
-
-		var req CreateTopicWithDependencyRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			httpresp.Error(w, http.StatusBadRequest, "bad_request", "invalid request body")
-			return
-		}
-		if req.Title == "" || req.DependsOnTopicID == "" {
-			httpresp.Error(w, http.StatusBadRequest, "validation_error", "title and depends_on_topic_id are required")
-			return
-		}
-
-		resp, err := h.svc.CreateTopicWithDependency(r.Context(), userID, req)
 		if err != nil {
 			handleError(w, err)
 			return
@@ -322,6 +308,8 @@ func handleError(w http.ResponseWriter, err error) {
 		httpresp.Error(w, http.StatusConflict, "roadmap_exists", "roadmap already exists for this user")
 	case apperr.Is(err, ErrTopicNotFound):
 		httpresp.Error(w, http.StatusNotFound, "topic_not_found", "topic not found")
+	case apperr.Is(err, ErrInvalidDirection):
+		httpresp.Error(w, http.StatusBadRequest, "invalid_direction", "direction must be one of: left, right, below")
 	case apperr.Is(err, ErrCycleDetected):
 		httpresp.Error(w, http.StatusConflict, "cycle_detected", "adding this dependency would create a cycle")
 	case apperr.Is(err, ErrTopicBlocked):

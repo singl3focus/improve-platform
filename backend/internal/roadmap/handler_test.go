@@ -17,17 +17,16 @@ import (
 )
 
 type mockService struct {
-	getFullRoadmapFn     func(ctx context.Context, userID string) (roadmap.RoadmapResponse, error)
-	createRoadmapFn      func(ctx context.Context, userID string, req roadmap.CreateRoadmapRequest) (roadmap.RoadmapResponse, error)
-	updateRoadmapFn      func(ctx context.Context, userID string, req roadmap.UpdateRoadmapRequest) error
-	createTopicFn        func(ctx context.Context, userID string, req roadmap.CreateTopicRequest) (roadmap.TopicResponse, error)
-	createTopicWithDepFn func(ctx context.Context, userID string, req roadmap.CreateTopicWithDependencyRequest) (roadmap.TopicResponse, error)
-	getTopicFn           func(ctx context.Context, userID, topicID string) (roadmap.TopicResponse, error)
-	updateTopicFn        func(ctx context.Context, userID, topicID string, req roadmap.UpdateTopicRequest) error
-	updateTopicStatusFn  func(ctx context.Context, userID, topicID string, req roadmap.UpdateStatusRequest) error
-	deleteTopicFn        func(ctx context.Context, userID, topicID string) error
-	addDependencyFn      func(ctx context.Context, userID, topicID string, req roadmap.AddDependencyRequest) error
-	removeDependencyFn   func(ctx context.Context, userID, topicID, depTopicID string) error
+	getFullRoadmapFn    func(ctx context.Context, userID string) (roadmap.RoadmapResponse, error)
+	createRoadmapFn     func(ctx context.Context, userID string, req roadmap.CreateRoadmapRequest) (roadmap.RoadmapResponse, error)
+	updateRoadmapFn     func(ctx context.Context, userID string, req roadmap.UpdateRoadmapRequest) error
+	createTopicFn       func(ctx context.Context, userID string, req roadmap.CreateTopicRequest) (roadmap.TopicResponse, error)
+	getTopicFn          func(ctx context.Context, userID, topicID string) (roadmap.TopicResponse, error)
+	updateTopicFn       func(ctx context.Context, userID, topicID string, req roadmap.UpdateTopicRequest) error
+	updateTopicStatusFn func(ctx context.Context, userID, topicID string, req roadmap.UpdateStatusRequest) error
+	deleteTopicFn       func(ctx context.Context, userID, topicID string) error
+	addDependencyFn     func(ctx context.Context, userID, topicID string, req roadmap.AddDependencyRequest) error
+	removeDependencyFn  func(ctx context.Context, userID, topicID, depTopicID string) error
 }
 
 func (m *mockService) GetFullRoadmap(ctx context.Context, userID string) (roadmap.RoadmapResponse, error) {
@@ -41,9 +40,6 @@ func (m *mockService) UpdateRoadmap(ctx context.Context, userID string, req road
 }
 func (m *mockService) CreateTopic(ctx context.Context, userID string, req roadmap.CreateTopicRequest) (roadmap.TopicResponse, error) {
 	return m.createTopicFn(ctx, userID, req)
-}
-func (m *mockService) CreateTopicWithDependency(ctx context.Context, userID string, req roadmap.CreateTopicWithDependencyRequest) (roadmap.TopicResponse, error) {
-	return m.createTopicWithDepFn(ctx, userID, req)
 }
 func (m *mockService) GetTopic(ctx context.Context, userID, topicID string) (roadmap.TopicResponse, error) {
 	return m.getTopicFn(ctx, userID, topicID)
@@ -255,6 +251,73 @@ func TestHandler_CreateTopic_SuccessWithoutStageFields(t *testing.T) {
 	}
 }
 
+func TestHandler_CreateTopic_DirectionalSuccess(t *testing.T) {
+	svc := &mockService{
+		createTopicFn: func(_ context.Context, _ string, req roadmap.CreateTopicRequest) (roadmap.TopicResponse, error) {
+			if req.Direction != roadmap.TopicCreateDirectionRight {
+				t.Fatalf("unexpected direction: %s", req.Direction)
+			}
+			if req.RelativeToTopicID != "11111111-1111-1111-1111-111111111111" {
+				t.Fatalf("unexpected relative id: %s", req.RelativeToTopicID)
+			}
+			return roadmap.TopicResponse{ID: "topic-2", Title: req.Title, Description: req.Description}, nil
+		},
+	}
+	h := roadmap.NewHandler(svc)
+
+	body, _ := json.Marshal(map[string]any{
+		"title":                "Topic 2",
+		"description":          "desc",
+		"direction":            "right",
+		"relative_to_topic_id": "11111111-1111-1111-1111-111111111111",
+	})
+	req := authedRequest(http.MethodPost, "/api/v1/roadmap/topics", body)
+	rec := httptest.NewRecorder()
+
+	h.CreateTopic().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d", rec.Code)
+	}
+}
+
+func TestHandler_CreateTopic_DirectionalMissingRelativeTopicID(t *testing.T) {
+	h := roadmap.NewHandler(&mockService{})
+
+	body, _ := json.Marshal(map[string]any{
+		"title":       "Topic 2",
+		"description": "desc",
+		"direction":   "below",
+	})
+	req := authedRequest(http.MethodPost, "/api/v1/roadmap/topics", body)
+	rec := httptest.NewRecorder()
+
+	h.CreateTopic().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", rec.Code)
+	}
+}
+
+func TestHandler_CreateTopic_DirectionalInvalidDirection(t *testing.T) {
+	h := roadmap.NewHandler(&mockService{})
+
+	body, _ := json.Marshal(map[string]any{
+		"title":                "Topic 2",
+		"description":          "desc",
+		"direction":            "diagonal",
+		"relative_to_topic_id": "11111111-1111-1111-1111-111111111111",
+	})
+	req := authedRequest(http.MethodPost, "/api/v1/roadmap/topics", body)
+	rec := httptest.NewRecorder()
+
+	h.CreateTopic().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", rec.Code)
+	}
+}
+
 func TestHandler_UpdateTopic_SuccessWithoutStageFields(t *testing.T) {
 	called := false
 	svc := &mockService{
@@ -301,6 +364,33 @@ func TestHandler_UpdateTopicStatus_Blocked(t *testing.T) {
 	h := roadmap.NewHandler(svc)
 
 	body, _ := json.Marshal(map[string]string{"status": "in_progress"})
+	req := withURLParams(authedRequest(http.MethodPatch, "/api/v1/roadmap/topics/t1/status", body), "topicID", "11111111-1111-1111-1111-111111111111")
+	rec := httptest.NewRecorder()
+
+	h.UpdateTopicStatus().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusConflict {
+		t.Errorf("expected 409, got %d", rec.Code)
+	}
+
+	var resp httpresp.ErrorResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode error: %v", err)
+	}
+	if resp.Error.Code != "topic_blocked" {
+		t.Errorf("expected code 'topic_blocked', got %s", resp.Error.Code)
+	}
+}
+
+func TestHandler_UpdateTopicStatus_BlockedOnCompleted(t *testing.T) {
+	svc := &mockService{
+		updateTopicStatusFn: func(_ context.Context, _, _ string, _ roadmap.UpdateStatusRequest) error {
+			return roadmap.ErrTopicBlocked
+		},
+	}
+	h := roadmap.NewHandler(svc)
+
+	body, _ := json.Marshal(map[string]string{"status": "completed"})
 	req := withURLParams(authedRequest(http.MethodPatch, "/api/v1/roadmap/topics/t1/status", body), "topicID", "11111111-1111-1111-1111-111111111111")
 	rec := httptest.NewRecorder()
 
@@ -424,65 +514,6 @@ func TestHandler_AddDependency_TopicNotFound(t *testing.T) {
 	}
 	if resp.Error.Code != "topic_not_found" {
 		t.Errorf("expected code 'topic_not_found', got %s", resp.Error.Code)
-	}
-}
-
-func TestHandler_CreateTopicWithDependency_Success(t *testing.T) {
-	svc := &mockService{
-		createTopicWithDepFn: func(_ context.Context, _ string, req roadmap.CreateTopicWithDependencyRequest) (roadmap.TopicResponse, error) {
-			return roadmap.TopicResponse{ID: "topic-new", Title: req.Title, Dependencies: []string{req.DependsOnTopicID}}, nil
-		},
-	}
-	h := roadmap.NewHandler(svc)
-
-	body, _ := json.Marshal(map[string]any{
-		"title":               "Child topic",
-		"description":         "desc",
-		"position":            1,
-		"depends_on_topic_id": "22222222-2222-2222-2222-222222222222",
-	})
-	req := authedRequest(http.MethodPost, "/api/v1/roadmap/topics/with-dependency", body)
-	rec := httptest.NewRecorder()
-
-	h.CreateTopicWithDependency().ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusCreated {
-		t.Errorf("expected 201, got %d", rec.Code)
-	}
-
-	var resp roadmap.TopicResponse
-	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
-		t.Fatalf("decode error: %v", err)
-	}
-	if resp.ID != "topic-new" {
-		t.Fatalf("expected topic-new, got %s", resp.ID)
-	}
-	if len(resp.Dependencies) != 1 || resp.Dependencies[0] != "22222222-2222-2222-2222-222222222222" {
-		t.Fatalf("unexpected dependencies: %v", resp.Dependencies)
-	}
-}
-
-func TestHandler_CreateTopicWithDependency_ValidationError(t *testing.T) {
-	h := roadmap.NewHandler(&mockService{})
-
-	body, _ := json.Marshal(map[string]any{
-		"title": "Child topic",
-	})
-	req := authedRequest(http.MethodPost, "/api/v1/roadmap/topics/with-dependency", body)
-	rec := httptest.NewRecorder()
-
-	h.CreateTopicWithDependency().ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusBadRequest {
-		t.Errorf("expected 400, got %d", rec.Code)
-	}
-
-	var resp httpresp.ErrorResponse
-	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
-		t.Fatalf("decode error: %v", err)
-	}
-	if resp.Error.Code != "validation_error" {
-		t.Errorf("expected code 'validation_error', got %s", resp.Error.Code)
 	}
 }
 

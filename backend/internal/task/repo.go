@@ -87,13 +87,28 @@ func (r *Repo) ListByUser(ctx context.Context, userID string, topicID *string) (
 	return tasks, apperr.E(op, rows.Err())
 }
 
-func (r *Repo) Update(ctx context.Context, id, userID, title, description string, deadline *time.Time, position int) error {
+func (r *Repo) Update(
+	ctx context.Context,
+	id,
+	userID,
+	title,
+	description string,
+	deadline *time.Time,
+	position int,
+	topicID *string,
+	updateTopicID bool,
+) error {
 	const op apperr.Op = "Repo.Update"
 	tag, err := r.pool.Exec(ctx,
 		`UPDATE tasks
-		 SET title = $1, description = $2, deadline = $3, position = $4, updated_at = now()
-		 WHERE id = $5 AND user_id = $6`,
-		title, description, deadline, position, id, userID,
+		 SET title = $1,
+		     description = $2,
+		     deadline = $3,
+		     position = $4,
+		     topic_id = CASE WHEN $5 THEN $6::uuid ELSE topic_id END,
+		     updated_at = now()
+		 WHERE id = $7 AND user_id = $8`,
+		title, description, deadline, position, updateTopicID, topicID, id, userID,
 	)
 	if err != nil {
 		return apperr.E(op, err)

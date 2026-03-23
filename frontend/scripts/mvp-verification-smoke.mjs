@@ -4,6 +4,8 @@ const FRONTEND_BASE_URL = process.env.FRONTEND_BASE_URL ?? "http://127.0.0.1:302
 const MOCK_BACKEND_PORT = Number(process.env.MOCK_BACKEND_PORT ?? "8080");
 const MOCK_BACKEND_HOST = process.env.MOCK_BACKEND_HOST ?? "127.0.0.1";
 const MOCK_BACKEND_BASE_URL = `http://${MOCK_BACKEND_HOST}:${MOCK_BACKEND_PORT}`;
+const SMOKE_AUTH_EMAIL = process.env.SMOKE_AUTH_EMAIL ?? "smoke.user@example.com";
+const SMOKE_AUTH_PASSWORD = process.env.SMOKE_AUTH_PASSWORD ?? "SmokePassword123!";
 const MATERIAL_UNIT_BY_TYPE = {
   book: "pages",
   article: "pages",
@@ -108,9 +110,39 @@ function createMockState() {
     roadmapCounter: 1,
     stageCounter: 1,
     topicCounter: 1,
+    authCounter: 1,
     roadmapMode: "ok",
-    taskDeleteMode: "ok"
+    taskDeleteMode: "ok",
+    validAccessTokens: new Set(),
+    validRefreshTokens: new Set()
   };
+}
+
+function issueSessionTokens(state) {
+  state.authCounter += 1;
+  const tokenSuffix = String(state.authCounter);
+  const accessToken = `smoke-access-token-${tokenSuffix}`;
+  const refreshToken = `smoke-refresh-token-${tokenSuffix}`;
+
+  state.validAccessTokens.add(accessToken);
+  state.validRefreshTokens.add(refreshToken);
+
+  return {
+    accessToken,
+    refreshToken,
+    accessExpiresIn: 900,
+    refreshExpiresIn: 1_209_600
+  };
+}
+
+function isAuthorizedRequest(state, request) {
+  const header = request.headers.authorization;
+  if (typeof header !== "string" || !header.startsWith("Bearer ")) {
+    return false;
+  }
+
+  const token = header.slice("Bearer ".length).trim();
+  return token.length > 0 && state.validAccessTokens.has(token);
 }
 
 function parseJsonBody(request) {
@@ -242,11 +274,68 @@ function createMockBackendServer() {
     }
 
     if (method === "POST" && path === "/api/v1/auth/refresh") {
-      sendJson(response, 401, {
-        message: "Refresh token is invalid.",
-        code: "invalid_refresh_token"
+      const payload = await parseJsonBody(request);
+      const refreshToken = typeof payload?.refreshToken === "string" ? payload.refreshToken : "";
+
+      if (!refreshToken || !state.validRefreshTokens.has(refreshToken)) {
+        sendJson(response, 401, {
+          message: "Refresh token is invalid.",
+          code: "invalid_refresh_token"
+        });
+        return;
+      }
+
+      const tokens = issueSessionTokens(state);
+      sendJson(response, 200, {
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+        accessExpiresIn: tokens.accessExpiresIn,
+        refreshExpiresIn: tokens.refreshExpiresIn,
+        user: {
+          id: "smoke-user",
+          email: SMOKE_AUTH_EMAIL,
+          full_name: "Smoke User"
+        }
       });
       return;
+    }
+
+    if (method === "POST" && path === "/api/v1/auth/login") {
+      const payload = await parseJsonBody(request);
+      const email = typeof payload?.email === "string" ? payload.email.trim() : "";
+      const password = typeof payload?.password === "string" ? payload.password : "";
+
+      if (email !== SMOKE_AUTH_EMAIL || password !== SMOKE_AUTH_PASSWORD) {
+        sendJson(response, 401, {
+          message: "Email or password is invalid.",
+          code: "invalid_credentials"
+        });
+        return;
+      }
+
+      const tokens = issueSessionTokens(state);
+      sendJson(response, 200, {
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+        accessExpiresIn: tokens.accessExpiresIn,
+        refreshExpiresIn: tokens.refreshExpiresIn,
+        user: {
+          id: "smoke-user",
+          email,
+          full_name: "Smoke User"
+        }
+      });
+      return;
+    }
+
+    if (path.startsWith("/api/v1/") && !path.startsWith("/api/v1/auth/")) {
+      if (!isAuthorizedRequest(state, request)) {
+        sendJson(response, 401, {
+          message: "Unauthorized.",
+          code: "unauthorized"
+        });
+        return;
+      }
     }
 
     if (method === "GET" && path === "/api/v1/roadmap") {
@@ -828,11 +917,18 @@ async function request(pathname, init = {}) {
     headers["Content-Type"] = "application/json";
   }
 
+  const cookieHeader = getCookieHeader();
+  if (cookieHeader) {
+    headers.cookie = cookieHeader;
+  }
+
   const response = await fetch(`${FRONTEND_BASE_URL}${pathname}`, {
     redirect: "manual",
     ...init,
     headers
   });
+
+  storeResponseCookies(response.headers);
 
   const contentType = response.headers.get("content-type") ?? "";
   const isJson = contentType.toLowerCase().includes("application/json");
@@ -850,6 +946,70 @@ async function request(pathname, init = {}) {
     body,
     headers: response.headers
   };
+}
+
+const cookieJar = new Map();
+
+function getSetCookieHeaders(headers) {
+  if (typeof headers.getSetCookie === "function") {
+    return headers.getSetCookie();
+  }
+
+  const fallback = headers.get("set-cookie");
+  return fallback ? [fallback] : [];
+}
+
+function storeResponseCookies(headers) {
+  const setCookies = getSetCookieHeaders(headers);
+
+  for (const entry of setCookies) {
+    const firstPair = entry.split(";", 1)[0] ?? "";
+    const separatorIndex = firstPair.indexOf("=");
+    if (separatorIndex <= 0) {
+      continue;
+    }
+
+    const name = firstPair.slice(0, separatorIndex).trim();
+    const value = firstPair.slice(separatorIndex + 1).trim();
+    if (!name) {
+      continue;
+    }
+
+    if (!value) {
+      cookieJar.delete(name);
+      continue;
+    }
+
+    cookieJar.set(name, value);
+  }
+}
+
+function getCookieHeader() {
+  if (cookieJar.size === 0) {
+    return "";
+  }
+
+  return Array.from(cookieJar.entries())
+    .map(([name, value]) => `${name}=${value}`)
+    .join("; ");
+}
+
+async function authenticateForProtectedApiChecks() {
+  const loginResponse = await request("/api/auth/login", {
+    method: "POST",
+    body: JSON.stringify({
+      email: SMOKE_AUTH_EMAIL,
+      password: SMOKE_AUTH_PASSWORD
+    })
+  });
+
+  invariant(loginResponse.status === 200, `Expected 200 from /api/auth/login, got ${loginResponse.status}`);
+
+  const sessionResponse = await request("/api/auth/session", {
+    method: "GET"
+  });
+  invariant(sessionResponse.status === 200, `Expected 200 from /api/auth/session, got ${sessionResponse.status}`);
+  invariant(sessionResponse.body?.authenticated === true, "Expected authenticated session payload.");
 }
 
 async function setMockScenario(patch) {
@@ -898,6 +1058,15 @@ async function run() {
       });
       invariant(response.status === 400, `Expected 400, got ${response.status}`);
       invariant(typeof response.body?.message === "string", "Expected JSON validation error message.");
+    });
+
+    await check("Auth login establishes session for protected BFF routes", async () => {
+      await authenticateForProtectedApiChecks();
+      invariant(cookieJar.has("improve_access_token"), "Expected improve_access_token cookie after login.");
+      invariant(cookieJar.has("improve_refresh_token"), "Expected improve_refresh_token cookie after login.");
+
+      const roadmap = await request("/api/roadmap");
+      invariant(roadmap.status === 200, `Expected 200 from protected route after login, got ${roadmap.status}`);
     });
 
     await check("Roadmap GET route keeps response shape", async () => {

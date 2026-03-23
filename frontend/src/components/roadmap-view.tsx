@@ -4,6 +4,7 @@ import {
   FormEvent,
   KeyboardEvent,
   MouseEvent,
+  PointerEvent as ReactPointerEvent,
   useCallback,
   useEffect,
   useMemo,
@@ -16,9 +17,22 @@ import { useRoadmapGraphLayout } from "@/components/roadmap/use-roadmap-graph-la
 import { useUserPreferences } from "@/components/providers/user-preferences-provider";
 import {
   buildConnectionPath,
+  clampGraphScale,
+  getConnectionAnchorOffsetDistance,
+  getConnectionAnchorSides,
+  getRoadmapWheelZoomBehavior,
+  getGraphOffsetForScale,
+  offsetConnectionAnchorPoint,
   isDragGesture,
   normalizeGraphPoint
 } from "@/lib/roadmap-graph";
+import { buildTopicGridPlacementById, compareTopicsByPosition } from "@/lib/roadmap-layout";
+import { prepareRoadmapTopicEditSubmission } from "@/lib/roadmap-topic-edit";
+import { buildTopicCreatePayload } from "@/lib/roadmap-topic-create";
+import {
+  getRoadmapTopicStatuses,
+  validateRoadmapTopicStatusChange
+} from "@/lib/roadmap-topic-status";
 import type { AppLanguage } from "@/lib/ui-copy";
 import type {
   RoadmapResponse,
@@ -48,6 +62,7 @@ interface TopicEditDraft {
   topicId: string;
   title: string;
   description: string;
+  status: RoadmapTopicStatus;
 }
 
 interface ApiErrorDetails {
@@ -58,6 +73,12 @@ interface ApiErrorDetails {
 interface TopicCreateResult {
   topicId: string;
 }
+
+type TopicCreateDirection = "left" | "right" | "below";
+
+const ROADMAP_MIN_SCALE = 0.6;
+const ROADMAP_MAX_SCALE = 1.8;
+const ROADMAP_MOBILE_BREAKPOINT = 960;
 
 const ROADMAP_COPY = {
   ru: {
@@ -83,7 +104,7 @@ const ROADMAP_COPY = {
     legendBlocked: (count: number) => `Заблокировано (${count})`,
     nextAvailableTopic: (value: string) => `Следующая доступная тема: ${value}`,
     noUnlockedTopics: "Пока нет разблокированных тем.",
-    empty: "Roadmap пока пуст. Добавьте темы и зависимости, чтобы построить граф.",
+    empty: "Дорожная карта пока пуста. Добавьте темы и зависимости, чтобы построить граф.",
     quickCreateTitle: "Быстрое создание первой темы",
     quickCreateSubtitle:
       "Создадим roadmap, этап и первую тему одним действием. Вы сможете отредактировать детали позже.",
@@ -95,47 +116,61 @@ const ROADMAP_COPY = {
     quickCreatingButton: "Создание...",
     quickCreateTopicRequired: "Укажите название первой темы.",
     quickCreateFailed: "Не удалось создать первую тему.",
-    stageManageTitle: "Управление этапами",
-    stageManageSubtitle: "Создавайте, редактируйте и удаляйте этапы roadmap.",
-    stageFieldTitle: "Название этапа",
-    stageFieldPosition: "Позиция",
-    stageTitlePlaceholder: "Например: Базовый уровень",
-    stageCreateButton: "Создать этап",
-    stageCreatingButton: "Создание...",
-    stageEditButton: "Редактировать этап",
-    stageDeleteButton: "Удалить этап",
-    stageSaveButton: "Сохранить",
-    stageCancelButton: "Отмена",
-    stageUpdatingButton: "Сохранение...",
-    stageDeletingButton: "Удаление...",
-    stageTitleRequired: "Укажите название этапа.",
-    stageCreateFailed: "Не удалось создать этап.",
-    stageUpdateFailed: "Не удалось обновить этап.",
-    stageDeleteFailed: "Не удалось удалить этап.",
-    stageDeleteConfirm: (title: string) => `Удалить этап «${title}»?`,
-    stageCreateSuccess: "Этап создан.",
-    stageUpdateSuccess: "Этап обновлён.",
-    stageDeleteSuccess: "Этап удалён.",
     topicCreateTitle: "Добавить тему",
     topicCreateSubtitle: "Создайте новую тему в текущем roadmap.",
-    topicCreateChildTitle: "Добавить дочернюю тему",
-    topicCreateChildSubtitle: (parentTitle: string) =>
-      `Новая тема будет создана после «${parentTitle}» с автосвязью.`,
+    topicCreateDirectionTitle: (direction: TopicCreateDirection) => {
+      if (direction === "left") {
+        return "Создать тему слева";
+      }
+      if (direction === "right") {
+        return "Создать тему справа";
+      }
+      return "Создать тему ниже";
+    },
+    topicCreateDirectionSubtitle: (parentTitle: string, direction: TopicCreateDirection) => {
+      if (direction === "left") {
+        return `Новая тема будет создана слева от «${parentTitle}» со связью от текущей темы.`;
+      }
+      if (direction === "right") {
+        return `Новая тема будет создана справа от «${parentTitle}» со связью от текущей темы.`;
+      }
+      return `Новая тема будет создана ниже «${parentTitle}» со связью от текущей темы.`;
+    },
     topicFieldTitle: "Название",
     topicFieldDescription: "Описание",
+    topicFieldStatus: "Статус",
     topicTitlePlaceholder: "Например: Работа с формами",
     topicDescriptionPlaceholder: "Кратко: что изучаем в этой теме",
     topicCreateButton: "Добавить тему",
     topicCreatingButton: "Добавление...",
-    topicCreateChildButton: "Создать дочернюю тему",
-    topicCreatingChildButton: "Создание дочерней темы...",
+    topicCreateDirectionButton: (direction: TopicCreateDirection) => {
+      if (direction === "left") {
+        return "Создать слева";
+      }
+      if (direction === "right") {
+        return "Создать справа";
+      }
+      return "Создать ниже";
+    },
+    topicCreatingDirectionButton: (direction: TopicCreateDirection) => {
+      if (direction === "left") {
+        return "Создание слева...";
+      }
+      if (direction === "right") {
+        return "Создание справа...";
+      }
+      return "Создание ниже...";
+    },
     topicEditButton: "Редактировать",
     topicDeleteButton: "Удалить",
     topicMenuAria: (title: string) => `Действия для темы «${title}»`,
-    topicMenuCreateChild: "Создать дочернюю",
-    topicCreateNoNextStage: "Для создания дочерней темы нужен следующий этап roadmap.",
+    topicMenuCreateLeft: "Создать слева",
+    topicMenuCreateRight: "Создать справа",
+    topicMenuCreateBelow: "Создать ниже",
     topicCreateDependencyFailedAfterCreate:
       "Тема создана, но автосвязь с родительской темой не добавлена. Свяжите темы вручную.",
+    topicCreateCloseAria: "Закрыть окно создания темы",
+    topicEditCloseAria: "Закрыть окно редактирования темы",
     topicSaveButton: "Сохранить",
     topicCancelButton: "Отмена",
     topicUpdatingButton: "Сохранение...",
@@ -145,6 +180,12 @@ const ROADMAP_COPY = {
     topicCreateFailed: "Не удалось добавить тему.",
     topicUpdateFailed: "Не удалось обновить тему.",
     topicDeleteFailed: "Не удалось удалить тему.",
+    topicStatusInvalidTransition: (from: string, to: string, allowed: string) =>
+      `Нельзя перевести тему из «${from}» в «${to}». Допустимые переходы: ${allowed}.`,
+    topicStatusBlockedTransition: (to: string, reason?: string | null) =>
+      `Заблокированную тему нельзя вручную перевести в «${to}», пока не завершены зависимости.${
+        reason ? ` Причина: ${reason}` : ""
+      }`,
     topicDeleteConfirm: (title: string) => `Удалить тему «${title}»?`,
     dependencyDragHandleAria: (title: string) =>
       `Начать перетаскивание зависимости из темы «${title}»`,
@@ -198,47 +239,61 @@ const ROADMAP_COPY = {
     quickCreatingButton: "Creating...",
     quickCreateTopicRequired: "First topic title is required.",
     quickCreateFailed: "Failed to create first topic.",
-    stageManageTitle: "Stage management",
-    stageManageSubtitle: "Create, edit, and delete roadmap stages.",
-    stageFieldTitle: "Stage title",
-    stageFieldPosition: "Position",
-    stageTitlePlaceholder: "For example: Fundamentals",
-    stageCreateButton: "Create stage",
-    stageCreatingButton: "Creating...",
-    stageEditButton: "Edit stage",
-    stageDeleteButton: "Delete stage",
-    stageSaveButton: "Save",
-    stageCancelButton: "Cancel",
-    stageUpdatingButton: "Saving...",
-    stageDeletingButton: "Deleting...",
-    stageTitleRequired: "Stage title is required.",
-    stageCreateFailed: "Stage creation failed.",
-    stageUpdateFailed: "Stage update failed.",
-    stageDeleteFailed: "Stage removal failed.",
-    stageDeleteConfirm: (title: string) => `Delete stage "${title}"?`,
-    stageCreateSuccess: "Stage created.",
-    stageUpdateSuccess: "Stage updated.",
-    stageDeleteSuccess: "Stage removed.",
     topicCreateTitle: "Add topic",
     topicCreateSubtitle: "Create a new topic in your current roadmap.",
-    topicCreateChildTitle: "Add child topic",
-    topicCreateChildSubtitle: (parentTitle: string) =>
-      `The new topic will be created after "${parentTitle}" with auto-linking.`,
+    topicCreateDirectionTitle: (direction: TopicCreateDirection) => {
+      if (direction === "left") {
+        return "Create topic on the left";
+      }
+      if (direction === "right") {
+        return "Create topic on the right";
+      }
+      return "Create topic below";
+    },
+    topicCreateDirectionSubtitle: (parentTitle: string, direction: TopicCreateDirection) => {
+      if (direction === "left") {
+        return `The new topic will be created to the left of "${parentTitle}" with a link from the current topic.`;
+      }
+      if (direction === "right") {
+        return `The new topic will be created to the right of "${parentTitle}" with a link from the current topic.`;
+      }
+      return `The new topic will be created below "${parentTitle}" with a link from the current topic.`;
+    },
     topicFieldTitle: "Title",
     topicFieldDescription: "Description",
+    topicFieldStatus: "Status",
     topicTitlePlaceholder: "For example: Working with forms",
     topicDescriptionPlaceholder: "Short note about what to learn in this topic",
     topicCreateButton: "Add topic",
     topicCreatingButton: "Adding...",
-    topicCreateChildButton: "Create child topic",
-    topicCreatingChildButton: "Creating child topic...",
+    topicCreateDirectionButton: (direction: TopicCreateDirection) => {
+      if (direction === "left") {
+        return "Create left";
+      }
+      if (direction === "right") {
+        return "Create right";
+      }
+      return "Create below";
+    },
+    topicCreatingDirectionButton: (direction: TopicCreateDirection) => {
+      if (direction === "left") {
+        return "Creating left...";
+      }
+      if (direction === "right") {
+        return "Creating right...";
+      }
+      return "Creating below...";
+    },
     topicEditButton: "Edit",
     topicDeleteButton: "Delete",
     topicMenuAria: (title: string) => `Topic actions for "${title}"`,
-    topicMenuCreateChild: "Create child",
-    topicCreateNoNextStage: "A next roadmap stage is required to create a child topic.",
+    topicMenuCreateLeft: "Create left",
+    topicMenuCreateRight: "Create right",
+    topicMenuCreateBelow: "Create below",
     topicCreateDependencyFailedAfterCreate:
       "Topic was created, but parent auto-link failed. Link topics manually.",
+    topicCreateCloseAria: "Close topic creation modal",
+    topicEditCloseAria: "Close topic editing modal",
     topicSaveButton: "Save",
     topicCancelButton: "Cancel",
     topicUpdatingButton: "Saving...",
@@ -248,6 +303,12 @@ const ROADMAP_COPY = {
     topicCreateFailed: "Topic creation failed.",
     topicUpdateFailed: "Topic update failed.",
     topicDeleteFailed: "Topic removal failed.",
+    topicStatusInvalidTransition: (from: string, to: string, allowed: string) =>
+      `Cannot move topic from "${from}" to "${to}". Allowed transitions: ${allowed}.`,
+    topicStatusBlockedTransition: (to: string, reason?: string | null) =>
+      `Blocked topic cannot be moved manually to "${to}" until prerequisites are completed.${
+        reason ? ` Reason: ${reason}` : ""
+      }`,
     topicDeleteConfirm: (title: string) => `Delete topic "${title}"?`,
     dependencyDragHandleAria: (title: string) =>
       `Start dragging a dependency from topic "${title}"`,
@@ -375,6 +436,31 @@ function getDependencyErrorMessage(
   return error instanceof Error ? error.message : copy.dependencyAddFailed;
 }
 
+function getTopicStatusErrorMessage(
+  validationResult: ReturnType<typeof validateRoadmapTopicStatusChange>,
+  topic: Pick<RoadmapTopic, "status" | "blockedReason">,
+  nextStatus: RoadmapTopicStatus,
+  copy: RoadmapCopy,
+  language: AppLanguage
+): string {
+  if (validationResult.ok) {
+    return "";
+  }
+
+  if (validationResult.reason === "blocked") {
+    return copy.topicStatusBlockedTransition(
+      getStatusLabel(nextStatus, language),
+      topic.blockedReason
+    );
+  }
+
+  return copy.topicStatusInvalidTransition(
+    getStatusLabel(topic.status, language),
+    getStatusLabel(nextStatus, language),
+    validationResult.allowedStatuses.map((status) => getStatusLabel(status, language)).join(", ")
+  );
+}
+
 async function quickCreateFirstTopic(payload: {
   roadmapTitle: string;
   stageTitle: string;
@@ -397,6 +483,9 @@ async function quickCreateFirstTopic(payload: {
 async function createRoadmapTopic(payload: {
   title: string;
   description: string;
+  direction?: TopicCreateDirection;
+  relative_to_topic_id?: string;
+  position?: number;
 }): Promise<TopicCreateResult> {
   const response = await fetch("/api/roadmap/topics", {
     method: "POST",
@@ -433,6 +522,7 @@ async function updateRoadmapTopic(
   payload: {
     title: string;
     description: string;
+    status: RoadmapTopicStatus;
   }
 ): Promise<void> {
   const response = await fetch(`/api/roadmap/topics/${encodeURIComponent(topicId)}`, {
@@ -613,11 +703,6 @@ function TopicMutationPanel(props: {
 }) {
   return (
     <section className="panel roadmap-topic-mutation-panel">
-      <header>
-        <h3>{props.title ?? props.copy.topicCreateTitle}</h3>
-        <p>{props.subtitle ?? props.copy.topicCreateSubtitle}</p>
-      </header>
-
       {props.error ? (
         <div className="dashboard-error roadmap-modal-error">
           <p>{props.error}</p>
@@ -646,29 +731,11 @@ function TopicMutationPanel(props: {
           />
         </label>
 
-        {props.onCancel ? (
-          <div className="roadmap-stage-actions">
-            <button
-              type="button"
-              className="button button-outline"
-              disabled={props.isSubmitting}
-              onClick={props.onCancel}
-            >
-              {props.copy.topicCancelButton}
-            </button>
-            <button type="submit" className="button button-primary" disabled={props.isSubmitting}>
-              {props.isSubmitting
-                ? (props.submitLoadingLabel ?? props.copy.topicCreatingButton)
-                : (props.submitLabel ?? props.copy.topicCreateButton)}
-            </button>
-          </div>
-        ) : (
-          <button type="submit" className="button button-primary" disabled={props.isSubmitting}>
-            {props.isSubmitting
-              ? (props.submitLoadingLabel ?? props.copy.topicCreatingButton)
-              : (props.submitLabel ?? props.copy.topicCreateButton)}
-          </button>
-        )}
+        <button type="submit" className="button button-primary" disabled={props.isSubmitting}>
+          {props.isSubmitting
+            ? (props.submitLoadingLabel ?? props.copy.topicCreatingButton)
+            : (props.submitLabel ?? props.copy.topicCreateButton)}
+        </button>
       </form>
     </section>
   );
@@ -728,7 +795,7 @@ function QuickCreatePanel(props: {
 export function RoadmapView() {
   const router = useRouter();
   const { language } = useUserPreferences();
-  const copy = ROADMAP_COPY[language];
+  const copy = ROADMAP_COPY.ru;
   const roadmap = useRoadmapData(copy.errorFallback);
   const roadmapReload = roadmap.reload;
   const graphRef = useRef<HTMLDivElement | null>(null);
@@ -740,11 +807,21 @@ export function RoadmapView() {
   const topicModalTitleInputRef = useRef<HTMLInputElement | null>(null);
   const topicCreateModalTriggerRef = useRef<HTMLElement | null>(null);
   const topicModalTriggerRef = useRef<HTMLElement | null>(null);
+  const panStartPointRef = useRef<{ x: number; y: number } | null>(null);
+  const panStartOffsetRef = useRef<{ x: number; y: number } | null>(null);
+  const pendingFirstTopicCenterRef = useRef(false);
+  const [sceneTransform, setSceneTransform] = useState({
+    scale: 1,
+    offsetX: 0,
+    offsetY: 0
+  });
+  const [panPointerId, setPanPointerId] = useState<number | null>(null);
   const { connections, graphSize } = useRoadmapGraphLayout({
     status: roadmap.state.status,
     data: roadmap.state.data,
     graphRef,
-    topicRefs
+    topicRefs,
+    transform: sceneTransform
   });
   const [quickCreateDraft, setQuickCreateDraft] = useState<QuickCreateDraft>(initialQuickCreateDraft());
   const [quickCreateError, setQuickCreateError] = useState<string | null>(null);
@@ -758,7 +835,10 @@ export function RoadmapView() {
   const [updatingTopicId, setUpdatingTopicId] = useState<string | null>(null);
   const [deletingTopicId, setDeletingTopicId] = useState<string | null>(null);
   const [topicMenuTopicId, setTopicMenuTopicId] = useState<string | null>(null);
-  const [childTopicParentId, setChildTopicParentId] = useState<string | null>(null);
+  const [topicCreateAnchor, setTopicCreateAnchor] = useState<{
+    parentId: string;
+    direction: TopicCreateDirection;
+  } | null>(null);
   const [dependencyMutationError, setDependencyMutationError] = useState<string | null>(null);
   const [isDependencyMutating, setIsDependencyMutating] = useState(false);
   const [removingDependencyKey, setRemovingDependencyKey] = useState<string | null>(null);
@@ -774,14 +854,6 @@ export function RoadmapView() {
 
   const stages = useMemo(() => roadmap.state.data?.stages ?? [], [roadmap.state.data]);
 
-  const stagePositionById = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const [index, stage] of stages.entries()) {
-      map.set(stage.id, index + 1);
-    }
-    return map;
-  }, [stages]);
-
   const topicById = useMemo(() => {
     const map = new Map<string, RoadmapTopic>();
     for (const stage of stages) {
@@ -795,21 +867,18 @@ export function RoadmapView() {
   const allTopics = useMemo(
     () =>
       stages.flatMap((stage) =>
-        [...stage.topics].sort((leftTopic, rightTopic) => leftTopic.position - rightTopic.position)
+        [...stage.topics].sort(compareTopicsByPosition)
       ),
     [stages]
   );
-  const maxTopicsPerStage = useMemo(
-    () =>
-      Math.max(
-        stages.reduce((maxValue, stage) => Math.max(maxValue, stage.topics.length), 0),
-        1
-      ),
-    [stages]
+  const topicGridPlacementById = useMemo(() => buildTopicGridPlacementById(stages), [stages]);
+  const maxGridColumns = useMemo(
+    () => Math.max(...Array.from(topicGridPlacementById.values()).map((placement) => placement.column), 1),
+    [topicGridPlacementById]
   );
-  const childTopicParent = useMemo(
-    () => (childTopicParentId ? topicById.get(childTopicParentId) ?? null : null),
-    [childTopicParentId, topicById]
+  const topicCreateAnchorTopic = useMemo(
+    () => (topicCreateAnchor ? topicById.get(topicCreateAnchor.parentId) ?? null : null),
+    [topicCreateAnchor, topicById]
   );
   const editingTopic = useMemo(() => {
     if (!editingTopicId) {
@@ -834,6 +903,107 @@ export function RoadmapView() {
       ) ?? null
     );
   }, [allTopics]);
+
+  const updateSceneScale = useCallback((
+    nextScaleCandidate: number,
+    anchor: { x: number; y: number }
+  ) => {
+    setSceneTransform((current) => {
+      const nextScale = clampGraphScale(nextScaleCandidate, ROADMAP_MIN_SCALE, ROADMAP_MAX_SCALE);
+      if (nextScale === current.scale) {
+        return current;
+      }
+
+      const nextOffset = getGraphOffsetForScale(anchor, current, nextScale);
+      return {
+        scale: nextScale,
+        offsetX: nextOffset.x,
+        offsetY: nextOffset.y
+      };
+    });
+  }, []);
+
+  const recenterGraphScene = useCallback((targetScale?: number) => {
+    const graphElement = graphRef.current;
+    if (!graphElement || allTopics.length === 0) {
+      return;
+    }
+
+    const nextScale = clampGraphScale(
+      targetScale ?? sceneTransform.scale,
+      ROADMAP_MIN_SCALE,
+      ROADMAP_MAX_SCALE
+    );
+
+    let minX = Number.POSITIVE_INFINITY;
+    let minY = Number.POSITIVE_INFINITY;
+    let maxX = Number.NEGATIVE_INFINITY;
+    let maxY = Number.NEGATIVE_INFINITY;
+
+    for (const topic of allTopics) {
+      const topicElement = topicRefs.current.get(topic.id);
+      if (!topicElement) {
+        continue;
+      }
+
+      const topicRect = topicElement.getBoundingClientRect();
+      const graphRect = graphElement.getBoundingClientRect();
+      const left = (topicRect.left - graphRect.left - sceneTransform.offsetX) / sceneTransform.scale;
+      const top = (topicRect.top - graphRect.top - sceneTransform.offsetY) / sceneTransform.scale;
+      const width = topicRect.width / sceneTransform.scale;
+      const height = topicRect.height / sceneTransform.scale;
+
+      minX = Math.min(minX, left);
+      minY = Math.min(minY, top);
+      maxX = Math.max(maxX, left + width);
+      maxY = Math.max(maxY, top + height);
+    }
+
+    if (!Number.isFinite(minX) || !Number.isFinite(minY)) {
+      return;
+    }
+
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
+    const viewportCenterX = graphElement.clientWidth / 2;
+    const viewportCenterY = graphElement.clientHeight / 2;
+
+    setSceneTransform({
+      scale: nextScale,
+      offsetX: viewportCenterX - centerX * nextScale,
+      offsetY: viewportCenterY - centerY * nextScale
+    });
+  }, [allTopics, sceneTransform.offsetX, sceneTransform.offsetY, sceneTransform.scale]);
+
+  const centerTopicInViewport = useCallback((topicId: string, targetScale?: number) => {
+    const graphElement = graphRef.current;
+    const topicElement = topicRefs.current.get(topicId);
+    if (!graphElement || !topicElement) {
+      return;
+    }
+
+    const nextScale = clampGraphScale(
+      targetScale ?? sceneTransform.scale,
+      ROADMAP_MIN_SCALE,
+      ROADMAP_MAX_SCALE
+    );
+    const topicRect = topicElement.getBoundingClientRect();
+    const graphRect = graphElement.getBoundingClientRect();
+    const renderedCenter = {
+      x: topicRect.left - graphRect.left + topicRect.width / 2,
+      y: topicRect.top - graphRect.top + topicRect.height / 2
+    };
+    const worldCenter = {
+      x: (renderedCenter.x - sceneTransform.offsetX) / sceneTransform.scale,
+      y: (renderedCenter.y - sceneTransform.offsetY) / sceneTransform.scale
+    };
+
+    setSceneTransform({
+      scale: nextScale,
+      offsetX: graphElement.clientWidth / 2 - worldCenter.x * nextScale,
+      offsetY: graphElement.clientHeight / 2 - worldCenter.y * nextScale
+    });
+  }, [sceneTransform.offsetX, sceneTransform.offsetY, sceneTransform.scale]);
 
   useEffect(() => {
     if (!editingTopicId) {
@@ -919,6 +1089,57 @@ export function RoadmapView() {
   }, [topicMenuTopicId]);
 
   useEffect(() => {
+    const graphElement = graphRef.current;
+    if (!graphElement) {
+      return;
+    }
+
+    // Native non-passive wheel listener is required here so desktop zoom
+    // suppresses document scroll while the cursor stays inside the graph.
+    const onGraphWheel = (event: WheelEvent) => {
+      const behavior = getRoadmapWheelZoomBehavior(
+        event.deltaY,
+        window.innerWidth,
+        ROADMAP_MOBILE_BREAKPOINT
+      );
+      if (!behavior.preventPageScroll) {
+        return;
+      }
+
+      event.preventDefault();
+      const graphRect = graphElement.getBoundingClientRect();
+      const anchor = {
+        x: event.clientX - graphRect.left,
+        y: event.clientY - graphRect.top
+      };
+
+      setSceneTransform((current) => {
+        const nextScale = clampGraphScale(
+          current.scale + behavior.scaleDelta,
+          ROADMAP_MIN_SCALE,
+          ROADMAP_MAX_SCALE
+        );
+        if (nextScale === current.scale) {
+          return current;
+        }
+
+        const nextOffset = getGraphOffsetForScale(anchor, current, nextScale);
+        return {
+          scale: nextScale,
+          offsetX: nextOffset.x,
+          offsetY: nextOffset.y
+        };
+      });
+    };
+
+    graphElement.addEventListener("wheel", onGraphWheel, { passive: false });
+
+    return () => {
+      graphElement.removeEventListener("wheel", onGraphWheel);
+    };
+  }, [roadmap.state.status, stages.length]);
+
+  useEffect(() => {
     if (!isTopicCreateModalOpen) {
       return;
     }
@@ -926,9 +1147,87 @@ export function RoadmapView() {
     topicCreateModalTitleInputRef.current?.focus();
   }, [isTopicCreateModalOpen]);
 
+  useEffect(() => {
+    if (panPointerId === null) {
+      return;
+    }
+
+    const onPointerMove = (event: PointerEvent) => {
+      if (event.pointerId !== panPointerId) {
+        return;
+      }
+
+      const startPoint = panStartPointRef.current;
+      const startOffset = panStartOffsetRef.current;
+      if (!startPoint || !startOffset) {
+        return;
+      }
+
+      const nextOffsetX = startOffset.x + (event.clientX - startPoint.x);
+      const nextOffsetY = startOffset.y + (event.clientY - startPoint.y);
+      setSceneTransform((current) => ({
+        ...current,
+        offsetX: nextOffsetX,
+        offsetY: nextOffsetY
+      }));
+    };
+
+    const onPointerUp = (event: PointerEvent) => {
+      if (event.pointerId !== panPointerId) {
+        return;
+      }
+
+      setPanPointerId(null);
+      panStartPointRef.current = null;
+      panStartOffsetRef.current = null;
+    };
+
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", onPointerUp);
+    window.addEventListener("pointercancel", onPointerUp);
+
+    return () => {
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerUp);
+      window.removeEventListener("pointercancel", onPointerUp);
+    };
+  }, [panPointerId]);
+
+  useEffect(() => {
+    if (!pendingFirstTopicCenterRef.current) {
+      return;
+    }
+
+    if (roadmap.state.status !== "success" || allTopics.length !== 1) {
+      return;
+    }
+
+    const firstTopicId = allTopics[0]?.id;
+    if (!firstTopicId || !topicRefs.current.has(firstTopicId)) {
+      const frame = requestAnimationFrame(() => {
+        if (!pendingFirstTopicCenterRef.current) {
+          return;
+        }
+
+        const delayedTopicId = allTopics[0]?.id;
+        if (!delayedTopicId || !topicRefs.current.has(delayedTopicId)) {
+          return;
+        }
+
+        centerTopicInViewport(delayedTopicId, 1);
+        pendingFirstTopicCenterRef.current = false;
+      });
+
+      return () => cancelAnimationFrame(frame);
+    }
+
+    centerTopicInViewport(firstTopicId, 1);
+    pendingFirstTopicCenterRef.current = false;
+  }, [allTopics, centerTopicInViewport, roadmap.state.status]);
+
   function openTopicCreateModal(triggerElement: HTMLElement) {
     topicCreateModalTriggerRef.current = triggerElement;
-    setChildTopicParentId(null);
+    setTopicCreateAnchor(null);
     setTopicMenuTopicId(null);
     setTopicMutationError(null);
     setIsTopicCreateModalOpen(true);
@@ -941,7 +1240,7 @@ export function RoadmapView() {
 
     setIsTopicCreateModalOpen(false);
     setTopicMutationError(null);
-    setChildTopicParentId(null);
+    setTopicCreateAnchor(null);
     const trigger = topicCreateModalTriggerRef.current;
     if (trigger && trigger.isConnected) {
       trigger.focus();
@@ -949,7 +1248,11 @@ export function RoadmapView() {
     topicCreateModalTriggerRef.current = null;
   }
 
-  function startChildTopicCreate(parentTopic: RoadmapTopic, triggerElement: HTMLElement) {
+  function startDirectionalTopicCreate(
+    parentTopic: RoadmapTopic,
+    direction: TopicCreateDirection,
+    triggerElement: HTMLElement
+  ) {
     topicCreateModalTriggerRef.current = triggerElement;
     setTopicCreateDraft({
       title: "",
@@ -957,7 +1260,10 @@ export function RoadmapView() {
     });
     setTopicMutationError(null);
     setTopicMenuTopicId(null);
-    setChildTopicParentId(parentTopic.id);
+    setTopicCreateAnchor({
+      parentId: parentTopic.id,
+      direction
+    });
     setIsTopicCreateModalOpen(true);
   }
 
@@ -1016,6 +1322,7 @@ export function RoadmapView() {
         topicTitle,
         topicDescription: quickCreateDraft.topicDescription.trim()
       });
+      pendingFirstTopicCenterRef.current = true;
       setQuickCreateDraft(initialQuickCreateDraft());
       roadmap.reload();
     } catch (error) {
@@ -1037,37 +1344,25 @@ export function RoadmapView() {
     setTopicMutationError(null);
     setIsTopicCreating(true);
     try {
-      const createdTopic = await createRoadmapTopic({
-        title,
-        description: topicCreateDraft.description.trim()
-      });
-
-      if (childTopicParentId) {
-        try {
-          await createRoadmapDependency({
-            topicId: createdTopic.topicId,
-            prerequisiteTopicId: childTopicParentId
-          });
-        } catch (error) {
-          const dependencyErrorMessage = getDependencyErrorMessage(error, copy);
-          setTopicMutationError(
-            `${copy.topicCreateDependencyFailedAfterCreate} ${dependencyErrorMessage}`
-          );
-          setDependencySourceTopicId(childTopicParentId);
-          setIsTopicCreateModalOpen(false);
-          setChildTopicParentId(null);
-          topicCreateModalTriggerRef.current = null;
-          roadmap.reload();
-          return;
-        }
-      }
+      await createRoadmapTopic(
+        buildTopicCreatePayload({
+          title,
+          description: topicCreateDraft.description.trim(),
+          anchor: topicCreateAnchor
+            ? {
+                parentId: topicCreateAnchor.parentId,
+                direction: topicCreateAnchor.direction
+              }
+            : null
+        })
+      );
 
       setTopicCreateDraft(() => ({
         title: "",
         description: ""
       }));
       setIsTopicCreateModalOpen(false);
-      setChildTopicParentId(null);
+      setTopicCreateAnchor(null);
       topicCreateModalTriggerRef.current = null;
       roadmap.reload();
     } catch (error) {
@@ -1086,7 +1381,8 @@ export function RoadmapView() {
     setTopicEditDraft({
       topicId: topic.id,
       title: topic.title,
-      description: topic.description
+      description: topic.description,
+      status: topic.status
     });
     setTopicMutationError(null);
   }
@@ -1108,19 +1404,41 @@ export function RoadmapView() {
       return;
     }
 
-    const title = topicEditDraft.title.trim();
-    if (!title) {
-      setTopicMutationError(copy.topicTitleRequired);
+    if (!editingTopic) {
+      setTopicMutationError(copy.topicUpdateFailed);
+      return;
+    }
+
+    const submission = prepareRoadmapTopicEditSubmission({
+      topic: editingTopic,
+      draft: {
+        title: topicEditDraft.title,
+        description: topicEditDraft.description,
+        status: topicEditDraft.status
+      }
+    });
+    if (!submission.ok) {
+      if (submission.reason === "title_required") {
+        setTopicMutationError(copy.topicTitleRequired);
+        return;
+      }
+
+      setTopicMutationError(
+        getTopicStatusErrorMessage(
+          submission.validationResult,
+          editingTopic,
+          topicEditDraft.status,
+          copy,
+          language
+        )
+      );
       return;
     }
 
     setTopicMutationError(null);
     setUpdatingTopicId(editingTopicId);
     try {
-      await updateRoadmapTopic(editingTopicId, {
-        title,
-        description: topicEditDraft.description.trim()
-      });
+      await updateRoadmapTopic(editingTopicId, submission.payload);
       cancelTopicEditing();
       roadmap.reload();
     } catch (error) {
@@ -1163,7 +1481,7 @@ export function RoadmapView() {
     clearDependencyDragState();
   }, [clearDependencyDragState]);
 
-  function getTopicAnchorPoint(topicId: string, side: "left" | "right") {
+  function getTopicCenterPoint(topicId: string) {
     const graphElement = graphRef.current;
     const topicElement = topicRefs.current.get(topicId);
     if (!graphElement || !topicElement) {
@@ -1174,9 +1492,57 @@ export function RoadmapView() {
     const topicRect = topicElement.getBoundingClientRect();
 
     return {
-      x: side === "right" ? topicRect.right - graphRect.left : topicRect.left - graphRect.left,
-      y: topicRect.top + topicRect.height / 2 - graphRect.top
+      x:
+        (topicRect.left + topicRect.width / 2 - graphRect.left - sceneTransform.offsetX) /
+        sceneTransform.scale,
+      y:
+        (topicRect.top + topicRect.height / 2 - graphRect.top - sceneTransform.offsetY) /
+        sceneTransform.scale
     };
+  }
+
+  function getTopicAnchorPoint(
+    topicId: string,
+    side: "left" | "right" | "top" | "bottom"
+  ) {
+    const graphElement = graphRef.current;
+    const topicElement = topicRefs.current.get(topicId);
+    if (!graphElement || !topicElement) {
+      return null;
+    }
+
+    const graphRect = graphElement.getBoundingClientRect();
+    const topicRect = topicElement.getBoundingClientRect();
+
+    const renderedPoint =
+      side === "left"
+        ? {
+            x: topicRect.left - graphRect.left,
+            y: topicRect.top + topicRect.height / 2 - graphRect.top
+          }
+        : side === "right"
+          ? {
+              x: topicRect.right - graphRect.left,
+              y: topicRect.top + topicRect.height / 2 - graphRect.top
+            }
+          : side === "top"
+            ? {
+                x: topicRect.left + topicRect.width / 2 - graphRect.left,
+                y: topicRect.top - graphRect.top
+              }
+            : {
+                x: topicRect.left + topicRect.width / 2 - graphRect.left,
+                y: topicRect.bottom - graphRect.top
+              };
+
+    return offsetConnectionAnchorPoint(
+      {
+        x: (renderedPoint.x - sceneTransform.offsetX) / sceneTransform.scale,
+        y: (renderedPoint.y - sceneTransform.offsetY) / sceneTransform.scale
+      },
+      side,
+      getConnectionAnchorOffsetDistance(side)
+    );
   }
 
   function resolveTopicIdByClientPoint(clientX: number, clientY: number): string | null {
@@ -1194,14 +1560,19 @@ export function RoadmapView() {
     return typeof topicId === "string" && topicId.length > 0 ? topicId : null;
   }
 
-  function getPreviewPointByClientPoint(clientX: number, clientY: number) {
+  const getPreviewPointByClientPoint = useCallback((clientX: number, clientY: number) => {
     const graphElement = graphRef.current;
     if (!graphElement) {
       return null;
     }
 
-    return normalizeGraphPoint(clientX, clientY, graphElement.getBoundingClientRect());
-  }
+    return normalizeGraphPoint(
+      clientX,
+      clientY,
+      graphElement.getBoundingClientRect(),
+      sceneTransform
+    );
+  }, [sceneTransform]);
 
   const createDependencyFromSourceToTarget = useCallback(async (
     sourceTopicId: string,
@@ -1241,7 +1612,8 @@ export function RoadmapView() {
     dependencyDragStartPointRef.current = normalizeGraphPoint(
       clientX,
       clientY,
-      graphRef.current?.getBoundingClientRect() ?? { left: 0, top: 0 }
+      graphRef.current?.getBoundingClientRect() ?? { left: 0, top: 0 },
+      sceneTransform
     );
     dependencyDragExceededThresholdRef.current = false;
   }
@@ -1306,7 +1678,8 @@ export function RoadmapView() {
     clearDependencyDragState,
     clearDependencySourceState,
     dependencySourceTopicId,
-    createDependencyFromSourceToTarget
+    createDependencyFromSourceToTarget,
+    getPreviewPointByClientPoint
   ]);
 
   useEffect(() => {
@@ -1370,12 +1743,81 @@ export function RoadmapView() {
     }));
   }
 
+  function handleGraphPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
+    if (window.matchMedia(`(max-width: ${ROADMAP_MOBILE_BREAKPOINT}px)`).matches) {
+      return;
+    }
+
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+
+    if (
+      target.closest(
+        ".roadmap-topic-card, .roadmap-topic-link-handle, .roadmap-topic-menu, .roadmap-modal, .roadmap-connection-remove, button, input, textarea, a"
+      )
+    ) {
+      return;
+    }
+
+    setPanPointerId(event.pointerId);
+    panStartPointRef.current = {
+      x: event.clientX,
+      y: event.clientY
+    };
+    panStartOffsetRef.current = {
+      x: sceneTransform.offsetX,
+      y: sceneTransform.offsetY
+    };
+  }
+
+  function handleZoomIn() {
+    const graphElement = graphRef.current;
+    if (!graphElement) {
+      return;
+    }
+
+    updateSceneScale(sceneTransform.scale + 0.12, {
+      x: graphElement.clientWidth / 2,
+      y: graphElement.clientHeight / 2
+    });
+  }
+
+  function handleZoomOut() {
+    const graphElement = graphRef.current;
+    if (!graphElement) {
+      return;
+    }
+
+    updateSceneScale(sceneTransform.scale - 0.12, {
+      x: graphElement.clientWidth / 2,
+      y: graphElement.clientHeight / 2
+    });
+  }
+
+  const dependencyPreviewSides =
+    dependencySourceTopicId && dependencyHoverTopicId
+      ? (() => {
+          const sourceCenter = getTopicCenterPoint(dependencySourceTopicId);
+          const targetCenter = getTopicCenterPoint(dependencyHoverTopicId);
+          if (!sourceCenter || !targetCenter) {
+            return null;
+          }
+
+          return getConnectionAnchorSides(sourceCenter, targetCenter);
+        })()
+      : null;
   const dependencyPreviewStart = dependencySourceTopicId
-    ? getTopicAnchorPoint(dependencySourceTopicId, "right")
+    ? getTopicAnchorPoint(
+        dependencySourceTopicId,
+        dependencyPreviewSides?.sourceSide ?? "right"
+      )
     : null;
-  const dependencyPreviewEnd = dependencyHoverTopicId
-    ? getTopicAnchorPoint(dependencyHoverTopicId, "left")
-    : dependencyPreviewPoint;
+  const dependencyPreviewEnd =
+    dependencyHoverTopicId && dependencyPreviewSides
+      ? getTopicAnchorPoint(dependencyHoverTopicId, dependencyPreviewSides.targetSide)
+      : dependencyPreviewPoint;
   const dependencyEdgeControls = useMemo(
     () =>
       connections.map((connection) => {
@@ -1403,6 +1845,34 @@ export function RoadmapView() {
           <p>{copy.subtitle}</p>
           {roadmap.state.status === "success" && stages.length > 0 ? (
             <div className="roadmap-header-actions">
+              <div className="roadmap-canvas-controls" role="group" aria-label="Roadmap canvas controls">
+                <button
+                  type="button"
+                  className="button button-outline"
+                  onClick={handleZoomOut}
+                  disabled={isDependencyMutating || sceneTransform.scale <= ROADMAP_MIN_SCALE}
+                  aria-label={copy.zoomOut}
+                >
+                  -
+                </button>
+                <button
+                  type="button"
+                  className="button button-outline"
+                  onClick={handleZoomIn}
+                  disabled={isDependencyMutating || sceneTransform.scale >= ROADMAP_MAX_SCALE}
+                  aria-label={copy.zoomIn}
+                >
+                  +
+                </button>
+                <button
+                  type="button"
+                  className="button button-outline"
+                  onClick={() => recenterGraphScene(1)}
+                  disabled={isDependencyMutating}
+                >
+                  {copy.recenter}
+                </button>
+              </div>
               <button
                 type="button"
                 className="button button-outline"
@@ -1455,13 +1925,15 @@ export function RoadmapView() {
                 >
                   <div className="roadmap-modal-header">
                     <h4 id="roadmap-topic-create-modal-title">
-                      {childTopicParent ? copy.topicCreateChildTitle : copy.topicCreateTitle}
+                      {topicCreateAnchor
+                        ? copy.topicCreateDirectionTitle(topicCreateAnchor.direction)
+                        : copy.topicCreateTitle}
                     </h4>
                     <button
                       type="button"
                       className="roadmap-modal-close"
                       onClick={closeTopicCreateModal}
-                      aria-label={copy.topicCancelButton}
+                      aria-label={copy.topicCreateCloseAria}
                       disabled={isTopicCreating}
                     >
                       ×
@@ -1472,18 +1944,27 @@ export function RoadmapView() {
                     copy={copy}
                     draft={topicCreateDraft}
                     error={topicMutationError}
-                    title={childTopicParent ? copy.topicCreateChildTitle : copy.topicCreateTitle}
+                    title={
+                      topicCreateAnchor && topicCreateAnchorTopic
+                        ? copy.topicCreateDirectionTitle(topicCreateAnchor.direction)
+                        : copy.topicCreateTitle
+                    }
                     subtitle={
-                      childTopicParent
-                        ? copy.topicCreateChildSubtitle(childTopicParent.title)
+                      topicCreateAnchor && topicCreateAnchorTopic
+                        ? copy.topicCreateDirectionSubtitle(
+                            topicCreateAnchorTopic.title,
+                            topicCreateAnchor.direction
+                          )
                         : copy.topicCreateSubtitle
                     }
                     submitLabel={
-                      childTopicParent ? copy.topicCreateChildButton : copy.topicCreateButton
+                      topicCreateAnchor
+                        ? copy.topicCreateDirectionButton(topicCreateAnchor.direction)
+                        : copy.topicCreateButton
                     }
                     submitLoadingLabel={
-                      childTopicParent
-                        ? copy.topicCreatingChildButton
+                      topicCreateAnchor
+                        ? copy.topicCreatingDirectionButton(topicCreateAnchor.direction)
                         : copy.topicCreatingButton
                     }
                     isSubmitting={isTopicCreating}
@@ -1513,7 +1994,7 @@ export function RoadmapView() {
                       type="button"
                       className="roadmap-modal-close"
                       onClick={cancelTopicEditing}
-                      aria-label={copy.topicCancelButton}
+                      aria-label={copy.topicEditCloseAria}
                       disabled={updatingTopicId === editingTopic.id || deletingTopicId === editingTopic.id}
                     >
                       ×
@@ -1564,6 +2045,31 @@ export function RoadmapView() {
                       />
                     </label>
 
+                    <label className="roadmap-topic-field">
+                      <span>{copy.topicFieldStatus}</span>
+                      <select
+                        className="input"
+                        value={topicEditDraft.status}
+                        onChange={(event) =>
+                          setTopicEditDraft((current) =>
+                            current
+                              ? {
+                                  ...current,
+                                  status: event.target.value as RoadmapTopicStatus
+                                }
+                              : current
+                          )
+                        }
+                        disabled={updatingTopicId === editingTopic.id || deletingTopicId === editingTopic.id}
+                      >
+                        {getRoadmapTopicStatuses().map((status) => (
+                          <option key={status} value={status}>
+                            {getStatusLabel(status, language)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
                     <div className="roadmap-stage-edit-actions roadmap-modal-actions">
                       <button
                         type="button"
@@ -1576,14 +2082,6 @@ export function RoadmapView() {
                         {deletingTopicId === editingTopic.id
                           ? copy.topicDeletingButton
                           : copy.topicDeleteButton}
-                      </button>
-                      <button
-                        type="button"
-                        className="button button-outline"
-                        disabled={updatingTopicId === editingTopic.id || deletingTopicId === editingTopic.id}
-                        onClick={cancelTopicEditing}
-                      >
-                        {copy.topicCancelButton}
                       </button>
                       <button
                         type="submit"
@@ -1603,23 +2101,47 @@ export function RoadmapView() {
             <div
               className="roadmap-graph"
               ref={graphRef}
+              onPointerDown={handleGraphPointerDown}
+              data-panning={panPointerId !== null ? "true" : "false"}
             >
-              <svg
-                className="roadmap-connections"
-                viewBox={`0 0 ${graphSize.width} ${graphSize.height}`}
-                preserveAspectRatio="none"
-                aria-hidden="true"
+              <div
+                className="roadmap-graph-canvas"
+                style={{
+                  width: `${graphSize.width}px`,
+                  height: `${graphSize.height}px`,
+                  transform: `translate(${sceneTransform.offsetX}px, ${sceneTransform.offsetY}px) scale(${sceneTransform.scale})`
+                }}
               >
+                <svg
+                  className="roadmap-connections"
+                  viewBox={`0 0 ${graphSize.width} ${graphSize.height}`}
+                  preserveAspectRatio="none"
+                  aria-hidden="true"
+                >
                 <defs>
                   <marker
                     id="roadmap-arrowhead"
-                    markerWidth="8"
-                    markerHeight="6"
-                    refX="7"
-                    refY="3"
+                    markerWidth="16"
+                    markerHeight="12"
+                    viewBox="0 0 16 12"
+                    refX="15"
+                    refY="6"
                     orient="auto"
+                    markerUnits="userSpaceOnUse"
                   >
-                    <polygon points="0 0, 8 3, 0 6" fill="#c2d2ef" />
+                    <polygon points="0 0, 16 6, 0 12" fill="#c2d2ef" />
+                  </marker>
+                  <marker
+                    id="roadmap-arrowhead-preview"
+                    markerWidth="16"
+                    markerHeight="12"
+                    viewBox="0 0 16 12"
+                    refX="15"
+                    refY="6"
+                    orient="auto"
+                    markerUnits="userSpaceOnUse"
+                  >
+                    <polygon points="0 0, 16 6, 0 12" fill="#4b7fe3" />
                   </marker>
                 </defs>
                 {connections.map((connection) => (
@@ -1644,16 +2166,16 @@ export function RoadmapView() {
                       dependencyPreviewEnd.x,
                       dependencyPreviewEnd.y
                     )}
-                    markerEnd="url(#roadmap-arrowhead)"
+                    markerEnd="url(#roadmap-arrowhead-preview)"
                   />
                 ) : null}
-              </svg>
+                </svg>
 
-              <div
-                className="roadmap-connection-controls"
-                role="group"
-                aria-label={copy.dependencyControlsAria}
-              >
+                <div
+                  className="roadmap-connection-controls"
+                  role="group"
+                  aria-label={copy.dependencyControlsAria}
+                >
                 {dependencyEdgeControls.map((control) => {
                   const isRemoving =
                     removingDependencyKey === `${control.topicId}:${control.dependencyTopicId}`;
@@ -1675,28 +2197,27 @@ export function RoadmapView() {
                     </button>
                   );
                 })}
-              </div>
+                </div>
 
-              <div
-                className="roadmap-graph-scene"
-                aria-label={copy.stageAria}
-              >
+                <div
+                  className="roadmap-graph-scene"
+                  aria-label={copy.stageAria}
+                >
                 <ul
                   className="roadmap-graph-nodes"
                   style={{
-                    gridTemplateColumns: `repeat(${maxTopicsPerStage}, minmax(280px, 280px))`
+                    gridTemplateColumns: `repeat(${maxGridColumns}, minmax(280px, 280px))`
                   }}
                 >
                   {allTopics.map((topic) => {
-                    const topicStageId = topic.stageId ?? stages[0]?.id ?? "";
-                    const stagePosition = stagePositionById.get(topicStageId) ?? 1;
+                    const placement = topicGridPlacementById.get(topic.id);
 
                     return (
                       <li
                         key={topic.id}
                         style={{
-                          gridRow: stagePosition,
-                          gridColumn: Math.max(topic.position, 1)
+                          gridRow: placement?.row ?? 1,
+                          gridColumn: placement?.column ?? Math.max(topic.position, 1)
                         }}
                       >
                           <article
@@ -1799,10 +2320,34 @@ export function RoadmapView() {
                                         onClick={(event) => {
                                           event.preventDefault();
                                           event.stopPropagation();
-                                          startChildTopicCreate(topic, event.currentTarget);
+                                          startDirectionalTopicCreate(topic, "left", event.currentTarget);
                                         }}
                                       >
-                                        {copy.topicMenuCreateChild}
+                                        {copy.topicMenuCreateLeft}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="roadmap-topic-menu-item"
+                                        role="menuitem"
+                                        onClick={(event) => {
+                                          event.preventDefault();
+                                          event.stopPropagation();
+                                          startDirectionalTopicCreate(topic, "right", event.currentTarget);
+                                        }}
+                                      >
+                                        {copy.topicMenuCreateRight}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="roadmap-topic-menu-item"
+                                        role="menuitem"
+                                        onClick={(event) => {
+                                          event.preventDefault();
+                                          event.stopPropagation();
+                                          startDirectionalTopicCreate(topic, "below", event.currentTarget);
+                                        }}
+                                      >
+                                        {copy.topicMenuCreateBelow}
                                       </button>
                                     </div>
                                   ) : null}
@@ -1816,7 +2361,6 @@ export function RoadmapView() {
                             <div className="roadmap-topic-core">
                               <div className="roadmap-topic-center">
                                 <h4 className="roadmap-topic-title">{topic.title}</h4>
-                                <p className="roadmap-topic-description">{topic.description}</p>
 
                                 <div className="roadmap-topic-progress">
                                   <div className="roadmap-progress-row">
@@ -1860,6 +2404,7 @@ export function RoadmapView() {
                     );
                   })}
                 </ul>
+                </div>
               </div>
             </div>
 

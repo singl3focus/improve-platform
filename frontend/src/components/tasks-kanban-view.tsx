@@ -3,6 +3,7 @@
 import Link from "next/link";
 import type { Dispatch, DragEvent, FormEvent, SetStateAction } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Filter, Pencil, Plus, Trash2 } from "lucide-react";
 import { useUserPreferences } from "@/components/providers/user-preferences-provider";
 import {
   formatTaskDueDate,
@@ -19,95 +20,52 @@ import type {
 } from "@/lib/tasks-board-types";
 
 const TASKS_COPY = {
-  ru: {
-    title: "Мой канбан",
-    subtitle: "Отслеживайте задачи по статусам и перемещайте карточки через API-обновления.",
-    filterButton: "Фильтр",
-    filterModalTitle: "Фильтры задач",
-    closeFilterAria: "Закрыть окно фильтров",
-    clearFiltersButton: "Сбросить",
-    topicFilter: "Тема",
-    deadlineFilter: "Дедлайн",
-    allTopics: "Все темы",
-    dueAll: "Все",
-    dueOverdue: "Просроченные",
-    dueWeek: "Срок в ближайшие 7 дней",
-    loading: "Загрузка доски задач...",
-    loadError: "Не удалось загрузить доску задач.",
-    retry: "Повторить",
-    createTitle: "Добавить задачу",
-    createSubtitle: "Новая задача создаётся сразу в колонке «Новая».",
-    fieldTitle: "Название",
-    fieldDescription: "Описание",
-    fieldTopic: "Тема",
-    fieldDeadline: "Дедлайн",
-    createPlaceholderTitle: "Например: Разобрать flex/grid кейсы",
-    createPlaceholderDescription: "Краткое описание задачи (опционально)",
-    createButton: "Создать задачу",
-    createModalTitle: "Создать задачу",
-    closeModalAria: "Закрыть окно создания задачи",
-    cancelButton: "Отмена",
-    creatingButton: "Создание...",
-    noTopicOption: "Без темы",
-    titleRequired: "Название задачи обязательно.",
-    createFailed: "Не удалось создать задачу.",
-    noTasksInColumn: "В этой колонке пока нет задач.",
-    noTopic: "Без темы",
-    due: "Срок",
-    overdue: "Просрочено",
-    planned: "Запланировано",
-    dragHint: "Перетащите карточку в нужную колонку",
-    noDate: "Нет даты",
-    deleteTaskAria: "Удалить задачу",
-    deleteConfirm: (title: string) => `Удалить задачу «${title}»?`,
-    deleteFailed: "Не удалось удалить задачу."
-  },
-  en: {
-    title: "My kanban",
-    subtitle: "Track your tasks by status and move cards across columns via API updates.",
-    filterButton: "Filter",
-    filterModalTitle: "Task filters",
-    closeFilterAria: "Close task filters",
-    clearFiltersButton: "Reset",
-    topicFilter: "Topic",
-    deadlineFilter: "Deadline",
-    allTopics: "All topics",
-    dueAll: "All",
-    dueOverdue: "Overdue",
-    dueWeek: "Due in 7 days",
-    loading: "Loading tasks board...",
-    loadError: "Tasks board failed to load.",
-    retry: "Retry",
-    createTitle: "Add task",
-    createSubtitle: "A new task is created directly in the New column.",
-    fieldTitle: "Title",
-    fieldDescription: "Description",
-    fieldTopic: "Topic",
-    fieldDeadline: "Deadline",
-    createPlaceholderTitle: "For example: Practice flex/grid cases",
-    createPlaceholderDescription: "Short task description (optional)",
-    createButton: "Create task",
-    createModalTitle: "Create task",
-    closeModalAria: "Close task creation modal",
-    cancelButton: "Cancel",
-    creatingButton: "Creating...",
-    noTopicOption: "No topic",
-    titleRequired: "Task title is required.",
-    createFailed: "Task creation failed.",
-    noTasksInColumn: "No tasks in this column.",
-    noTopic: "No topic",
-    due: "Due",
-    overdue: "Overdue",
-    planned: "Planned",
-    dragHint: "Drag this card to another column",
-    noDate: "No date",
-    deleteTaskAria: "Delete task",
-    deleteConfirm: (title: string) => `Delete task "${title}"?`,
-    deleteFailed: "Task removal failed."
-  }
+  title: "Мой канбан",
+  subtitle: "Отслеживайте задачи по статусам и перемещайте карточки через API-обновления.",
+  filterButton: "Фильтр",
+  filterModalTitle: "Фильтры задач",
+  closeFilterAria: "Закрыть окно фильтров",
+  clearFiltersButton: "Сбросить",
+  topicFilter: "Тема",
+  deadlineFilter: "Дедлайн",
+  allTopics: "Все темы",
+  dueAll: "Все",
+  dueOverdue: "Просроченные",
+  dueWeek: "Срок в ближайшие 7 дней",
+  loading: "Загрузка доски задач...",
+  loadError: "Не удалось загрузить доску задач.",
+  retry: "Повторить",
+  fieldTitle: "Название",
+  fieldDescription: "Описание",
+  fieldTopic: "Тема",
+  fieldDeadline: "Дедлайн",
+  createPlaceholderTitle: "Например: Разобрать flex/grid кейсы",
+  createPlaceholderDescription: "Краткое описание задачи (опционально)",
+  createButton: "Создать задачу",
+  createModalTitle: "Создать задачу",
+  closeModalAria: "Закрыть окно создания задачи",
+  creatingButton: "Создание...",
+  noTopicOption: "Без темы",
+  titleRequired: "Название задачи обязательно.",
+  createFailed: "Не удалось создать задачу.",
+  updateFailed: "Не удалось обновить задачу.",
+  noTasksInColumn: "В этой колонке пока нет задач.",
+  noTopic: "Без темы",
+  due: "Срок",
+  overdue: "Просрочено",
+  planned: "Запланировано",
+  editTaskAria: "Редактировать задачу",
+  editModalTitle: "Редактировать задачу",
+  closeEditModalAria: "Закрыть окно редактирования задачи",
+  saveButton: "Сохранить",
+  savingButton: "Сохранение...",
+  noDate: "Нет даты",
+  deleteTaskAria: "Удалить задачу",
+  deleteConfirm: (title: string) => `Удалить задачу «${title}»?`,
+  deleteFailed: "Не удалось удалить задачу."
 } as const;
 
-type TasksCopy = (typeof TASKS_COPY)[keyof typeof TASKS_COPY];
+type TasksCopy = typeof TASKS_COPY;
 
 interface TaskBoardTopicOption {
   id: string;
@@ -115,36 +73,19 @@ interface TaskBoardTopicOption {
 }
 
 function TaskDeleteIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-      <path
-        d="M9 3.75A2.25 2.25 0 0 0 6.75 6H4.5a.75.75 0 0 0 0 1.5h.81l.78 10.19a2.25 2.25 0 0 0 2.24 2.06h7.34a2.25 2.25 0 0 0 2.24-2.06l.78-10.19h.81a.75.75 0 0 0 0-1.5h-2.25A2.25 2.25 0 0 0 15 3.75H9Zm0 1.5h6A.75.75 0 0 1 15.75 6h-7.5A.75.75 0 0 1 9 5.25Zm-.78 2.25h7.56l-.78 10.08a.75.75 0 0 1-.75.67H8.99a.75.75 0 0 1-.75-.67L7.44 7.5Zm2.28 2.25a.75.75 0 0 0-.75.75v5.25a.75.75 0 0 0 1.5 0V10.5a.75.75 0 0 0-.75-.75Zm3 0a.75.75 0 0 0-.75.75v5.25a.75.75 0 0 0 1.5 0V10.5a.75.75 0 0 0-.75-.75Z"
-        fill="currentColor"
-      />
-    </svg>
-  );
+  return <Trash2 size={16} strokeWidth={2} aria-hidden="true" focusable="false" />;
+}
+
+function TaskEditIcon() {
+  return <Pencil size={16} strokeWidth={2} aria-hidden="true" focusable="false" />;
 }
 
 function TaskCreateIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-      <path
-        d="M12 4.5a.75.75 0 0 1 .75.75v6h6a.75.75 0 0 1 0 1.5h-6v6a.75.75 0 0 1-1.5 0v-6h-6a.75.75 0 0 1 0-1.5h6v-6A.75.75 0 0 1 12 4.5Z"
-        fill="currentColor"
-      />
-    </svg>
-  );
+  return <Plus size={16} strokeWidth={2} aria-hidden="true" focusable="false" />;
 }
 
 function TaskFilterIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-      <path
-        d="M4.5 6.75A.75.75 0 0 1 5.25 6h13.5a.75.75 0 0 1 .53 1.28l-4.78 4.78V17.4a.75.75 0 0 1-.4.66l-3 1.58a.75.75 0 0 1-1.1-.66v-6.92L4.72 7.28a.75.75 0 0 1-.22-.53Zm2.56.75 4.5 4.5a.75.75 0 0 1 .22.53v5.2l1.5-.79v-4.4a.75.75 0 0 1 .22-.53l4.5-4.5H7.06Z"
-        fill="currentColor"
-      />
-    </svg>
-  );
+  return <Filter size={16} strokeWidth={2} aria-hidden="true" focusable="false" />;
 }
 
 function TasksBoardHeader({
@@ -290,6 +231,7 @@ function TasksBoardColumn({
   onColumnDragEnter,
   onColumnDragLeave,
   onColumnDrop,
+  onEdit,
   onDelete
 }: {
   copy: TasksCopy;
@@ -308,6 +250,7 @@ function TasksBoardColumn({
   onColumnDragEnter: (status: TaskBoardStatus) => void;
   onColumnDragLeave: (status: TaskBoardStatus) => void;
   onColumnDrop: (event: DragEvent<HTMLDivElement>, status: TaskBoardStatus) => void;
+  onEdit: (task: TaskBoardItem, triggerElement: HTMLElement) => void;
   onDelete: (task: TaskBoardItem) => void;
 }) {
   return (
@@ -364,16 +307,28 @@ function TasksBoardColumn({
                 ) : (
                   <span>{copy.noTopic}</span>
                 )}
-                <button
-                  type="button"
-                  className="tasks-delete-button"
-                  aria-label={`${copy.deleteTaskAria}: ${task.title}`}
-                  title={copy.deleteTaskAria}
-                  disabled={updatingTaskId === task.id}
-                  onClick={() => onDelete(task)}
-                >
-                  <TaskDeleteIcon />
-                </button>
+                <div className="tasks-card-actions">
+                  <button
+                    type="button"
+                    className="tasks-edit-button"
+                    aria-label={`${copy.editTaskAria}: ${task.title}`}
+                    title={copy.editTaskAria}
+                    disabled={updatingTaskId === task.id}
+                    onClick={(event) => onEdit(task, event.currentTarget)}
+                  >
+                    <TaskEditIcon />
+                  </button>
+                  <button
+                    type="button"
+                    className="tasks-delete-button"
+                    aria-label={`${copy.deleteTaskAria}: ${task.title}`}
+                    title={copy.deleteTaskAria}
+                    disabled={updatingTaskId === task.id}
+                    onClick={() => onDelete(task)}
+                  >
+                    <TaskDeleteIcon />
+                  </button>
+                </div>
               </div>
 
               <h4>{task.title}</h4>
@@ -389,8 +344,6 @@ function TasksBoardColumn({
                   <span className="dashboard-badge">{copy.planned}</span>
                 )}
               </div>
-
-              <p className="tasks-card-drag-hint">{copy.dragHint}</p>
             </li>
           ))
         )}
@@ -420,11 +373,6 @@ function TasksCreatePanel({
 
   return (
     <section className={rootClassName}>
-      <header>
-        <h3>{copy.createTitle}</h3>
-        <p>{copy.createSubtitle}</p>
-      </header>
-
       <form className="tasks-create-form" onSubmit={onSubmit}>
         <label className="tasks-create-field tasks-create-field-title">
           <span>{copy.fieldTitle}</span>
@@ -500,17 +448,119 @@ function TasksCreatePanel({
   );
 }
 
+function TasksEditPanel({
+  copy,
+  topics,
+  editDraft,
+  setEditDraft,
+  isSaving,
+  onSubmit
+}: {
+  copy: TasksCopy;
+  topics: TaskBoardTopicOption[];
+  editDraft: TaskCreateDraft;
+  setEditDraft: Dispatch<SetStateAction<TaskCreateDraft>>;
+  isSaving: boolean;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+}) {
+  return (
+    <section className="tasks-create-panel">
+      <form className="tasks-create-form" onSubmit={onSubmit}>
+        <label className="tasks-create-field tasks-create-field-title">
+          <span>{copy.fieldTitle}</span>
+          <input
+            type="text"
+            className="input"
+            value={editDraft.title}
+            onChange={(event) =>
+              setEditDraft((current) => ({
+                ...current,
+                title: event.target.value
+              }))
+            }
+            placeholder={copy.createPlaceholderTitle}
+          />
+        </label>
+
+        <label className="tasks-create-field">
+          <span>{copy.fieldTopic}</span>
+          <select
+            className="input"
+            value={editDraft.topicId}
+            onChange={(event) =>
+              setEditDraft((current) => ({
+                ...current,
+                topicId: event.target.value
+              }))
+            }
+          >
+            <option value="">{copy.noTopicOption}</option>
+            {topics.map((topic) => (
+              <option key={topic.id} value={topic.id}>
+                {topic.title}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="tasks-create-field">
+          <span>{copy.fieldDeadline}</span>
+          <input
+            type="date"
+            className="input"
+            value={editDraft.deadline}
+            onChange={(event) =>
+              setEditDraft((current) => ({
+                ...current,
+                deadline: event.target.value
+              }))
+            }
+          />
+        </label>
+
+        <label className="tasks-create-field tasks-create-field-description">
+          <span>{copy.fieldDescription}</span>
+          <textarea
+            value={editDraft.description}
+            onChange={(event) =>
+              setEditDraft((current) => ({
+                ...current,
+                description: event.target.value
+              }))
+            }
+            placeholder={copy.createPlaceholderDescription}
+          />
+        </label>
+
+        <button type="submit" className="button button-primary" disabled={isSaving}>
+          {isSaving ? copy.savingButton : copy.saveButton}
+        </button>
+      </form>
+    </section>
+  );
+}
+
 export function TasksKanbanView() {
   const { language } = useUserPreferences();
-  const copy = TASKS_COPY[language];
+  const copy = TASKS_COPY;
   const columnConfig = useMemo(() => getTaskColumnConfig(language), [language]);
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [dragOverStatus, setDragOverStatus] = useState<TaskBoardStatus | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState<TaskCreateDraft>({
+    title: "",
+    description: "",
+    topicId: "",
+    deadline: ""
+  });
   const createModalTitleId = "tasks-create-modal-title";
+  const editModalTitleId = "tasks-edit-modal-title";
   const filterModalTitleId = "tasks-filter-modal-title";
   const createModalTriggerRef = useRef<HTMLElement | null>(null);
+  const editModalTriggerRef = useRef<HTMLElement | null>(null);
   const filterDrawerTriggerRef = useRef<HTMLElement | null>(null);
   const {
     filters,
@@ -525,6 +575,7 @@ export function TasksKanbanView() {
     clearMutationError,
     groupedTasks,
     handleCreate,
+    handleUpdate,
     handleStatusChange,
     handleDelete
   } = useTasksBoardViewModel(copy);
@@ -537,7 +588,7 @@ export function TasksKanbanView() {
   }, [state.data?.tasks]);
 
   useEffect(() => {
-    if (!isCreateModalOpen && !isFilterDrawerOpen) {
+    if (!isCreateModalOpen && !isEditModalOpen && !isFilterDrawerOpen) {
       return;
     }
 
@@ -554,6 +605,15 @@ export function TasksKanbanView() {
         return;
       }
 
+      if (isEditModalOpen && (!editingTaskId || updatingTaskId !== editingTaskId)) {
+        clearMutationError();
+        setIsEditModalOpen(false);
+        setEditingTaskId(null);
+        editModalTriggerRef.current?.focus();
+        editModalTriggerRef.current = null;
+        return;
+      }
+
       if (isFilterDrawerOpen) {
         setIsFilterDrawerOpen(false);
         filterDrawerTriggerRef.current?.focus();
@@ -563,7 +623,15 @@ export function TasksKanbanView() {
 
     document.addEventListener("keydown", handleEscClose);
     return () => document.removeEventListener("keydown", handleEscClose);
-  }, [isCreateModalOpen, isFilterDrawerOpen, isCreating, clearMutationError]);
+  }, [
+    isCreateModalOpen,
+    isEditModalOpen,
+    isFilterDrawerOpen,
+    isCreating,
+    updatingTaskId,
+    editingTaskId,
+    clearMutationError
+  ]);
 
   function handleCardDragStart(event: DragEvent<HTMLLIElement>, taskId: string) {
     if (updatingTaskId === taskId) {
@@ -607,6 +675,19 @@ export function TasksKanbanView() {
     setIsFilterDrawerOpen(true);
   }
 
+  function openEditModal(task: TaskBoardItem, triggerElement: HTMLElement) {
+    clearMutationError();
+    editModalTriggerRef.current = triggerElement;
+    setEditingTaskId(task.id);
+    setEditDraft({
+      title: task.title,
+      description: task.description,
+      topicId: task.topicId ?? "",
+      deadline: task.dueAt
+    });
+    setIsEditModalOpen(true);
+  }
+
   function closeFilterDrawer() {
     setIsFilterDrawerOpen(false);
     filterDrawerTriggerRef.current?.focus();
@@ -623,6 +704,17 @@ export function TasksKanbanView() {
     createModalTriggerRef.current = null;
   }
 
+  function closeEditModal() {
+    if (editingTaskId && updatingTaskId === editingTaskId) {
+      return;
+    }
+    clearMutationError();
+    setIsEditModalOpen(false);
+    setEditingTaskId(null);
+    editModalTriggerRef.current?.focus();
+    editModalTriggerRef.current = null;
+  }
+
   async function handleCreateSubmit(event: FormEvent<HTMLFormElement>) {
     const created = await handleCreate(event);
     if (!created) {
@@ -633,6 +725,24 @@ export function TasksKanbanView() {
     setIsCreateModalOpen(false);
     createModalTriggerRef.current?.focus();
     createModalTriggerRef.current = null;
+  }
+
+  async function handleEditSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!editingTaskId) {
+      return;
+    }
+
+    const updated = await handleUpdate(editingTaskId, editDraft);
+    if (!updated) {
+      return;
+    }
+
+    clearMutationError();
+    setIsEditModalOpen(false);
+    setEditingTaskId(null);
+    editModalTriggerRef.current?.focus();
+    editModalTriggerRef.current = null;
   }
 
   return (
@@ -711,16 +821,51 @@ export function TasksKanbanView() {
               </div>
             ) : null}
 
-            <div className="roadmap-modal-actions">
-              <button type="button" className="button button-outline" onClick={closeCreateModal}>
-                {copy.cancelButton}
-              </button>
-            </div>
           </section>
         </div>
       ) : null}
 
-      {mutationError && !isCreateModalOpen ? (
+      {isEditModalOpen ? (
+        <div className="roadmap-modal-overlay" role="presentation" onClick={closeEditModal}>
+          <section
+            className="roadmap-modal tasks-create-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={editModalTitleId}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="roadmap-modal-header">
+              <h4 id={editModalTitleId}>{copy.editModalTitle}</h4>
+              <button
+                type="button"
+                className="roadmap-modal-close"
+                aria-label={copy.closeEditModalAria}
+                onClick={closeEditModal}
+              >
+                ×
+              </button>
+            </div>
+
+            <TasksEditPanel
+              copy={copy}
+              topics={state.data?.topics ?? []}
+              editDraft={editDraft}
+              setEditDraft={setEditDraft}
+              isSaving={Boolean(editingTaskId) && updatingTaskId === editingTaskId}
+              onSubmit={handleEditSubmit}
+            />
+
+            {mutationError ? (
+              <div className="dashboard-error">
+                <p>{mutationError}</p>
+              </div>
+            ) : null}
+
+          </section>
+        </div>
+      ) : null}
+
+      {mutationError && !isCreateModalOpen && !isEditModalOpen ? (
         <div className="dashboard-error">
           <p>{mutationError}</p>
         </div>
@@ -769,6 +914,7 @@ export function TasksKanbanView() {
                 }
               }}
               onColumnDrop={handleColumnDrop}
+              onEdit={openEditModal}
               onDelete={(task) => {
                 if (!window.confirm(copy.deleteConfirm(task.title))) {
                   return;

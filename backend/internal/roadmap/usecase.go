@@ -114,7 +114,27 @@ func (uc *UseCase) UpdateRoadmap(ctx context.Context, userID string, req UpdateR
 
 func (uc *UseCase) CreateTopic(ctx context.Context, userID string, req CreateTopicRequest) (TopicResponse, error) {
 	const op apperr.Op = "UseCase.CreateTopic"
-	t, err := uc.repo.CreateTopic(ctx, userID, req.Title, req.Description, req.Position)
+	var (
+		t   Topic
+		err error
+	)
+
+	if req.IsDirectional() {
+		if req.RelativeToTopicID == "" || !req.Direction.IsValid() {
+			return TopicResponse{}, apperr.E(op, ErrInvalidDirection)
+		}
+
+		t, err = uc.repo.CreateTopicDirectional(
+			ctx,
+			userID,
+			req.RelativeToTopicID,
+			req.Title,
+			req.Description,
+			req.Direction,
+		)
+	} else {
+		t, err = uc.repo.CreateTopic(ctx, userID, req.Title, req.Description, req.Position)
+	}
 	if err != nil {
 		return TopicResponse{}, apperr.E(op, err)
 	}
@@ -126,34 +146,6 @@ func (uc *UseCase) CreateTopic(ctx context.Context, userID string, req CreateTop
 	})
 
 	return buildTopicResponse(t, nil, TopicMetrics{}, false, nil), nil
-}
-
-func (uc *UseCase) CreateTopicWithDependency(ctx context.Context, userID string, req CreateTopicWithDependencyRequest) (TopicResponse, error) {
-	const op apperr.Op = "UseCase.CreateTopicWithDependency"
-
-	if _, err := uc.repo.GetTopicByID(ctx, req.DependsOnTopicID, userID); err != nil {
-		return TopicResponse{}, apperr.E(op, err)
-	}
-
-	t, err := uc.repo.CreateTopicWithDependency(
-		ctx,
-		userID,
-		req.Title,
-		req.Description,
-		req.Position,
-		req.DependsOnTopicID,
-	)
-	if err != nil {
-		return TopicResponse{}, apperr.E(op, err)
-	}
-
-	uc.record(ctx, history.Event{
-		UserID: userID, EntityType: "topic", EntityID: t.ID,
-		EventType: "technical", EventName: "entity.created",
-		Payload: map[string]any{"title": t.Title},
-	})
-
-	return buildTopicResponse(t, []string{req.DependsOnTopicID}, TopicMetrics{}, false, nil), nil
 }
 
 func (uc *UseCase) GetTopic(ctx context.Context, userID, topicID string) (TopicResponse, error) {
@@ -220,7 +212,7 @@ func (uc *UseCase) UpdateTopicStatus(ctx context.Context, userID, topicID string
 		return apperr.E(op, ErrInvalidStatus)
 	}
 
-	if req.Status == "in_progress" {
+	if req.Status == "in_progress" || req.Status == "completed" {
 		topics, err := uc.repo.GetTopicsByUserID(ctx, userID)
 		if err != nil {
 			return apperr.E(op, err)

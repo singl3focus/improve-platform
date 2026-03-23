@@ -93,23 +93,29 @@ export async function POST(request: NextRequest) {
       return errorResponse;
     }
 
-    const roadmapResult = await client.call("/api/v1/roadmap", { method: "GET" });
-    if (!roadmapResult.response.ok) {
-      const errorResponse = createBackendErrorResponse(
-        roadmapResult.response,
-        roadmapResult.payload,
-        "Roadmap load failed."
-      );
-      client.applyUpdatedSession(errorResponse);
-      return errorResponse;
+    let nextTopicPosition = 1;
+    if (createRoadmapResult.response.status !== 201) {
+      const roadmapResult = await client.call("/api/v1/roadmap", { method: "GET" });
+      if (!roadmapResult.response.ok) {
+        if (roadmapResult.response.status < 500) {
+          const errorResponse = createBackendErrorResponse(
+            roadmapResult.response,
+            roadmapResult.payload,
+            "Roadmap load failed."
+          );
+          client.applyUpdatedSession(errorResponse);
+          return errorResponse;
+        }
+      } else {
+        const roadmap = roadmapResult.payload as BackendRoadmapResponse;
+        nextTopicPosition = getNextTopicPosition(roadmap);
+      }
     }
-
-    const roadmap = roadmapResult.payload as BackendRoadmapResponse;
 
     const topicBody = {
       title: topicTitle,
       description: topicDescription,
-      position: getNextTopicPosition(roadmap)
+      position: nextTopicPosition
     };
 
     const createTopicResult = await client.call("/api/v1/roadmap/topics", {

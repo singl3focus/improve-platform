@@ -17,6 +17,11 @@ type Repo struct {
 	pool *pgxpool.Pool
 }
 
+type directionalInsertPlan struct {
+	insertPosition int
+	shiftExisting  bool
+}
+
 func NewRepo(pool *pgxpool.Pool) *Repo {
 	return &Repo{pool: pool}
 }
@@ -86,38 +91,90 @@ func (r *Repo) CreateTopic(ctx context.Context, userID, title, description strin
 	return t, apperr.E(op, err)
 }
 
-func (r *Repo) CreateTopicWithDependency(ctx context.Context, userID, title, description string, position int, dependsOnTopicID string) (Topic, error) {
-	const op apperr.Op = "Repo.CreateTopicWithDependency"
+func (r *Repo) CreateTopicDirectional(ctx context.Context, userID, currentTopicID, title, description string, direction TopicCreateDirection) (Topic, error) {
+	const op apperr.Op = "Repo.CreateTopicDirectional"
 
-	tx, err := r.pool.Begin(ctx)
+	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return Topic{}, apperr.E(op, err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
 
-	if err := ensureTopicExistsInUserScope(ctx, tx, dependsOnTopicID, userID); err != nil {
+	rows, err := tx.Query(ctx, `SELECT id, position FROM topics WHERE user_id = $1 FOR UPDATE`, userID)
+	if err != nil {
 		return Topic{}, apperr.E(op, err)
 	}
 
-	var t Topic
+	maxPosition := 0
+	hasPositions := false
+	currentPosition := 0
+	currentFound := false
+
+	for rows.Next() {
+		var (
+			topicID  string
+			position int
+		)
+		if scanErr := rows.Scan(&topicID, &position); scanErr != nil {
+			rows.Close()
+			return Topic{}, apperr.E(op, scanErr)
+		}
+
+		if !hasPositions || position > maxPosition {
+			maxPosition = position
+			hasPositions = true
+		}
+		if topicID == currentTopicID {
+			currentPosition = position
+			currentFound = true
+		}
+	}
+	if err = rows.Err(); err != nil {
+		rows.Close()
+		return Topic{}, apperr.E(op, err)
+	}
+	rows.Close()
+
+	if !currentFound {
+		return Topic{}, apperr.E(op, ErrTopicNotFound)
+	}
+	if !hasPositions {
+		maxPosition = 0
+	}
+
+	insertPlan := resolveDirectionalInsertPlan(direction, currentPosition, maxPosition)
+
+	if insertPlan.shiftExisting {
+		if _, err = tx.Exec(ctx,
+			`UPDATE topics
+			 SET position = position + 1, updated_at = now()
+			 WHERE user_id = $1 AND position >= $2`,
+			userID, insertPlan.insertPosition,
+		); err != nil {
+			return Topic{}, apperr.E(op, err)
+		}
+	}
+
+	var created Topic
 	err = tx.QueryRow(ctx,
 		`INSERT INTO topics (user_id, title, description, position)
 		 VALUES ($1, $2, $3, $4)
 		 RETURNING id, user_id, title, description, status,
 		           start_date, target_date, completed_date, position, created_at, updated_at`,
-		userID, title, description, position,
-	).Scan(&t.ID, &t.UserID, &t.Title, &t.Description, &t.Status,
-		&t.StartDate, &t.TargetDate, &t.CompletedDate, &t.Position, &t.CreatedAt, &t.UpdatedAt)
+		userID, title, description, insertPlan.insertPosition,
+	).Scan(&created.ID, &created.UserID, &created.Title, &created.Description, &created.Status,
+		&created.StartDate, &created.TargetDate, &created.CompletedDate, &created.Position, &created.CreatedAt, &created.UpdatedAt)
 	if err != nil {
 		return Topic{}, apperr.E(op, err)
 	}
 
-	_, err = tx.Exec(ctx,
+	if _, err = tx.Exec(ctx,
 		`INSERT INTO topic_dependencies (topic_id, depends_on_topic_id, user_id)
 		 VALUES ($1, $2, $3)`,
-		t.ID, dependsOnTopicID, userID,
-	)
-	if err != nil {
+		currentTopicID, created.ID, userID,
+	); err != nil {
 		var pgErr *pgconn.PgError
 		if apperr.As(err, &pgErr) && pgErr.Code == uniqueViolation {
 			return Topic{}, apperr.E(op, ErrDependencyExists)
@@ -125,11 +182,36 @@ func (r *Repo) CreateTopicWithDependency(ctx context.Context, userID, title, des
 		return Topic{}, apperr.E(op, err)
 	}
 
-	if err := tx.Commit(ctx); err != nil {
+	if err = tx.Commit(ctx); err != nil {
 		return Topic{}, apperr.E(op, err)
 	}
 
-	return t, nil
+	return created, nil
+}
+
+func resolveDirectionalInsertPlan(direction TopicCreateDirection, currentPosition, maxPosition int) directionalInsertPlan {
+	switch direction {
+	case TopicCreateDirectionLeft:
+		return directionalInsertPlan{
+			insertPosition: currentPosition,
+			shiftExisting:  true,
+		}
+	case TopicCreateDirectionRight:
+		return directionalInsertPlan{
+			insertPosition: currentPosition + 1,
+			shiftExisting:  true,
+		}
+	case TopicCreateDirectionBelow:
+		return directionalInsertPlan{
+			insertPosition: currentPosition,
+			shiftExisting:  false,
+		}
+	default:
+		return directionalInsertPlan{
+			insertPosition: maxPosition + 1,
+			shiftExisting:  false,
+		}
+	}
 }
 
 func (r *Repo) GetTopicByID(ctx context.Context, id, userID string) (Topic, error) {
@@ -332,21 +414,4 @@ func (r *Repo) GetTopicMetricsByUserID(ctx context.Context, userID string) (map[
 	}
 
 	return metrics, apperr.E(op, rows.Err())
-}
-
-func ensureTopicExistsInUserScope(ctx context.Context, tx pgx.Tx, topicID, userID string) error {
-	const op apperr.Op = "Repo.ensureTopicExistsInUserScope"
-	var exists bool
-	err := tx.QueryRow(ctx,
-		`SELECT EXISTS(SELECT 1 FROM topics WHERE id = $1 AND user_id = $2)`,
-		topicID,
-		userID,
-	).Scan(&exists)
-	if err != nil {
-		return apperr.E(op, err)
-	}
-	if !exists {
-		return apperr.E(op, ErrTopicNotFound)
-	}
-	return nil
 }

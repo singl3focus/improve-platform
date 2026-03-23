@@ -25,6 +25,13 @@ interface CreateTaskPayload {
   deadline?: string;
 }
 
+interface UpdateTaskPayload {
+  title: string;
+  description?: string;
+  topicId?: string | null;
+  deadline?: string;
+}
+
 type TaskBoardLoadStatus = "loading" | "success" | "error";
 
 interface TaskBoardState {
@@ -49,6 +56,7 @@ interface TasksBoardCopyForViewModel {
   loadError: string;
   titleRequired: string;
   createFailed: string;
+  updateFailed: string;
   deleteFailed: string;
 }
 
@@ -131,6 +139,22 @@ async function createTask(payload: CreateTaskPayload): Promise<TaskBoardItem> {
 
   if (!response.ok) {
     throw new Error(await parseErrorMessage(response, "Task creation failed."));
+  }
+
+  return (await response.json()) as TaskBoardItem;
+}
+
+async function updateTask(taskId: string, payload: UpdateTaskPayload): Promise<TaskBoardItem> {
+  const response = await fetch(`/api/tasks/${encodeURIComponent(taskId)}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(payload)
+  });
+
+  if (!response.ok) {
+    throw new Error(await parseErrorMessage(response, "Task update failed."));
   }
 
   return (await response.json()) as TaskBoardItem;
@@ -412,6 +436,72 @@ export function useTasksBoardViewModel(copy: TasksBoardCopyForViewModel) {
     }
   }
 
+  async function handleUpdate(taskId: string, draft: TaskCreateDraft): Promise<boolean> {
+    if (!state.data) {
+      return false;
+    }
+
+    const title = draft.title.trim();
+    if (!title) {
+      setMutationError(copy.titleRequired);
+      return false;
+    }
+
+    const description = draft.description.trim();
+    const topicId = draft.topicId.trim();
+    const deadline = draft.deadline.trim();
+
+    setMutationError(null);
+    setUpdatingTaskId(taskId);
+
+    try {
+      const updatedTask = await updateTask(taskId, {
+        title,
+        description,
+        topicId: topicId || null,
+        ...(deadline ? { deadline } : {})
+      });
+
+      setState((current) => {
+        if (current.status !== "success" || !current.data) {
+          return current;
+        }
+
+        if (!doesTaskMatchFilters(updatedTask, filters)) {
+          return {
+            ...current,
+            data: {
+              ...current.data,
+              tasks: current.data.tasks.filter((task) => task.id !== taskId)
+            }
+          };
+        }
+
+        return {
+          ...current,
+          data: {
+            ...current.data,
+            tasks: current.data.tasks.map((task) =>
+              task.id === taskId
+                ? {
+                    ...task,
+                    ...updatedTask
+                  }
+                : task
+            )
+          }
+        };
+      });
+
+      return true;
+    } catch (error) {
+      setMutationError(error instanceof Error ? error.message : copy.updateFailed);
+      return false;
+    } finally {
+      setUpdatingTaskId(null);
+    }
+  }
+
   async function handleDelete(taskId: string) {
     if (!state.data) {
       return;
@@ -468,6 +558,7 @@ export function useTasksBoardViewModel(copy: TasksBoardCopyForViewModel) {
     clearMutationError,
     groupedTasks,
     handleCreate,
+    handleUpdate,
     handleStatusChange,
     handleDelete
   };

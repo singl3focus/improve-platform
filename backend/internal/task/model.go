@@ -2,6 +2,7 @@ package task
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"time"
 )
@@ -39,8 +40,40 @@ type CreateRequest struct {
 type UpdateRequest struct {
 	Title       string  `json:"title"`
 	Description string  `json:"description"`
+	TopicID     *string `json:"topic_id"`
 	Deadline    *string `json:"deadline"`
 	Position    int     `json:"position"`
+
+	topicIDProvided bool
+}
+
+func (r *UpdateRequest) UnmarshalJSON(data []byte) error {
+	type updateRequestJSON struct {
+		Title       string  `json:"title"`
+		Description string  `json:"description"`
+		TopicID     *string `json:"topic_id"`
+		Deadline    *string `json:"deadline"`
+		Position    int     `json:"position"`
+	}
+
+	var decoded updateRequestJSON
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
+		return err
+	}
+
+	r.Title = decoded.Title
+	r.Description = decoded.Description
+	r.TopicID = decoded.TopicID
+	r.Deadline = decoded.Deadline
+	r.Position = decoded.Position
+	_, r.topicIDProvided = fields["topic_id"]
+
+	return nil
 }
 
 type UpdateStatusRequest struct {
@@ -76,7 +109,7 @@ type Repository interface {
 	Create(ctx context.Context, t Task) (Task, error)
 	GetByID(ctx context.Context, id, userID string) (Task, error)
 	ListByUser(ctx context.Context, userID string, topicID *string) ([]Task, error)
-	Update(ctx context.Context, id, userID, title, description string, deadline *time.Time, position int) error
+	Update(ctx context.Context, id, userID, title, description string, deadline *time.Time, position int, topicID *string, updateTopicID bool) error
 	UpdateStatus(ctx context.Context, id, userID, status string) error
 	Delete(ctx context.Context, id, userID string) error
 	CountByTopic(ctx context.Context, topicID, userID string) (total int, done int, err error)

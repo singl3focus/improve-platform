@@ -3,107 +3,60 @@
 import Link from "next/link";
 import type { Dispatch, FormEvent, SetStateAction } from "react";
 import { useEffect, useRef, useState } from "react";
-import { useUserPreferences } from "@/components/providers/user-preferences-provider";
 import {
   type MaterialDraft,
   useMaterialsLibraryViewModel
 } from "@/components/hooks/use-materials-library-view-model";
-import type { LibraryMaterial, MaterialType } from "@/lib/materials-library-types";
+import type { LibraryMaterial, MaterialType, MaterialUnit } from "@/lib/materials-library-types";
 
 const MATERIALS_COPY = {
-  ru: {
-    title: "Личная библиотека материалов",
-    subtitle: "Просматривайте, обновляйте и упорядочивайте материалы по темам.",
-    search: "Поиск",
-    topic: "Тема",
-    allTopics: "Все темы",
-    searchPlaceholder: "Название, описание, тема",
-    createTitle: "Добавить материал",
-    createSubtitle: "Создайте новый элемент и задайте позицию в выбранной теме.",
-    fieldTitle: "Название",
-    fieldDescription: "Описание",
-    fieldType: "Тип",
-    fieldUnit: "Единица",
-    fieldTotalAmount: "Полная мера",
-    fieldCompletedAmount: "Выполнено",
-    fieldPosition: "Позиция",
-    fieldTopic: "Тема",
-    typeBook: "Книга",
-    typeArticle: "Статья",
-    typeCourse: "Курс",
-    typeVideo: "Видео",
-    createPlaceholderTitle: "Название материала",
-    createPlaceholderDescription: "Описание материала",
-    noTopicsAvailable: "Нет доступных тем",
-    createButton: "Создать материал",
-    createModalTitle: "Создать материал",
-    closeModalAria: "Закрыть окно создания материала",
-    creatingButton: "Создание...",
-    topicRequired: "Для создания материала нужна тема.",
-    titleDescriptionRequired: "Название и описание обязательны.",
-    amountInvalid: "Выполненная мера должна быть меньше или равна полной мере.",
-    createFailed: "Не удалось создать материал.",
-    updateFailed: "Не удалось обновить материал.",
-    deleteFailed: "Не удалось удалить материал.",
-    loading: "Загрузка библиотеки материалов...",
-    loadFailed: "Не удалось загрузить библиотеку материалов.",
-    retry: "Повторить",
-    progress: "Прогресс",
-    updateProgress: "Обновить прогресс",
-    edit: "Редактировать",
-    delete: "Удалить",
-    save: "Сохранить",
-    cancel: "Отмена",
-    empty: "Материалы по текущим фильтрам не найдены. Измените фильтр или добавьте новый элемент."
-  },
-  en: {
-    title: "Curated materials library",
-    subtitle: "Browse, update and organize learning materials with topic-aware ordering.",
-    search: "Search",
-    topic: "Topic",
-    allTopics: "All topics",
-    searchPlaceholder: "Title, description, topic",
-    createTitle: "Add material",
-    createSubtitle: "Create a new library item and place it at a position inside the selected topic.",
-    fieldTitle: "Title",
-    fieldDescription: "Description",
-    fieldType: "Type",
-    fieldUnit: "Unit",
-    fieldTotalAmount: "Total amount",
-    fieldCompletedAmount: "Completed amount",
-    fieldPosition: "Position",
-    fieldTopic: "Topic",
-    typeBook: "Book",
-    typeArticle: "Article",
-    typeCourse: "Course",
-    typeVideo: "Video",
-    createPlaceholderTitle: "Material title",
-    createPlaceholderDescription: "Material description",
-    noTopicsAvailable: "No topics available",
-    createButton: "Create material",
-    createModalTitle: "Create material",
-    closeModalAria: "Close material creation modal",
-    creatingButton: "Creating...",
-    topicRequired: "Topic is required for material creation.",
-    titleDescriptionRequired: "Title and description are required.",
-    amountInvalid: "Completed amount must be less than or equal to total amount.",
-    createFailed: "Material creation failed.",
-    updateFailed: "Material update failed.",
-    deleteFailed: "Material removal failed.",
-    loading: "Loading materials library...",
-    loadFailed: "Materials library failed to load.",
-    retry: "Retry",
-    progress: "Progress",
-    updateProgress: "Update progress",
-    edit: "Edit",
-    delete: "Delete",
-    save: "Save",
-    cancel: "Cancel",
-    empty: "No materials found for the current filters. Try another topic or add a new item."
-  }
+  title: "Личная библиотека материалов",
+  subtitle: "Просматривайте, обновляйте и упорядочивайте материалы по темам.",
+  search: "Поиск",
+  topic: "Тема",
+  allTopics: "Все темы",
+  searchPlaceholder: "Название, описание, тема",
+  fieldTitle: "Название",
+  fieldDescription: "Описание",
+  fieldType: "Тип",
+  fieldUnit: "Единица",
+  fieldTotalAmount: "Полная мера",
+  fieldCompletedAmount: "Выполнено",
+  fieldPosition: "Позиция",
+  fieldTopic: "Тема",
+  typeBook: "Книга",
+  typeArticle: "Статья",
+  typeCourse: "Курс",
+  typeVideo: "Видео",
+  unitPages: "страницы",
+  unitLessons: "уроки",
+  unitHours: "часы",
+  createPlaceholderTitle: "Название материала",
+  createPlaceholderDescription: "Описание материала",
+  noTopicsAvailable: "Нет доступных тем",
+  createButton: "Создать материал",
+  createModalTitle: "Создать материал",
+  closeModalAria: "Закрыть окно создания материала",
+  creatingButton: "Создание...",
+  topicRequired: "Для создания материала нужна тема.",
+  titleDescriptionRequired: "Название и описание обязательны.",
+  amountInvalid: "Выполненная мера должна быть меньше или равна полной мере.",
+  createFailed: "Не удалось создать материал.",
+  updateFailed: "Не удалось обновить материал.",
+  deleteFailed: "Не удалось удалить материал.",
+  loading: "Загрузка библиотеки материалов...",
+  loadFailed: "Не удалось загрузить библиотеку материалов.",
+  retry: "Повторить",
+  progress: "Прогресс",
+  updateProgress: "Обновить прогресс",
+  edit: "Редактировать",
+  delete: "Удалить",
+  save: "Сохранить",
+  cancel: "Отмена",
+  empty: "Материалы по текущим фильтрам не найдены. Измените фильтр или добавьте новый элемент."
 } as const;
 
-type MaterialsCopy = (typeof MATERIALS_COPY)[keyof typeof MATERIALS_COPY];
+type MaterialsCopy = typeof MATERIALS_COPY;
 
 const MATERIAL_TYPE_OPTIONS: MaterialType[] = ["book", "article", "course", "video"];
 
@@ -119,6 +72,17 @@ function getMaterialTypeLabel(copy: MaterialsCopy, type: MaterialType): string {
   }
 
   return copy.typeVideo;
+}
+
+function getMaterialUnitLabel(copy: MaterialsCopy, unit: MaterialUnit): string {
+  if (unit === "hours") {
+    return copy.unitHours;
+  }
+  if (unit === "lessons") {
+    return copy.unitLessons;
+  }
+
+  return copy.unitPages;
 }
 
 interface TopicOption {
@@ -213,11 +177,6 @@ function MaterialsCreatePanel({
 
   return (
     <section className={rootClassName}>
-      <header>
-        <h3>{copy.createTitle}</h3>
-        <p>{copy.createSubtitle}</p>
-      </header>
-
       <form className="materials-create-form" onSubmit={onSubmit}>
         <label className="materials-form-field materials-form-field-title">
           <span>{copy.fieldTitle}</span>
@@ -283,7 +242,13 @@ function MaterialsCreatePanel({
 
         <label className="materials-form-field">
           <span>{copy.fieldUnit}</span>
-          <input type="text" className="input" value={createDraft.unit} readOnly disabled />
+          <input
+            type="text"
+            className="input"
+            value={getMaterialUnitLabel(copy, createDraft.unit as MaterialUnit)}
+            readOnly
+            disabled
+          />
         </label>
 
         <label className="materials-form-field">
@@ -400,7 +365,7 @@ function MaterialsCard({
       <div className="materials-card-meta-head">
         <span className="materials-type-badge">{getMaterialTypeLabel(copy, material.type)}</span>
         <span className="materials-measure-badge">
-          {material.completedAmount}/{material.totalAmount} {material.unit}
+          {material.completedAmount}/{material.totalAmount} {getMaterialUnitLabel(copy, material.unit)}
         </span>
       </div>
 
@@ -511,7 +476,13 @@ function MaterialsCard({
 
           <label className="materials-form-field">
             <span>{copy.fieldUnit}</span>
-            <input type="text" className="input" value={editDraft.unit} readOnly disabled />
+            <input
+              type="text"
+              className="input"
+              value={getMaterialUnitLabel(copy, editDraft.unit as MaterialUnit)}
+              readOnly
+              disabled
+            />
           </label>
 
           <label className="materials-form-field">
@@ -615,8 +586,7 @@ function MaterialsCard({
 }
 
 export function MaterialsLibraryView() {
-  const { language } = useUserPreferences();
-  const copy = MATERIALS_COPY[language];
+  const copy = MATERIALS_COPY;
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const createModalTriggerRef = useRef<HTMLElement | null>(null);
   const createModalTitleId = "materials-create-modal-title";
@@ -748,11 +718,6 @@ export function MaterialsLibraryView() {
               </div>
             ) : null}
 
-            <div className="roadmap-modal-actions">
-              <button type="button" className="button button-outline" onClick={closeCreateModal}>
-                {copy.cancel}
-              </button>
-            </div>
           </section>
         </div>
       ) : null}

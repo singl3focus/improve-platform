@@ -11,20 +11,20 @@ import (
 
 // mockRepo implements roadmap.Repository for unit tests.
 type mockRepo struct {
-	createRoadmapFn      func(ctx context.Context, userID, title string) (roadmap.Roadmap, error)
-	getRoadmapByUserIDFn func(ctx context.Context, userID string) (roadmap.Roadmap, error)
-	updateRoadmapTitleFn func(ctx context.Context, userID, title string) error
-	createTopicFn        func(ctx context.Context, userID, title, description string, position int) (roadmap.Topic, error)
-	createTopicWithDepFn func(ctx context.Context, userID, title, description string, position int, dependsOnTopicID string) (roadmap.Topic, error)
-	getTopicByIDFn       func(ctx context.Context, id, userID string) (roadmap.Topic, error)
-	getTopicsByUserIDFn  func(ctx context.Context, userID string) ([]roadmap.Topic, error)
-	updateTopicFn        func(ctx context.Context, id, userID, title, description string, startDate, targetDate *time.Time, position int) error
-	updateTopicStatusFn  func(ctx context.Context, id, userID, status string, startDate, completedDate *time.Time) error
-	deleteTopicFn        func(ctx context.Context, id, userID string) error
-	addDependencyFn      func(ctx context.Context, topicID, dependsOnTopicID, userID string) error
-	removeDependencyFn   func(ctx context.Context, topicID, dependsOnTopicID, userID string) error
-	getDependenciesFn    func(ctx context.Context, userID string) ([]roadmap.TopicDep, error)
-	getTopicMetricsFn    func(ctx context.Context, userID string) (map[string]roadmap.TopicMetrics, error)
+	createRoadmapFn          func(ctx context.Context, userID, title string) (roadmap.Roadmap, error)
+	getRoadmapByUserIDFn     func(ctx context.Context, userID string) (roadmap.Roadmap, error)
+	updateRoadmapTitleFn     func(ctx context.Context, userID, title string) error
+	createTopicFn            func(ctx context.Context, userID, title, description string, position int) (roadmap.Topic, error)
+	createTopicDirectionalFn func(ctx context.Context, userID, currentTopicID, title, description string, direction roadmap.TopicCreateDirection) (roadmap.Topic, error)
+	getTopicByIDFn           func(ctx context.Context, id, userID string) (roadmap.Topic, error)
+	getTopicsByUserIDFn      func(ctx context.Context, userID string) ([]roadmap.Topic, error)
+	updateTopicFn            func(ctx context.Context, id, userID, title, description string, startDate, targetDate *time.Time, position int) error
+	updateTopicStatusFn      func(ctx context.Context, id, userID, status string, startDate, completedDate *time.Time) error
+	deleteTopicFn            func(ctx context.Context, id, userID string) error
+	addDependencyFn          func(ctx context.Context, topicID, dependsOnTopicID, userID string) error
+	removeDependencyFn       func(ctx context.Context, topicID, dependsOnTopicID, userID string) error
+	getDependenciesFn        func(ctx context.Context, userID string) ([]roadmap.TopicDep, error)
+	getTopicMetricsFn        func(ctx context.Context, userID string) (map[string]roadmap.TopicMetrics, error)
 }
 
 func (m *mockRepo) CreateRoadmap(ctx context.Context, userID, title string) (roadmap.Roadmap, error) {
@@ -39,8 +39,8 @@ func (m *mockRepo) UpdateRoadmapTitle(ctx context.Context, userID, title string)
 func (m *mockRepo) CreateTopic(ctx context.Context, userID, title, description string, position int) (roadmap.Topic, error) {
 	return m.createTopicFn(ctx, userID, title, description, position)
 }
-func (m *mockRepo) CreateTopicWithDependency(ctx context.Context, userID, title, description string, position int, dependsOnTopicID string) (roadmap.Topic, error) {
-	return m.createTopicWithDepFn(ctx, userID, title, description, position, dependsOnTopicID)
+func (m *mockRepo) CreateTopicDirectional(ctx context.Context, userID, currentTopicID, title, description string, direction roadmap.TopicCreateDirection) (roadmap.Topic, error) {
+	return m.createTopicDirectionalFn(ctx, userID, currentTopicID, title, description, direction)
 }
 func (m *mockRepo) GetTopicByID(ctx context.Context, id, userID string) (roadmap.Topic, error) {
 	return m.getTopicByIDFn(ctx, id, userID)
@@ -68,6 +68,57 @@ func (m *mockRepo) GetDependenciesByUserID(ctx context.Context, userID string) (
 }
 func (m *mockRepo) GetTopicMetricsByUserID(ctx context.Context, userID string) (map[string]roadmap.TopicMetrics, error) {
 	return m.getTopicMetricsFn(ctx, userID)
+}
+
+func TestCreateTopic_DirectionalSuccess(t *testing.T) {
+	called := false
+	repo := &mockRepo{
+		createTopicDirectionalFn: func(_ context.Context, userID, currentTopicID, title, description string, direction roadmap.TopicCreateDirection) (roadmap.Topic, error) {
+			called = true
+			if userID != "u-1" || currentTopicID != "11111111-1111-1111-1111-111111111111" {
+				t.Fatalf("unexpected ids: user=%s current=%s", userID, currentTopicID)
+			}
+			if direction != roadmap.TopicCreateDirectionBelow {
+				t.Fatalf("unexpected direction: %s", direction)
+			}
+			if title != "Child" || description != "desc" {
+				t.Fatalf("unexpected payload: %s / %s", title, description)
+			}
+			return roadmap.Topic{ID: "topic-new", Title: title, Description: description, Position: 4}, nil
+		},
+	}
+
+	uc := roadmap.NewUseCase(repo)
+	resp, err := uc.CreateTopic(context.Background(), "u-1", roadmap.CreateTopicRequest{
+		Title:             "Child",
+		Description:       "desc",
+		Direction:         roadmap.TopicCreateDirectionBelow,
+		RelativeToTopicID: "11111111-1111-1111-1111-111111111111",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !called {
+		t.Fatal("expected directional repo method to be called")
+	}
+	if resp.ID != "topic-new" {
+		t.Fatalf("expected topic-new, got %s", resp.ID)
+	}
+}
+
+func TestCreateTopic_DirectionalInvalidPayload(t *testing.T) {
+	repo := &mockRepo{}
+	uc := roadmap.NewUseCase(repo)
+
+	_, err := uc.CreateTopic(context.Background(), "u-1", roadmap.CreateTopicRequest{
+		Title:             "Child",
+		Description:       "desc",
+		Direction:         "diagonal",
+		RelativeToTopicID: "11111111-1111-1111-1111-111111111111",
+	})
+	if !errors.Is(err, roadmap.ErrInvalidDirection) {
+		t.Fatalf("expected ErrInvalidDirection, got %v", err)
+	}
 }
 
 // --- DAG cycle detection tests ---
@@ -208,69 +259,6 @@ func TestRemoveDependency_NotFound(t *testing.T) {
 	}
 }
 
-func TestCreateTopicWithDependency_Success(t *testing.T) {
-	var createdTopicID string
-	var createdDependsOn string
-
-	repo := &mockRepo{
-		getTopicByIDFn: func(_ context.Context, id, _ string) (roadmap.Topic, error) {
-			return roadmap.Topic{ID: id}, nil
-		},
-		createTopicWithDepFn: func(_ context.Context, _ string, title, description string, position int, dependsOnTopicID string) (roadmap.Topic, error) {
-			createdDependsOn = dependsOnTopicID
-			return roadmap.Topic{
-				ID:          "topic-new",
-				Title:       title,
-				Description: description,
-				Status:      "not_started",
-				Position:    position,
-			}, nil
-		},
-	}
-
-	uc := roadmap.NewUseCase(repo)
-	resp, err := uc.CreateTopicWithDependency(context.Background(), "u", roadmap.CreateTopicWithDependencyRequest{
-		Title:            "Child topic",
-		Description:      "desc",
-		Position:         2,
-		DependsOnTopicID: "topic-parent",
-	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	createdTopicID = resp.ID
-	if createdTopicID != "topic-new" {
-		t.Fatalf("expected topic id topic-new, got %s", createdTopicID)
-	}
-	if createdDependsOn != "topic-parent" {
-		t.Fatalf("expected depends_on topic-parent, got %s", createdDependsOn)
-	}
-	if len(resp.Dependencies) != 1 || resp.Dependencies[0] != "topic-parent" {
-		t.Fatalf("expected dependencies [topic-parent], got %v", resp.Dependencies)
-	}
-}
-
-func TestCreateTopicWithDependency_RollbackOnDependencyInsertError(t *testing.T) {
-	repo := &mockRepo{
-		getTopicByIDFn: func(_ context.Context, id, _ string) (roadmap.Topic, error) {
-			return roadmap.Topic{ID: id}, nil
-		},
-		createTopicWithDepFn: func(_ context.Context, _ string, _, _ string, _ int, _ string) (roadmap.Topic, error) {
-			return roadmap.Topic{}, roadmap.ErrDependencyExists
-		},
-	}
-
-	uc := roadmap.NewUseCase(repo)
-	_, err := uc.CreateTopicWithDependency(context.Background(), "u", roadmap.CreateTopicWithDependencyRequest{
-		Title:            "Child topic",
-		DependsOnTopicID: "topic-parent",
-	})
-	if !errors.Is(err, roadmap.ErrDependencyExists) {
-		t.Fatalf("expected ErrDependencyExists, got %v", err)
-	}
-}
-
 // --- Status transition tests ---
 
 func TestUpdateTopicStatus_ToInProgress_Unblocked(t *testing.T) {
@@ -351,6 +339,12 @@ func TestUpdateTopicStatus_ToCompleted(t *testing.T) {
 		getTopicByIDFn: func(_ context.Context, _ string, _ string) (roadmap.Topic, error) {
 			return roadmap.Topic{ID: "t1", Status: "in_progress"}, nil
 		},
+		getTopicsByUserIDFn: func(_ context.Context, _ string) ([]roadmap.Topic, error) {
+			return []roadmap.Topic{{ID: "t1", Status: "in_progress"}}, nil
+		},
+		getDependenciesFn: func(_ context.Context, _ string) ([]roadmap.TopicDep, error) {
+			return nil, nil
+		},
 		updateTopicStatusFn: func(_ context.Context, _, _, _ string, _ *time.Time, cd *time.Time) error {
 			gotCompletedDate = cd
 			return nil
@@ -364,6 +358,29 @@ func TestUpdateTopicStatus_ToCompleted(t *testing.T) {
 	}
 	if gotCompletedDate == nil {
 		t.Error("expected completed_date to be set")
+	}
+}
+
+func TestUpdateTopicStatus_ToCompleted_Blocked(t *testing.T) {
+	repo := &mockRepo{
+		getTopicByIDFn: func(_ context.Context, _ string, _ string) (roadmap.Topic, error) {
+			return roadmap.Topic{ID: "t1", Status: "in_progress"}, nil
+		},
+		getTopicsByUserIDFn: func(_ context.Context, _ string) ([]roadmap.Topic, error) {
+			return []roadmap.Topic{
+				{ID: "t1", Status: "in_progress"},
+				{ID: "t2", Status: "not_started"},
+			}, nil
+		},
+		getDependenciesFn: func(_ context.Context, _ string) ([]roadmap.TopicDep, error) {
+			return []roadmap.TopicDep{{TopicID: "t1", DependsOnTopicID: "t2", UserID: "u"}}, nil
+		},
+	}
+	uc := roadmap.NewUseCase(repo)
+
+	err := uc.UpdateTopicStatus(context.Background(), "u", "t1", roadmap.UpdateStatusRequest{Status: "completed"})
+	if !errors.Is(err, roadmap.ErrTopicBlocked) {
+		t.Fatalf("expected ErrTopicBlocked, got %v", err)
 	}
 }
 
