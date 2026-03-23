@@ -7,7 +7,6 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "verify:roadmap-tasks-ui:backend": "node ./scripts/roadmap-tasks-ui-review-backend.mjs",
     "verify:mvp": "node ./scripts/mvp-verification-smoke.mjs",
     "test": "node -e \"require('node:fs').rmSync('.test-dist',{recursive:true,force:true})\" && tsc -p tsconfig.test.json && node --test .test-dist"
   },
