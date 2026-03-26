@@ -11,6 +11,7 @@ import {
   useState
 } from "react";
 import { useRouter } from "next/navigation";
+import { authFetch } from "@/lib/auth/auth-fetch";
 import { MoreHorizontal, Pencil } from "lucide-react";
 import { useRoadmapGraphLayout } from "@/components/roadmap/use-roadmap-graph-layout";
 import { useUserPreferences } from "@/components/providers/user-preferences-provider";
@@ -302,9 +303,8 @@ function initialRoadmapState(): RoadmapState {
 }
 
 async function fetchRoadmap(signal: AbortSignal): Promise<RoadmapResponse> {
-  const response = await fetch("/api/roadmap", {
+  const response = await authFetch("/api/roadmap", {
     method: "GET",
-    cache: "no-store",
     signal
   });
 
@@ -389,7 +389,7 @@ async function quickCreateFirstTopic(payload: {
   topicTitle: string;
   topicDescription: string;
 }): Promise<void> {
-  const response = await fetch("/api/roadmap/quick-create", {
+  const response = await authFetch("/api/roadmap/quick-create", {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
@@ -409,7 +409,7 @@ async function createRoadmapTopic(payload: {
   relative_to_topic_id?: string;
   position?: number;
 }): Promise<TopicCreateResult> {
-  const response = await fetch("/api/roadmap/topics", {
+  const response = await authFetch("/api/roadmap/topics", {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
@@ -447,7 +447,7 @@ async function updateRoadmapTopic(
     status: RoadmapTopicStatus;
   }
 ): Promise<void> {
-  const response = await fetch(`/api/roadmap/topics/${encodeURIComponent(topicId)}`, {
+  const response = await authFetch(`/api/roadmap/topics/${encodeURIComponent(topicId)}`, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json"
@@ -461,7 +461,7 @@ async function updateRoadmapTopic(
 }
 
 async function deleteRoadmapTopic(topicId: string): Promise<void> {
-  const response = await fetch(`/api/roadmap/topics/${encodeURIComponent(topicId)}`, {
+  const response = await authFetch(`/api/roadmap/topics/${encodeURIComponent(topicId)}`, {
     method: "DELETE"
   });
 
@@ -471,7 +471,7 @@ async function deleteRoadmapTopic(topicId: string): Promise<void> {
 }
 
 async function deleteRoadmapDependency(topicId: string, dependencyTopicId: string): Promise<void> {
-  const response = await fetch(
+  const response = await authFetch(
     `/api/roadmap/topics/${encodeURIComponent(topicId)}/dependencies/${encodeURIComponent(
       dependencyTopicId
     )}`,

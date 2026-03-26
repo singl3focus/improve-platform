@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type FormEvent, useEffect, useState } from "react";
+import { authFetch } from "@/lib/auth/auth-fetch";
 import type {
   LibraryMaterial,
   MaterialsLibraryPayload,
@@ -95,9 +96,8 @@ async function fetchMaterialsLibrary(
     params.set("topicId", filters.topicId);
   }
 
-  const response = await fetch(`/api/materials?${params.toString()}`, {
+  const response = await authFetch(`/api/materials?${params.toString()}`, {
     method: "GET",
-    cache: "no-store",
     signal
   });
 
@@ -109,7 +109,7 @@ async function fetchMaterialsLibrary(
 }
 
 async function createMaterial(payload: CreateMaterialPayload): Promise<LibraryMaterial> {
-  const response = await fetch("/api/materials", {
+  const response = await authFetch("/api/materials", {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
@@ -128,7 +128,7 @@ async function patchMaterial(
   materialId: string,
   payload: UpdateLibraryMaterialInput
 ): Promise<LibraryMaterial> {
-  const response = await fetch(`/api/materials/${encodeURIComponent(materialId)}`, {
+  const response = await authFetch(`/api/materials/${encodeURIComponent(materialId)}`, {
     method: "PATCH",
     headers: {
       "Content-Type": "application/json"
@@ -144,7 +144,7 @@ async function patchMaterial(
 }
 
 async function removeMaterial(materialId: string): Promise<void> {
-  const response = await fetch(`/api/materials/${encodeURIComponent(materialId)}`, {
+  const response = await authFetch(`/api/materials/${encodeURIComponent(materialId)}`, {
     method: "DELETE"
   });
 

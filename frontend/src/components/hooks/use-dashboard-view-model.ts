@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { authFetch } from "@/lib/auth/auth-fetch";
 import { useUserPreferences } from "@/components/providers/user-preferences-provider";
 import type {
   DashboardChartsPayload,
@@ -41,9 +42,8 @@ async function fetchDashboardResource<T>(
   signal: AbortSignal,
   copy: DashboardCopy
 ): Promise<T> {
-  const response = await fetch(endpoint, {
+  const response = await authFetch(endpoint, {
     method: "GET",
-    cache: "no-store",
     signal
   });
 

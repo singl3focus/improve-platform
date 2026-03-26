@@ -1,7 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useState } from "react";
+import { authFetch } from "@/lib/auth/auth-fetch";
 import type { TopicWorkspace } from "@/lib/topic-workspace-types";
+import type { MaterialType } from "@/lib/materials-library-types";
+import {
+  computeProgressPercent,
+  parseNonNegativeInteger,
+  parsePositiveInteger,
+  resolveUnitByType
+} from "@/lib/materials-form";
 
 type TopicLoadStatus = "idle" | "loading" | "success" | "error";
 
@@ -11,11 +19,53 @@ interface TopicResourceState {
   errorMessage: string | null;
 }
 
+export interface TopicTaskDraft {
+  title: string;
+  description: string;
+  deadline: string;
+}
+
+export interface TopicMaterialDraft {
+  title: string;
+  description: string;
+  type: MaterialType;
+  unit: string;
+  totalAmount: string;
+  completedAmount: string;
+  position: string;
+}
+
+interface TopicWorkspaceCopy {
+  loadError: string;
+  taskTitleRequired: string;
+  taskCreateFailed: string;
+  materialTitleDescRequired: string;
+  materialAmountInvalid: string;
+  materialCreateFailed: string;
+}
+
 function initialTopicState(status: TopicLoadStatus = "loading"): TopicResourceState {
   return {
     status,
     data: null,
     errorMessage: null
+  };
+}
+
+function initialTaskDraft(): TopicTaskDraft {
+  return { title: "", description: "", deadline: "" };
+}
+
+function initialMaterialDraft(): TopicMaterialDraft {
+  const type: MaterialType = "book";
+  return {
+    title: "",
+    description: "",
+    type,
+    unit: resolveUnitByType(type),
+    totalAmount: "0",
+    completedAmount: "0",
+    position: "1"
   };
 }
 
@@ -32,9 +82,8 @@ async function parseErrorMessage(response: Response, fallback: string): Promise<
 }
 
 async function fetchTopicWorkspace(topicId: string, signal: AbortSignal): Promise<TopicWorkspace> {
-  const response = await fetch(`/api/topics/${encodeURIComponent(topicId)}`, {
+  const response = await authFetch(`/api/topics/${encodeURIComponent(topicId)}`, {
     method: "GET",
-    cache: "no-store",
     signal
   });
 
@@ -45,11 +94,58 @@ async function fetchTopicWorkspace(topicId: string, signal: AbortSignal): Promis
   return (await response.json()) as TopicWorkspace;
 }
 
-export function useTopicWorkspaceViewModel(topicId: string | null, loadErrorFallback: string) {
+async function createTaskForTopic(payload: {
+  title: string;
+  description?: string;
+  topicId: string;
+  deadline?: string;
+}): Promise<void> {
+  const response = await authFetch("/api/tasks", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+
+  if (!response.ok) {
+    throw new Error(await parseErrorMessage(response, "Task creation failed."));
+  }
+}
+
+async function createMaterialForTopic(payload: {
+  title: string;
+  description: string;
+  topicId: string;
+  type: MaterialType;
+  totalAmount: number;
+  completedAmount: number;
+  position: number;
+}): Promise<void> {
+  const response = await authFetch("/api/materials", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+
+  if (!response.ok) {
+    throw new Error(await parseErrorMessage(response, "Material creation failed."));
+  }
+}
+
+export function useTopicWorkspaceViewModel(topicId: string | null, copy: TopicWorkspaceCopy) {
   const [state, setState] = useState<TopicResourceState>(() =>
     initialTopicState(topicId ? "loading" : "idle")
   );
   const [reloadKey, setReloadKey] = useState(0);
+
+  // Task creation state
+  const [taskDraft, setTaskDraft] = useState<TopicTaskDraft>(initialTaskDraft());
+  const [isCreatingTask, setIsCreatingTask] = useState(false);
+  const [taskMutationError, setTaskMutationError] = useState<string | null>(null);
+
+  // Material creation state
+  const [materialDraft, setMaterialDraft] = useState<TopicMaterialDraft>(initialMaterialDraft());
+  const [isCreatingMaterial, setIsCreatingMaterial] = useState(false);
+  const [materialMutationError, setMaterialMutationError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!topicId) {
@@ -77,14 +173,14 @@ export function useTopicWorkspaceViewModel(topicId: string | null, loadErrorFall
         setState({
           status: "error",
           data: null,
-          errorMessage: error instanceof Error ? error.message : loadErrorFallback
+          errorMessage: error instanceof Error ? error.message : copy.loadError
         });
       }
     }
 
     void load();
     return () => controller.abort();
-  }, [topicId, reloadKey, loadErrorFallback]);
+  }, [topicId, reloadKey, copy.loadError]);
 
   const dependencySummary = useMemo(() => {
     const topic = state.data;
@@ -102,9 +198,106 @@ export function useTopicWorkspaceViewModel(topicId: string | null, loadErrorFall
     };
   }, [state.data]);
 
+  function reload() {
+    setReloadKey((value) => value + 1);
+  }
+
+  async function handleCreateTask(event: FormEvent<HTMLFormElement>): Promise<boolean> {
+    event.preventDefault();
+    if (!topicId) {
+      return false;
+    }
+
+    const title = taskDraft.title.trim();
+    if (!title) {
+      setTaskMutationError(copy.taskTitleRequired);
+      return false;
+    }
+
+    const description = taskDraft.description.trim();
+    const deadline = taskDraft.deadline.trim();
+
+    setTaskMutationError(null);
+    setIsCreatingTask(true);
+    try {
+      await createTaskForTopic({
+        title,
+        ...(description ? { description } : {}),
+        topicId,
+        ...(deadline ? { deadline } : {})
+      });
+      setTaskDraft(initialTaskDraft());
+      reload();
+      return true;
+    } catch (error) {
+      setTaskMutationError(error instanceof Error ? error.message : copy.taskCreateFailed);
+      return false;
+    } finally {
+      setIsCreatingTask(false);
+    }
+  }
+
+  async function handleCreateMaterial(event: FormEvent<HTMLFormElement>): Promise<boolean> {
+    event.preventDefault();
+    if (!topicId) {
+      return false;
+    }
+
+    const title = materialDraft.title.trim();
+    const description = materialDraft.description.trim();
+    if (!title || !description) {
+      setMaterialMutationError(copy.materialTitleDescRequired);
+      return false;
+    }
+
+    const totalAmount = parseNonNegativeInteger(materialDraft.totalAmount, 0);
+    const completedAmount = parseNonNegativeInteger(materialDraft.completedAmount, 0);
+    if (completedAmount > totalAmount) {
+      setMaterialMutationError(copy.materialAmountInvalid);
+      return false;
+    }
+
+    setMaterialMutationError(null);
+    setIsCreatingMaterial(true);
+    try {
+      await createMaterialForTopic({
+        title,
+        description,
+        topicId,
+        type: materialDraft.type,
+        totalAmount,
+        completedAmount,
+        position: parsePositiveInteger(materialDraft.position, 1)
+      });
+      setMaterialDraft(initialMaterialDraft());
+      reload();
+      return true;
+    } catch (error) {
+      setMaterialMutationError(error instanceof Error ? error.message : copy.materialCreateFailed);
+      return false;
+    } finally {
+      setIsCreatingMaterial(false);
+    }
+  }
+
   return {
     state,
-    reload: () => setReloadKey((value) => value + 1),
-    dependencySummary
+    reload,
+    dependencySummary,
+    // Task creation
+    taskDraft,
+    setTaskDraft,
+    isCreatingTask,
+    taskMutationError,
+    clearTaskMutationError: () => setTaskMutationError(null),
+    handleCreateTask,
+    // Material creation
+    materialDraft,
+    setMaterialDraft,
+    isCreatingMaterial,
+    materialMutationError,
+    clearMaterialMutationError: () => setMaterialMutationError(null),
+    handleCreateMaterial,
+    computeProgressPercent
   };
 }

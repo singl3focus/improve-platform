@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { authFetch } from "@/lib/auth/auth-fetch";
 import type { DashboardHistoryEvent } from "@/lib/dashboard-types";
 import { useUserPreferences } from "@/components/providers/user-preferences-provider";
 import { formatDashboardDate } from "@/components/hooks/use-dashboard-view-model";
@@ -23,9 +24,8 @@ function initialState(): HistoryState {
 }
 
 async function fetchHistory(signal: AbortSignal): Promise<DashboardHistoryEvent[]> {
-  const response = await fetch("/api/dashboard/history?limit=50", {
+  const response = await authFetch("/api/dashboard/history?limit=50", {
     method: "GET",
-    cache: "no-store",
     signal
   });
 

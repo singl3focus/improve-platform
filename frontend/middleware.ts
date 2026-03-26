@@ -45,10 +45,19 @@ export async function middleware(request: NextRequest) {
   const hasSession =
     request.cookies.has(ACCESS_TOKEN_COOKIE) || request.cookies.has(REFRESH_TOKEN_COOKIE);
 
-  if (isProtectedRoute(pathname) && !hasSession) {
-    const loginUrl = new URL("/login", request.url);
-    loginUrl.searchParams.set("next", pathname);
-    return NextResponse.redirect(loginUrl);
+  if (isProtectedRoute(pathname)) {
+    if (!hasSession) {
+      const loginUrl = new URL("/login", request.url);
+      loginUrl.searchParams.set("next", pathname);
+      return NextResponse.redirect(loginUrl);
+    }
+
+    const sessionValidation = await validateSession(request);
+    if (sessionValidation === "invalid") {
+      const loginUrl = new URL("/login", request.url);
+      loginUrl.searchParams.set("next", pathname);
+      return clearSessionCookies(NextResponse.redirect(loginUrl));
+    }
   }
 
   if (isAuthRoute(pathname) && hasSession) {

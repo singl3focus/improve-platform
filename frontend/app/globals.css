@@ -2015,6 +2015,49 @@ a {
   color: var(--text-strong-accent);
 }
 
+.topic-panel-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.topic-panel-add-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  font-size: 0.78rem;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.topic-create-modal {
+  max-width: 460px;
+}
+
+.topic-inline-create-form {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+}
+
+.topic-inline-field {
+  display: grid;
+  gap: 4px;
+}
+
+.topic-inline-field > span {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.topic-inline-field-description textarea {
+  min-height: 60px;
+  resize: vertical;
+}
+
 .tasks-board-view {
   display: grid;
   gap: 14px;

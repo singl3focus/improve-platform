@@ -1,6 +1,7 @@
 "use client";
 
 import { type FormEvent, useEffect, useMemo, useState } from "react";
+import { authFetch } from "@/lib/auth/auth-fetch";
 import type { AppLanguage } from "@/lib/ui-copy";
 import type {
   TaskBoardDueFilter,
@@ -90,9 +91,8 @@ async function fetchTasksBoard(
   }
   params.set("due", filters.due);
 
-  const response = await fetch(`/api/tasks?${params.toString()}`, {
+  const response = await authFetch(`/api/tasks?${params.toString()}`, {
     method: "GET",
-    cache: "no-store",
     signal
   });
 
@@ -113,7 +113,7 @@ function initialTaskCreateDraft(): TaskCreateDraft {
 }
 
 async function patchTaskStatus(taskId: string, status: TaskBoardStatus): Promise<TaskBoardItem> {
-  const response = await fetch(`/api/tasks/${encodeURIComponent(taskId)}/status`, {
+  const response = await authFetch(`/api/tasks/${encodeURIComponent(taskId)}/status`, {
     method: "PATCH",
     headers: {
       "Content-Type": "application/json"
@@ -129,7 +129,7 @@ async function patchTaskStatus(taskId: string, status: TaskBoardStatus): Promise
 }
 
 async function createTask(payload: CreateTaskPayload): Promise<TaskBoardItem> {
-  const response = await fetch("/api/tasks", {
+  const response = await authFetch("/api/tasks", {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
@@ -145,7 +145,7 @@ async function createTask(payload: CreateTaskPayload): Promise<TaskBoardItem> {
 }
 
 async function updateTask(taskId: string, payload: UpdateTaskPayload): Promise<TaskBoardItem> {
-  const response = await fetch(`/api/tasks/${encodeURIComponent(taskId)}`, {
+  const response = await authFetch(`/api/tasks/${encodeURIComponent(taskId)}`, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json"
@@ -161,7 +161,7 @@ async function updateTask(taskId: string, payload: UpdateTaskPayload): Promise<T
 }
 
 async function deleteTask(taskId: string): Promise<void> {
-  const response = await fetch(`/api/tasks/${encodeURIComponent(taskId)}`, {
+  const response = await authFetch(`/api/tasks/${encodeURIComponent(taskId)}`, {
     method: "DELETE"
   });
 
