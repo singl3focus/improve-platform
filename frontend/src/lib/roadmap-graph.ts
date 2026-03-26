@@ -25,8 +25,9 @@ export interface GraphSceneTransform {
   offsetY: number;
 }
 
-export const ROADMAP_CONNECTION_ARROW_GAP = 18;
-export const ROADMAP_CONNECTION_RIGHT_SIDE_GAP = 32;
+export const ROADMAP_CONNECTION_ARROW_GAP = 0;
+export const ROADMAP_CONNECTION_RIGHT_SIDE_GAP = 0;
+export const ROADMAP_MIN_BEZIER_CONTROL = 18;
 export const ROADMAP_WHEEL_SCALE_STEP = 0.12;
 
 export interface RoadmapWheelZoomBehavior {
@@ -52,11 +53,11 @@ export function buildConnectionPath(x1: number, y1: number, x2: number, y2: numb
   const deltaY = y2 - y1;
 
   if (Math.abs(deltaX) > Math.abs(deltaY)) {
-    const controlX = x1 + Math.sign(deltaX || 1) * Math.max(Math.abs(deltaX) * 0.5, 36);
+    const controlX = x1 + Math.sign(deltaX || 1) * Math.max(Math.abs(deltaX) * 0.5, ROADMAP_MIN_BEZIER_CONTROL);
     return `M ${x1} ${y1} C ${controlX} ${y1}, ${controlX} ${y2}, ${x2} ${y2}`;
   }
 
-  const controlY = y1 + Math.sign(deltaY || 1) * Math.max(Math.abs(deltaY) * 0.5, 36);
+  const controlY = y1 + Math.sign(deltaY || 1) * Math.max(Math.abs(deltaY) * 0.5, ROADMAP_MIN_BEZIER_CONTROL);
   return `M ${x1} ${y1} C ${x1} ${controlY}, ${x2} ${controlY}, ${x2} ${y2}`;
 }
 

@@ -21,8 +21,6 @@ function createRoadmapFixture() {
                         position: 1,
                         status: "in_progress",
                         progressPercent: 20,
-                        isBlocked: false,
-                        blockedReason: null,
                         tasksCount: 0,
                         materialsCount: 0,
                         prerequisiteTopicIds: []
@@ -35,8 +33,6 @@ function createRoadmapFixture() {
                         position: 2,
                         status: "not_started",
                         progressPercent: 0,
-                        isBlocked: false,
-                        blockedReason: null,
                         tasksCount: 0,
                         materialsCount: 0,
                         prerequisiteTopicIds: ["topic-a"]
@@ -56,8 +52,6 @@ function createStageFreeRoadmapFixture() {
                 position: 1,
                 status: "in_progress",
                 progressPercent: 20,
-                isBlocked: false,
-                blockedReason: null,
                 tasksCount: 0,
                 materialsCount: 0,
                 prerequisiteTopicIds: []
@@ -69,8 +63,6 @@ function createStageFreeRoadmapFixture() {
                 position: 2,
                 status: "not_started",
                 progressPercent: 0,
-                isBlocked: false,
-                blockedReason: null,
                 tasksCount: 0,
                 materialsCount: 0,
                 prerequisiteTopicIds: ["topic-a"]
@@ -105,9 +97,9 @@ function createStageFreeRoadmapFixture() {
         {
             fromId: "topic-a",
             toId: "topic-b",
-            x1: 232,
+            x1: 200,
             y1: 70,
-            x2: 302,
+            x2: 320,
             y2: 290
         }
     ]);
@@ -155,9 +147,9 @@ function createStageFreeRoadmapFixture() {
         {
             fromId: "topic-a",
             toId: "topic-b",
-            x1: 232,
+            x1: 200,
             y1: 70,
-            x2: 302,
+            x2: 320,
             y2: 290
         }
     ]);
@@ -202,8 +194,6 @@ function createStageFreeRoadmapFixture() {
                         position: 4,
                         status: "not_started",
                         progressPercent: 0,
-                        isBlocked: false,
-                        blockedReason: null,
                         tasksCount: 0,
                         materialsCount: 0,
                         prerequisiteTopicIds: []
@@ -216,8 +206,6 @@ function createStageFreeRoadmapFixture() {
                         position: 4,
                         status: "in_progress",
                         progressPercent: 30,
-                        isBlocked: false,
-                        blockedReason: null,
                         tasksCount: 0,
                         materialsCount: 0,
                         prerequisiteTopicIds: []
@@ -230,8 +218,6 @@ function createStageFreeRoadmapFixture() {
                         position: 6,
                         status: "not_started",
                         progressPercent: 0,
-                        isBlocked: false,
-                        blockedReason: null,
                         tasksCount: 0,
                         materialsCount: 0,
                         prerequisiteTopicIds: []
@@ -261,8 +247,6 @@ function createStageFreeRoadmapFixture() {
                         position: 1,
                         status: "in_progress",
                         progressPercent: 20,
-                        isBlocked: false,
-                        blockedReason: null,
                         tasksCount: 1,
                         materialsCount: 1,
                         prerequisiteTopicIds: []
@@ -275,8 +259,6 @@ function createStageFreeRoadmapFixture() {
                         position: 1,
                         status: "not_started",
                         progressPercent: 0,
-                        isBlocked: true,
-                        blockedReason: "blocked",
                         tasksCount: 0,
                         materialsCount: 0,
                         prerequisiteTopicIds: ["topic-parent"]
@@ -318,9 +300,9 @@ function createStageFreeRoadmapFixture() {
         {
             fromId: "topic-parent",
             toId: "topic-child",
-            x1: 232,
+            x1: 200,
             y1: 70,
-            x2: 302,
+            x2: 320,
             y2: 290
         }
     ]);
@@ -340,8 +322,6 @@ function createStageFreeRoadmapFixture() {
                         position: 1,
                         status: "in_progress",
                         progressPercent: 20,
-                        isBlocked: false,
-                        blockedReason: null,
                         tasksCount: 1,
                         materialsCount: 1,
                         prerequisiteTopicIds: []
@@ -354,8 +334,6 @@ function createStageFreeRoadmapFixture() {
                         position: 2,
                         status: "not_started",
                         progressPercent: 0,
-                        isBlocked: false,
-                        blockedReason: null,
                         tasksCount: 0,
                         materialsCount: 0,
                         prerequisiteTopicIds: ["topic-parent"]
@@ -389,14 +367,14 @@ function createStageFreeRoadmapFixture() {
         {
             fromId: "topic-parent",
             toId: "topic-child",
-            x1: 232,
+            x1: 200,
             y1: 70,
-            x2: 302,
+            x2: 320,
             y2: 82
         }
     ]);
 });
-(0, node_test_1.default)("buildRoadmapConnections keeps enough right-side clearance for visible arrowheads and link handles", () => {
+(0, node_test_1.default)("buildRoadmapConnections links left topic to right topic using inner horizontal anchors", () => {
     const roadmap = {
         stages: [
             {
@@ -411,8 +389,6 @@ function createStageFreeRoadmapFixture() {
                         position: 1,
                         status: "not_started",
                         progressPercent: 0,
-                        isBlocked: false,
-                        blockedReason: null,
                         tasksCount: 0,
                         materialsCount: 0,
                         prerequisiteTopicIds: ["topic-right"]
@@ -425,8 +401,6 @@ function createStageFreeRoadmapFixture() {
                         position: 2,
                         status: "in_progress",
                         progressPercent: 30,
-                        isBlocked: false,
-                        blockedReason: null,
                         tasksCount: 1,
                         materialsCount: 1,
                         prerequisiteTopicIds: []
@@ -460,9 +434,9 @@ function createStageFreeRoadmapFixture() {
         {
             fromId: "topic-right",
             toId: "topic-left",
-            x1: 302,
+            x1: 320,
             y1: 70,
-            x2: 232,
+            x2: 200,
             y2: 82
         }
     ]);
@@ -483,8 +457,6 @@ function createStageFreeRoadmapFixture() {
                         position: 5,
                         status: "in_progress",
                         progressPercent: 10,
-                        isBlocked: false,
-                        blockedReason: null,
                         tasksCount: 0,
                         materialsCount: 0,
                         prerequisiteTopicIds: []
@@ -497,8 +469,6 @@ function createStageFreeRoadmapFixture() {
                         position: 4,
                         status: "not_started",
                         progressPercent: 0,
-                        isBlocked: false,
-                        blockedReason: null,
                         tasksCount: 0,
                         materialsCount: 0,
                         prerequisiteTopicIds: ["topic-parent"]
@@ -511,8 +481,6 @@ function createStageFreeRoadmapFixture() {
                         position: 6,
                         status: "not_started",
                         progressPercent: 0,
-                        isBlocked: false,
-                        blockedReason: null,
                         tasksCount: 0,
                         materialsCount: 0,
                         prerequisiteTopicIds: ["topic-parent"]
@@ -525,8 +493,6 @@ function createStageFreeRoadmapFixture() {
                         position: 5,
                         status: "not_started",
                         progressPercent: 0,
-                        isBlocked: true,
-                        blockedReason: "blocked",
                         tasksCount: 0,
                         materialsCount: 0,
                         prerequisiteTopicIds: ["topic-parent"]
@@ -566,8 +532,6 @@ function createStageFreeRoadmapFixture() {
                         position: 10,
                         status: "in_progress",
                         progressPercent: 10,
-                        isBlocked: false,
-                        blockedReason: null,
                         tasksCount: 0,
                         materialsCount: 0,
                         prerequisiteTopicIds: []
@@ -580,8 +544,6 @@ function createStageFreeRoadmapFixture() {
                         position: 11,
                         status: "not_started",
                         progressPercent: 0,
-                        isBlocked: false,
-                        blockedReason: null,
                         tasksCount: 0,
                         materialsCount: 0,
                         prerequisiteTopicIds: ["topic-parent"]
@@ -594,8 +556,6 @@ function createStageFreeRoadmapFixture() {
                         position: 11,
                         status: "not_started",
                         progressPercent: 0,
-                        isBlocked: false,
-                        blockedReason: null,
                         tasksCount: 0,
                         materialsCount: 0,
                         prerequisiteTopicIds: ["topic-parent"]
@@ -608,8 +568,6 @@ function createStageFreeRoadmapFixture() {
                         position: 10,
                         status: "not_started",
                         progressPercent: 0,
-                        isBlocked: true,
-                        blockedReason: "blocked",
                         tasksCount: 0,
                         materialsCount: 0,
                         prerequisiteTopicIds: ["topic-parent"]
@@ -622,8 +580,6 @@ function createStageFreeRoadmapFixture() {
                         position: 10,
                         status: "not_started",
                         progressPercent: 0,
-                        isBlocked: true,
-                        blockedReason: "blocked",
                         tasksCount: 0,
                         materialsCount: 0,
                         prerequisiteTopicIds: ["topic-parent"]
@@ -639,4 +595,14 @@ function createStageFreeRoadmapFixture() {
         strict_1.default.equal(occupiedKeys.has(key), false);
         occupiedKeys.add(key);
     }
+    const parent = placementById.get("topic-parent");
+    const below1 = placementById.get("topic-below-1");
+    const below2 = placementById.get("topic-below-2");
+    strict_1.default.ok(parent);
+    strict_1.default.ok(below1);
+    strict_1.default.ok(below2);
+    strict_1.default.equal(below1.column, parent.column);
+    strict_1.default.equal(below2.column, parent.column);
+    strict_1.default.equal(below1.row, parent.row + 1);
+    strict_1.default.equal(below2.row, parent.row + 2);
 });

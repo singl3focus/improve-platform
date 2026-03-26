@@ -2,12 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   createBackendClient,
   createBackendErrorResponse,
-  createBackendUnavailableResponse,
-  isBackendErrorCode
+  createBackendUnavailableResponse
 } from "@/lib/backend-api";
 import { normalizeText } from "@/lib/payload-parsers";
 import { getNextTopicPosition } from "@/lib/roadmap-topic-position";
-import { buildDirectionalDependencyPlan } from "@/lib/roadmap-topic-create";
 
 interface TopicCreatePayload {
   title?: unknown;
@@ -15,42 +13,6 @@ interface TopicCreatePayload {
   position?: unknown;
   direction?: unknown;
   relative_to_topic_id?: unknown;
-}
-
-function readCreatedTopicId(payload: unknown): string | null {
-  if (!payload || typeof payload !== "object") {
-    return null;
-  }
-
-  const topLevelId = (payload as { id?: unknown }).id;
-  if (typeof topLevelId === "string" && topLevelId.trim()) {
-    return topLevelId.trim();
-  }
-
-  const nestedTopicId =
-    (payload as { topic?: { id?: unknown } }).topic?.id ??
-    (payload as { data?: { id?: unknown } }).data?.id;
-  if (typeof nestedTopicId === "string" && nestedTopicId.trim()) {
-    return nestedTopicId.trim();
-  }
-
-  return null;
-}
-
-function isIgnoredDirectionalRepairError(response: Response, payload: unknown): boolean {
-  if (response.status === 404 && isBackendErrorCode(payload, "dependency_not_found")) {
-    return true;
-  }
-
-  if (response.status === 409) {
-    return (
-      isBackendErrorCode(payload, "dependency_exists") ||
-      isBackendErrorCode(payload, "duplicate_dependency") ||
-      isBackendErrorCode(payload, "already_exists")
-    );
-  }
-
-  return false;
 }
 
 export async function POST(request: NextRequest) {
@@ -144,66 +106,6 @@ export async function POST(request: NextRequest) {
         );
         client.applyUpdatedSession(errorResponse);
         return errorResponse;
-      }
-
-      const createdTopicId = readCreatedTopicId(createResult.payload);
-      if (createdTopicId && createdTopicId !== requestedRelativeTopicId) {
-        const roadmapResult = await client.call("/api/v1/roadmap", { method: "GET" });
-
-        if (roadmapResult.response.ok) {
-          const plan = buildDirectionalDependencyPlan({
-            roadmapPayload: roadmapResult.payload,
-            parentTopicId: requestedRelativeTopicId,
-            createdTopicId
-          });
-
-          if (plan.shouldAddParentDependsOnCreated) {
-            const addResult = await client.call(
-              `/api/v1/roadmap/topics/${encodeURIComponent(requestedRelativeTopicId)}/dependencies`,
-              {
-                method: "POST",
-                body: {
-                  depends_on_topic_id: createdTopicId
-                }
-              }
-            );
-
-            if (
-              !addResult.response.ok &&
-              !isIgnoredDirectionalRepairError(addResult.response, addResult.payload)
-            ) {
-              const errorResponse = createBackendErrorResponse(
-                addResult.response,
-                addResult.payload,
-                "Roadmap directional dependency normalization failed."
-              );
-              client.applyUpdatedSession(errorResponse);
-              return errorResponse;
-            }
-          }
-
-          if (plan.shouldRemoveCreatedDependsOnParent) {
-            const removeResult = await client.call(
-              `/api/v1/roadmap/topics/${encodeURIComponent(createdTopicId)}/dependencies/${encodeURIComponent(requestedRelativeTopicId)}`,
-              {
-                method: "DELETE"
-              }
-            );
-
-            if (
-              !removeResult.response.ok &&
-              !isIgnoredDirectionalRepairError(removeResult.response, removeResult.payload)
-            ) {
-              const errorResponse = createBackendErrorResponse(
-                removeResult.response,
-                removeResult.payload,
-                "Roadmap directional dependency normalization failed."
-              );
-              client.applyUpdatedSession(errorResponse);
-              return errorResponse;
-            }
-          }
-        }
       }
 
       const response = NextResponse.json(createResult.payload, { status: 201 });

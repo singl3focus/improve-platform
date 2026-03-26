@@ -21,8 +21,6 @@ interface DashboardRoadmapTopic {
   id: string;
   title: string;
   status: "not_started" | "in_progress" | "paused" | "completed";
-  is_blocked: boolean;
-  block_reasons?: string[];
   target_date?: string | null;
 }
 

@@ -25,13 +25,13 @@ const TOPIC_COPY = {
     targetDate: "Целевая дата",
     completedAt: "Завершено",
     dependenciesTitle: "Зависимости",
-    dependenciesSummary: (completed: number, blocked: number) =>
-      `Выполнено: ${completed} · Заблокировано: ${blocked}`,
+    dependenciesSummary: (completed: number, pending: number) =>
+      `Выполнено: ${completed} · Ожидают: ${pending}`,
     noDependencies: "Для этой темы нет зависимостей.",
     dependencyRequired: "Обязательная зависимость",
     dependencyOptional: "Необязательная зависимость",
     dependencyReady: "Готово",
-    dependencyBlocked: "Заблокировано",
+    dependencyPending: "Ожидает",
     checklistTitle: "Чеклист / Задачи",
     checklistSubtitle: "Статусы доступны для изменения в разделе /tasks.",
     checklistEmpty: "Для этой темы чеклист пуст.",
@@ -55,13 +55,13 @@ const TOPIC_COPY = {
     targetDate: "Target date",
     completedAt: "Completed at",
     dependenciesTitle: "Dependencies",
-    dependenciesSummary: (completed: number, blocked: number) =>
-      `Completed: ${completed} · Blocked: ${blocked}`,
+    dependenciesSummary: (completed: number, pending: number) =>
+      `Completed: ${completed} · Pending: ${pending}`,
     noDependencies: "No dependencies for this topic.",
     dependencyRequired: "Required dependency",
     dependencyOptional: "Optional dependency",
     dependencyReady: "Ready",
-    dependencyBlocked: "Blocked",
+    dependencyPending: "Pending",
     checklistTitle: "Checklist / Tasks",
     checklistSubtitle: "Statuses can be changed in the /tasks section.",
     checklistEmpty: "Checklist is empty for this topic.",
@@ -212,18 +212,18 @@ function TopicDependenciesPanel({
   topic,
   copy,
   completed,
-  blocked
+  pending
 }: {
   topic: TopicWorkspace;
   copy: TopicCopy;
   completed: number;
-  blocked: number;
+  pending: number;
 }) {
   return (
     <aside className="topic-dependencies panel">
       <header>
         <h3>{copy.dependenciesTitle}</h3>
-        <p>{copy.dependenciesSummary(completed, blocked)}</p>
+        <p>{copy.dependenciesSummary(completed, pending)}</p>
       </header>
       {topic.dependencies.length === 0 ? (
         <p className="dashboard-empty">{copy.noDependencies}</p>
@@ -242,7 +242,7 @@ function TopicDependenciesPanel({
                   {copy.dependencyReady}
                 </span>
               ) : (
-                <span className="roadmap-blocked-badge">{copy.dependencyBlocked}</span>
+                <span className="roadmap-pending-badge">{copy.dependencyPending}</span>
               )}
             </li>
           ))}
@@ -382,7 +382,7 @@ export function TopicWorkspaceView() {
               topic={state.data}
               copy={copy}
               completed={dependencySummary.completed}
-              blocked={dependencySummary.blocked}
+              pending={dependencySummary.pending}
             />
             <TopicChecklistPanel
               topic={state.data}

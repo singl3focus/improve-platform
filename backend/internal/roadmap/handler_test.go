@@ -147,8 +147,7 @@ func TestHandler_GetRoadmap_Success(t *testing.T) {
 				ID:    "rm-1",
 				Title: "My RM",
 				Topics: []roadmap.TopicResponse{
-					{ID: "t-1", Title: "Topic 1", TasksCount: 4, MaterialsCount: 2, ProgressPercent: 75, IsBlocked: true,
-						BlockReasons: []string{"prerequisite topic 'X' is not completed"},
+					{ID: "t-1", Title: "Topic 1", TasksCount: 4, MaterialsCount: 2, ProgressPercent: 75,
 						Dependencies: []string{"t-2"}},
 				},
 			}, nil
@@ -173,12 +172,6 @@ func TestHandler_GetRoadmap_Success(t *testing.T) {
 		t.Fatalf("unexpected structure: %+v", resp)
 	}
 	topic := resp.Topics[0]
-	if !topic.IsBlocked {
-		t.Error("expected topic to be blocked")
-	}
-	if len(topic.BlockReasons) != 1 {
-		t.Errorf("expected 1 block reason, got %d", len(topic.BlockReasons))
-	}
 	if topic.TasksCount != 4 || topic.MaterialsCount != 2 || topic.ProgressPercent != 75 {
 		t.Errorf("unexpected metrics: tasks=%d materials=%d progress=%d", topic.TasksCount, topic.MaterialsCount, topic.ProgressPercent)
 	}
@@ -352,60 +345,6 @@ func TestHandler_UpdateTopic_SuccessWithoutStageFields(t *testing.T) {
 	}
 	if !called {
 		t.Fatal("expected updateTopic service to be called")
-	}
-}
-
-func TestHandler_UpdateTopicStatus_Blocked(t *testing.T) {
-	svc := &mockService{
-		updateTopicStatusFn: func(_ context.Context, _, _ string, _ roadmap.UpdateStatusRequest) error {
-			return roadmap.ErrTopicBlocked
-		},
-	}
-	h := roadmap.NewHandler(svc)
-
-	body, _ := json.Marshal(map[string]string{"status": "in_progress"})
-	req := withURLParams(authedRequest(http.MethodPatch, "/api/v1/roadmap/topics/t1/status", body), "topicID", "11111111-1111-1111-1111-111111111111")
-	rec := httptest.NewRecorder()
-
-	h.UpdateTopicStatus().ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusConflict {
-		t.Errorf("expected 409, got %d", rec.Code)
-	}
-
-	var resp httpresp.ErrorResponse
-	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
-		t.Fatalf("decode error: %v", err)
-	}
-	if resp.Error.Code != "topic_blocked" {
-		t.Errorf("expected code 'topic_blocked', got %s", resp.Error.Code)
-	}
-}
-
-func TestHandler_UpdateTopicStatus_BlockedOnCompleted(t *testing.T) {
-	svc := &mockService{
-		updateTopicStatusFn: func(_ context.Context, _, _ string, _ roadmap.UpdateStatusRequest) error {
-			return roadmap.ErrTopicBlocked
-		},
-	}
-	h := roadmap.NewHandler(svc)
-
-	body, _ := json.Marshal(map[string]string{"status": "completed"})
-	req := withURLParams(authedRequest(http.MethodPatch, "/api/v1/roadmap/topics/t1/status", body), "topicID", "11111111-1111-1111-1111-111111111111")
-	rec := httptest.NewRecorder()
-
-	h.UpdateTopicStatus().ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusConflict {
-		t.Errorf("expected 409, got %d", rec.Code)
-	}
-
-	var resp httpresp.ErrorResponse
-	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
-		t.Fatalf("decode error: %v", err)
-	}
-	if resp.Error.Code != "topic_blocked" {
-		t.Errorf("expected code 'topic_blocked', got %s", resp.Error.Code)
 	}
 }
 

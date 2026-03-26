@@ -151,23 +151,9 @@ function DashboardCharts({
   ];
   const topicsByStatusMax = Math.max(1, ...topicsByStatusItems.map((item) => item.value));
   const deadlinesMax = Math.max(1, ...charts.upcomingDeadlines.map((entry) => entry.count));
-  const topicAccessItems = [
-    {
-      label: copy.chartAccessBlocked,
-      value: charts.topicAccess.blocked,
-      className: "dashboard-chart-bar-blocked"
-    },
-    {
-      label: copy.chartAccessAvailable,
-      value: charts.topicAccess.available,
-      className: "dashboard-chart-bar-available"
-    }
-  ];
-  const topicAccessMax = Math.max(1, ...topicAccessItems.map((item) => item.value));
   const isEmpty =
     topicsByStatusItems.every((item) => item.value === 0) &&
-    charts.upcomingDeadlines.every((entry) => entry.count === 0) &&
-    topicAccessItems.every((item) => item.value === 0);
+    charts.upcomingDeadlines.every((entry) => entry.count === 0);
 
   return (
     <section className="dashboard-charts panel">
@@ -215,23 +201,6 @@ function DashboardCharts({
             </ul>
           </section>
 
-          <section className="dashboard-chart-card">
-            <h4>{copy.chartTopicAccessTitle}</h4>
-            <ul className="dashboard-chart-list">
-              {topicAccessItems.map((item) => (
-                <li key={item.label} className="dashboard-chart-list-item">
-                  <span>{item.label}</span>
-                  <div className="dashboard-chart-bar-track" aria-hidden="true">
-                    <span
-                      className={`dashboard-chart-bar-fill ${item.className}`}
-                      style={{ width: `${Math.round((item.value / topicAccessMax) * 100)}%` }}
-                    />
-                  </div>
-                  <strong>{copy.chartCountLabel(item.value)}</strong>
-                </li>
-              ))}
-            </ul>
-          </section>
         </div>
       )}
       <button type="button" className="button button-outline dashboard-chart-retry" onClick={onRetry}>
@@ -250,7 +219,6 @@ export function DashboardView() {
     dailySummary,
     topicsInProgress,
     upcomingTasks,
-    blockedTopics,
     charts,
     recentMaterials,
     history,
@@ -330,15 +298,11 @@ export function DashboardView() {
                   <p className="dashboard-hero-headline">{dailySummary.state.data.nextTaskTitle}</p>
                 ) : null}
                 <p className="dashboard-hero-focus">
-                  {dashboardCopy.upcomingTasksMetric(dailySummary.state.data.upcomingTasksCount)} /{" "}
-                  {dashboardCopy.blockedTopicsMetric(dailySummary.state.data.blockedTopicsCount)}
+                  {dashboardCopy.upcomingTasksMetric(dailySummary.state.data.upcomingTasksCount)}
                 </p>
                 <div className="dashboard-hero-metrics">
                   <span>
                     {dashboardCopy.upcomingTasksMetric(dailySummary.state.data.upcomingTasksCount)}
-                  </span>
-                  <span>
-                    {dashboardCopy.blockedTopicsMetric(dailySummary.state.data.blockedTopicsCount)}
                   </span>
                 </div>
               </>
@@ -496,41 +460,6 @@ export function DashboardView() {
                       ) : (
                         <span className="dashboard-badge">{dashboardCopy.planned}</span>
                       )}
-                    </li>
-                  ))}
-                </ul>
-              )
-            ) : null}
-          </DashboardPanel>
-
-          <DashboardPanel
-            title={dashboardCopy.blockedTopicsTitle}
-            description={dashboardCopy.blockedTopicsDescription}
-            href="/roadmap?filter=blocked"
-            copy={dashboardCopy}
-          >
-            {blockedTopics.state.status === "loading" ? <DashboardLoading /> : null}
-            {blockedTopics.state.status === "error" ? (
-              <DashboardError
-                message={blockedTopics.state.errorMessage ?? dashboardCopy.blockedTopicsLoadFailed}
-                onRetry={blockedTopics.reload}
-                retryLabel={dashboardCopy.retry}
-              />
-            ) : null}
-            {blockedTopics.state.status === "success" && blockedTopics.state.data ? (
-              blockedTopics.state.data.length === 0 ? (
-                <DashboardEmpty message={dashboardCopy.blockedTopicsEmpty} />
-              ) : (
-                <ul className="dashboard-list">
-                  {blockedTopics.state.data.map((topic) => (
-                    <li key={topic.id} className="dashboard-list-item">
-                      <div>
-                        <p className="dashboard-list-title">{topic.title}</p>
-                        <p className="dashboard-list-subtitle">{topic.blockedReason}</p>
-                      </div>
-                      <span className="dashboard-badge dashboard-badge-blocked">
-                        {dashboardCopy.blocked}
-                      </span>
                     </li>
                   ))}
                 </ul>

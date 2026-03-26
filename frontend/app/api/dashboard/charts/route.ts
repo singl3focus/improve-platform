@@ -72,11 +72,7 @@ export async function GET(request: NextRequest) {
       upcomingDeadlines: Array.from(deadlinesByDay.entries()).map(([date, count]) => ({
         date,
         count
-      })),
-      topicAccess: {
-        blocked: topics.filter((topic) => topic.is_blocked).length,
-        available: topics.filter((topic) => !topic.is_blocked).length
-      }
+      }))
     });
   } catch {
     return dashboardUnavailableResponse();

@@ -170,18 +170,6 @@ func (r *Repo) CreateTopicDirectional(ctx context.Context, userID, currentTopicI
 		return Topic{}, apperr.E(op, err)
 	}
 
-	if _, err = tx.Exec(ctx,
-		`INSERT INTO topic_dependencies (topic_id, depends_on_topic_id, user_id)
-		 VALUES ($1, $2, $3)`,
-		currentTopicID, created.ID, userID,
-	); err != nil {
-		var pgErr *pgconn.PgError
-		if apperr.As(err, &pgErr) && pgErr.Code == uniqueViolation {
-			return Topic{}, apperr.E(op, ErrDependencyExists)
-		}
-		return Topic{}, apperr.E(op, err)
-	}
-
 	if err = tx.Commit(ctx); err != nil {
 		return Topic{}, apperr.E(op, err)
 	}

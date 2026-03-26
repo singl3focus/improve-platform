@@ -20,10 +20,6 @@ export type RoadmapTopicStatusChangeValidationResult =
       ok: false;
       reason: "invalid_transition";
       allowedStatuses: RoadmapTopicStatus[];
-    }
-  | {
-      ok: false;
-      reason: "blocked";
     };
 
 export function isRoadmapTopicStatus(value: string): value is RoadmapTopicStatus {
@@ -43,7 +39,6 @@ export function getAllowedRoadmapTopicStatuses(
 export function validateRoadmapTopicStatusChange(input: {
   currentStatus: RoadmapTopicStatus;
   nextStatus: RoadmapTopicStatus;
-  isBlocked: boolean;
 }): RoadmapTopicStatusChangeValidationResult {
   if (input.currentStatus === input.nextStatus) {
     return { ok: true };
@@ -55,16 +50,6 @@ export function validateRoadmapTopicStatusChange(input: {
       ok: false,
       reason: "invalid_transition",
       allowedStatuses
-    };
-  }
-
-  if (
-    input.isBlocked &&
-    (input.nextStatus === "in_progress" || input.nextStatus === "completed")
-  ) {
-    return {
-      ok: false,
-      reason: "blocked"
     };
   }
 

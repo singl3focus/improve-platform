@@ -6,8 +6,6 @@ import type { RoadmapTopicStatus } from "./roadmap-types";
 
 export interface RoadmapTopicCurrentState {
   status: RoadmapTopicStatus;
-  isBlocked: boolean;
-  blockedReason: string | null;
   position: number;
   startDate: string | null;
   targetDate: string | null;
@@ -36,8 +34,8 @@ export type RoadmapTopicUpdatePlan =
     }
   | {
       ok: false;
-      httpStatus: 400 | 409;
-      code: "invalid_status" | "topic_blocked";
+      httpStatus: 400;
+      code: "invalid_status";
       message: string;
     };
 
@@ -50,22 +48,10 @@ export function buildRoadmapTopicUpdatePlan(input: {
   if (request.status) {
     const statusValidation = validateRoadmapTopicStatusChange({
       currentStatus: currentTopic.status,
-      nextStatus: request.status,
-      isBlocked: currentTopic.isBlocked
+      nextStatus: request.status
     });
 
     if (!statusValidation.ok) {
-      if (statusValidation.reason === "blocked") {
-        return {
-          ok: false,
-          httpStatus: 409,
-          code: "topic_blocked",
-          message: `Blocked topic cannot be moved manually to "${request.status}" until prerequisites are completed.${
-            currentTopic.blockedReason ? ` Reason: ${currentTopic.blockedReason}` : ""
-          }`
-        };
-      }
-
       return {
         ok: false,
         httpStatus: 400,

@@ -27,8 +27,7 @@ test("validateRoadmapTopicStatusChange allows a valid manual transition from pau
   assert.deepEqual(
     validateRoadmapTopicStatusChange({
       currentStatus: "paused",
-      nextStatus: "in_progress",
-      isBlocked: false
+      nextStatus: "in_progress"
     }),
     { ok: true }
   );
@@ -38,8 +37,7 @@ test("validateRoadmapTopicStatusChange rejects invalid transition from not_start
   assert.deepEqual(
     validateRoadmapTopicStatusChange({
       currentStatus: "not_started",
-      nextStatus: "completed",
-      isBlocked: false
+      nextStatus: "completed"
     }),
     {
       ok: false,
@@ -49,26 +47,11 @@ test("validateRoadmapTopicStatusChange rejects invalid transition from not_start
   );
 });
 
-test("validateRoadmapTopicStatusChange rejects blocked topic transition to in_progress", () => {
-  assert.deepEqual(
-    validateRoadmapTopicStatusChange({
-      currentStatus: "not_started",
-      nextStatus: "in_progress",
-      isBlocked: true
-    }),
-    {
-      ok: false,
-      reason: "blocked"
-    }
-  );
-});
-
-test("validateRoadmapTopicStatusChange allows saving unchanged blocked topic status", () => {
+test("validateRoadmapTopicStatusChange allows saving unchanged status", () => {
   assert.deepEqual(
     validateRoadmapTopicStatusChange({
       currentStatus: "paused",
-      nextStatus: "paused",
-      isBlocked: true
+      nextStatus: "paused"
     }),
     { ok: true }
   );

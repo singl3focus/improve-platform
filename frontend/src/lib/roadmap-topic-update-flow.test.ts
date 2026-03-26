@@ -6,8 +6,6 @@ test("buildRoadmapTopicUpdatePlan adds status PATCH step for a valid changed sta
   const result = buildRoadmapTopicUpdatePlan({
     currentTopic: {
       status: "in_progress",
-      isBlocked: false,
-      blockedReason: null,
       position: 3,
       startDate: "2026-03-01",
       targetDate: "2026-03-10"
@@ -39,8 +37,6 @@ test("buildRoadmapTopicUpdatePlan rejects invalid status transition before PATCH
   const result = buildRoadmapTopicUpdatePlan({
     currentTopic: {
       status: "not_started",
-      isBlocked: false,
-      blockedReason: null,
       position: 1,
       startDate: null,
       targetDate: null
@@ -61,12 +57,10 @@ test("buildRoadmapTopicUpdatePlan rejects invalid status transition before PATCH
   });
 });
 
-test("buildRoadmapTopicUpdatePlan rejects blocked status transition before PATCH flow", () => {
+test("buildRoadmapTopicUpdatePlan allows not_started to in_progress transition", () => {
   const result = buildRoadmapTopicUpdatePlan({
     currentTopic: {
       status: "not_started",
-      isBlocked: true,
-      blockedReason: "Complete HTML & CSS first",
       position: 1,
       startDate: null,
       targetDate: null
@@ -78,11 +72,5 @@ test("buildRoadmapTopicUpdatePlan rejects blocked status transition before PATCH
     }
   });
 
-  assert.deepEqual(result, {
-    ok: false,
-    httpStatus: 409,
-    code: "topic_blocked",
-    message:
-      'Blocked topic cannot be moved manually to "in_progress" until prerequisites are completed. Reason: Complete HTML & CSS first'
-  });
+  assert.equal(result.ok, true);
 });

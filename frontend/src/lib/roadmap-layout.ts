@@ -153,8 +153,10 @@ export function buildTopicGridPlacementById(
     while (occupied.has(buildTopicGridKey(nextRow, nextColumn))) {
       if (direction === "left") {
         nextColumn -= 1;
-      } else {
+      } else if (direction === "right") {
         nextColumn += 1;
+      } else {
+        nextRow += 1;
       }
     }
 

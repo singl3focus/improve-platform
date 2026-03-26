@@ -23,18 +23,6 @@ interface TopicUpdatePayload {
   status?: unknown;
 }
 
-function getBlockedReason(currentTopic: Record<string, unknown> | null): string | null {
-  const blockReasons = (currentTopic as { block_reasons?: unknown } | null)?.block_reasons;
-  if (!Array.isArray(blockReasons) || blockReasons.length === 0) {
-    return null;
-  }
-
-  const normalizedReasons = blockReasons.filter(
-    (value): value is string => typeof value === "string" && value.trim().length > 0
-  );
-  return normalizedReasons.length > 0 ? normalizedReasons.join(". ") : null;
-}
-
 export async function PUT(request: NextRequest, context: RouteContext) {
   let payload: TopicUpdatePayload;
   try {
@@ -101,8 +89,6 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     const updatePlan = buildRoadmapTopicUpdatePlan({
       currentTopic: {
         status: currentStatusValue,
-        isBlocked: (currentTopic as { is_blocked?: unknown } | null)?.is_blocked === true,
-        blockedReason: getBlockedReason(currentTopic),
         position,
         startDate,
         targetDate

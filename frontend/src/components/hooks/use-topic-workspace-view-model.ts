@@ -91,13 +91,13 @@ export function useTopicWorkspaceViewModel(topicId: string | null, loadErrorFall
     if (!topic) {
       return {
         completed: 0,
-        blocked: 0
+        pending: 0
       };
     }
 
     return {
       completed: topic.dependencies.filter((dependency) => dependency.isCompleted).length,
-      blocked: topic.dependencies.filter((dependency) => dependency.isRequired && !dependency.isCompleted)
+      pending: topic.dependencies.filter((dependency) => dependency.isRequired && !dependency.isCompleted)
         .length
     };
   }, [state.data]);

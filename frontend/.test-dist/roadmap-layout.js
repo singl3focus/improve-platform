@@ -105,8 +105,11 @@ function buildTopicGridPlacementById(stages) {
             if (direction === "left") {
                 nextColumn -= 1;
             }
-            else {
+            else if (direction === "right") {
                 nextColumn += 1;
+            }
+            else {
+                nextRow += 1;
             }
         }
         occupy(topicId, nextRow, nextColumn);

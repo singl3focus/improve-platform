@@ -72,11 +72,11 @@ test("offsetConnectionAnchorPoint moves roadmap arrow anchors away from cards", 
   );
 });
 
-test("getConnectionAnchorOffsetDistance reserves extra space on the right side for the link handle", () => {
-  assert.equal(getConnectionAnchorOffsetDistance("left"), 18);
-  assert.equal(getConnectionAnchorOffsetDistance("top"), 18);
-  assert.equal(getConnectionAnchorOffsetDistance("bottom"), 18);
-  assert.equal(getConnectionAnchorOffsetDistance("right"), 32);
+test("getConnectionAnchorOffsetDistance keeps arrow tips on the card border (no outward gap)", () => {
+  assert.equal(getConnectionAnchorOffsetDistance("left"), 0);
+  assert.equal(getConnectionAnchorOffsetDistance("top"), 0);
+  assert.equal(getConnectionAnchorOffsetDistance("bottom"), 0);
+  assert.equal(getConnectionAnchorOffsetDistance("right"), 0);
 });
 
 test("normalizeGraphPoint converts client coordinates into graph-relative point", () => {

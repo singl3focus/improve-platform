@@ -26,7 +26,7 @@ export type RoadmapTopicEditSubmissionResult =
     }
   | {
       ok: false;
-      reason: "invalid_transition" | "blocked";
+      reason: "invalid_transition";
       validationResult: Extract<
         RoadmapTopicStatusChangeValidationResult,
         {
@@ -36,7 +36,7 @@ export type RoadmapTopicEditSubmissionResult =
     };
 
 export function prepareRoadmapTopicEditSubmission(input: {
-  topic: Pick<RoadmapTopic, "status" | "isBlocked">;
+  topic: Pick<RoadmapTopic, "status">;
   draft: RoadmapTopicEditDraftValues;
 }): RoadmapTopicEditSubmissionResult {
   const title = input.draft.title.trim();
@@ -49,8 +49,7 @@ export function prepareRoadmapTopicEditSubmission(input: {
 
   const validationResult = validateRoadmapTopicStatusChange({
     currentStatus: input.topic.status,
-    nextStatus: input.draft.status,
-    isBlocked: input.topic.isBlocked
+    nextStatus: input.draft.status
   });
   if (!validationResult.ok) {
     return {

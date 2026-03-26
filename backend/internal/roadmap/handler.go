@@ -312,8 +312,6 @@ func handleError(w http.ResponseWriter, err error) {
 		httpresp.Error(w, http.StatusBadRequest, "invalid_direction", "direction must be one of: left, right, below")
 	case apperr.Is(err, ErrCycleDetected):
 		httpresp.Error(w, http.StatusConflict, "cycle_detected", "adding this dependency would create a cycle")
-	case apperr.Is(err, ErrTopicBlocked):
-		httpresp.Error(w, http.StatusConflict, "topic_blocked", "topic is blocked by incomplete prerequisites")
 	case apperr.Is(err, ErrInvalidStatus):
 		httpresp.Error(w, http.StatusBadRequest, "invalid_status", "invalid status transition")
 	case apperr.Is(err, ErrDependencyExists):

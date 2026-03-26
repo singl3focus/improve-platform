@@ -139,13 +139,23 @@ func (uc *UseCase) CreateTopic(ctx context.Context, userID string, req CreateTop
 		return TopicResponse{}, apperr.E(op, err)
 	}
 
+	// Auto-create dependency: new topic depends on the anchor topic.
+	// This ensures edges (arrows) appear in the roadmap graph.
+	var depIDs []string
+	if req.IsDirectional() && req.RelativeToTopicID != "" {
+		if addErr := uc.repo.AddDependency(ctx, t.ID, req.RelativeToTopicID, userID); addErr != nil {
+			return TopicResponse{}, apperr.E(op, addErr)
+		}
+		depIDs = []string{req.RelativeToTopicID}
+	}
+
 	uc.record(ctx, history.Event{
 		UserID: userID, EntityType: "topic", EntityID: t.ID,
 		EventType: "technical", EventName: "entity.created",
 		Payload: map[string]any{"title": t.Title},
 	})
 
-	return buildTopicResponse(t, nil, TopicMetrics{}, false, nil), nil
+	return buildTopicResponse(t, depIDs, TopicMetrics{}), nil
 }
 
 func (uc *UseCase) GetTopic(ctx context.Context, userID, topicID string) (TopicResponse, error) {
@@ -155,21 +165,14 @@ func (uc *UseCase) GetTopic(ctx context.Context, userID, topicID string) (TopicR
 		return TopicResponse{}, apperr.E(op, err)
 	}
 
-	topics, err := uc.repo.GetTopicsByUserID(ctx, userID)
-	if err != nil {
-		return TopicResponse{}, apperr.E(op, err)
-	}
-
 	deps, err := uc.repo.GetDependenciesByUserID(ctx, userID)
 	if err != nil {
 		return TopicResponse{}, apperr.E(op, err)
 	}
 
-	topicMap := buildTopicMap(topics)
 	depMap := buildDepMap(deps)
-	blocked, reasons := computeBlockage(t.ID, topicMap, depMap)
 
-	return buildTopicResponse(t, depMap[t.ID], TopicMetrics{}, blocked, reasons), nil
+	return buildTopicResponse(t, depMap[t.ID], TopicMetrics{}), nil
 }
 
 func (uc *UseCase) UpdateTopic(ctx context.Context, userID, topicID string, req UpdateTopicRequest) error {
@@ -210,23 +213,6 @@ func (uc *UseCase) UpdateTopicStatus(ctx context.Context, userID, topicID string
 
 	if !isValidTransition(topic.Status, req.Status) {
 		return apperr.E(op, ErrInvalidStatus)
-	}
-
-	if req.Status == "in_progress" || req.Status == "completed" {
-		topics, err := uc.repo.GetTopicsByUserID(ctx, userID)
-		if err != nil {
-			return apperr.E(op, err)
-		}
-		deps, err := uc.repo.GetDependenciesByUserID(ctx, userID)
-		if err != nil {
-			return apperr.E(op, err)
-		}
-		topicMap := buildTopicMap(topics)
-		depMap := buildDepMap(deps)
-		blocked, _ := computeBlockage(topicID, topicMap, depMap)
-		if blocked {
-			return apperr.E(op, ErrTopicBlocked)
-		}
 	}
 
 	var startDate *time.Time
@@ -342,21 +328,6 @@ func canReach(depMap map[string][]string, current, target string, visited map[st
 	return false
 }
 
-func computeBlockage(topicID string, topicMap map[string]Topic, depMap map[string][]string) (bool, []string) {
-	prereqs := depMap[topicID]
-	var reasons []string
-	for _, depID := range prereqs {
-		dep, ok := topicMap[depID]
-		if !ok {
-			continue
-		}
-		if dep.Status != "completed" {
-			reasons = append(reasons, fmt.Sprintf("prerequisite topic '%s' is not completed", dep.Title))
-		}
-	}
-	return len(reasons) > 0, reasons
-}
-
 func isValidTransition(from, to string) bool {
 	allowed, ok := validTransitions[from]
 	if !ok {
@@ -373,13 +344,11 @@ func isValidTransition(from, to string) bool {
 // --- Response builders ---
 
 func (uc *UseCase) assembleRoadmap(rm Roadmap, topics []Topic, deps []TopicDep, metricsByTopicID map[string]TopicMetrics) RoadmapResponse {
-	topicMap := buildTopicMap(topics)
 	depMap := buildDepMap(deps)
 
 	topicResponses := make([]TopicResponse, 0, len(topics))
 	for _, t := range topics {
-		blocked, reasons := computeBlockage(t.ID, topicMap, depMap)
-		topicResponses = append(topicResponses, buildTopicResponse(t, depMap[t.ID], metricsByTopicID[t.ID], blocked, reasons))
+		topicResponses = append(topicResponses, buildTopicResponse(t, depMap[t.ID], metricsByTopicID[t.ID]))
 	}
 
 	return RoadmapResponse{
@@ -392,12 +361,10 @@ func (uc *UseCase) assembleRoadmap(rm Roadmap, topics []Topic, deps []TopicDep, 
 	}
 }
 
-func buildTopicResponse(t Topic, depIDs []string, metrics TopicMetrics, blocked bool, reasons []string) TopicResponse {
+// buildTopicResponse builds the API response for a single topic.
+func buildTopicResponse(t Topic, depIDs []string, metrics TopicMetrics) TopicResponse {
 	if depIDs == nil {
 		depIDs = []string{}
-	}
-	if reasons == nil {
-		reasons = []string{}
 	}
 	return TopicResponse{
 		ID:              t.ID,
@@ -411,8 +378,6 @@ func buildTopicResponse(t Topic, depIDs []string, metrics TopicMetrics, blocked 
 		TasksCount:      metrics.TasksCount,
 		MaterialsCount:  metrics.MaterialsCount,
 		ProgressPercent: metrics.ProgressPercent,
-		IsBlocked:       blocked,
-		BlockReasons:    reasons,
 		Dependencies:    depIDs,
 		CreatedAt:       t.CreatedAt,
 		UpdatedAt:       t.UpdatedAt,

@@ -4,7 +4,6 @@ import {
   createDashboardClient,
   dashboardJson,
   dashboardUnavailableResponse,
-  flattenRoadmapTopics,
   loadRoadmapOrEmpty,
   loadTasks
 } from "../_shared";
@@ -35,9 +34,6 @@ export async function GET(request: NextRequest) {
       return applyDashboardError(client, tasksResult.errorResponse);
     }
 
-    const topics = flattenRoadmapTopics(roadmapResult.roadmap);
-    const blockedTopicsCount = topics.filter((topic) => topic.is_blocked).length;
-
     const now = Date.now();
     const upcomingTasks = (tasksResult.tasks ?? [])
       .filter((task) => task.status !== "done")
@@ -49,20 +45,10 @@ export async function GET(request: NextRequest) {
       .sort((left, right) => (left.timestamp ?? 0) - (right.timestamp ?? 0));
 
     const upcomingTasksCount = upcomingTasks.length;
-
-    if (upcomingTasksCount === 0 && blockedTopicsCount === 0) {
-      return dashboardJson(client, {
-        nextTaskTitle: null,
-        blockedTopicsCount: 0,
-        upcomingTasksCount: 0
-      });
-    }
-
     const nextTaskTitle = upcomingTasks[0]?.task.title ?? null;
 
     return dashboardJson(client, {
       nextTaskTitle,
-      blockedTopicsCount,
       upcomingTasksCount
     });
   } catch {

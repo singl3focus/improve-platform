@@ -57,7 +57,6 @@ export interface DashboardCopy {
   dailySummaryLoadFailed: string;
   dailySummaryEmpty: string;
   upcomingTasksMetric: (count: number) => string;
-  blockedTopicsMetric: (count: number) => string;
   roadmapProgressTitle: string;
   roadmapProgressLoadFailed: string;
   roadmapProgressLoading: string;
@@ -88,24 +87,16 @@ export interface DashboardCopy {
   dueAt: (topic: string, value: string) => string;
   overdue: string;
   planned: string;
-  blockedTopicsTitle: string;
-  blockedTopicsDescription: string;
-  blockedTopicsLoadFailed: string;
-  blockedTopicsEmpty: string;
-  blocked: string;
   chartsTitle: string;
   chartsDescription: string;
   chartsLoadFailed: string;
   chartsEmpty: string;
   chartTopicsByStatusTitle: string;
   chartDeadlinesTitle: string;
-  chartTopicAccessTitle: string;
   chartStatusNotStarted: string;
   chartStatusInProgress: string;
   chartStatusPaused: string;
   chartStatusCompleted: string;
-  chartAccessBlocked: string;
-  chartAccessAvailable: string;
   chartDeadlinesDayLabel: (date: string) => string;
   chartCountLabel: (count: number) => string;
 }
@@ -171,7 +162,6 @@ const RU_COPY: AppCopy = {
     dailySummaryLoadFailed: "Не удалось загрузить ежедневную сводку.",
     dailySummaryEmpty: "Сводка пуста. Добавьте задачи или материалы.",
     upcomingTasksMetric: (count) => `Скоро задач: ${count}`,
-    blockedTopicsMetric: (count) => `Заблокировано тем: ${count}`,
     roadmapProgressTitle: "Прогресс roadmap",
     roadmapProgressLoadFailed: "Не удалось загрузить прогресс roadmap.",
     roadmapProgressLoading: "Загрузка...",
@@ -203,24 +193,16 @@ const RU_COPY: AppCopy = {
     dueAt: (topic, value) => `${topic} · срок ${value}`,
     overdue: "Просрочено",
     planned: "Запланировано",
-    blockedTopicsTitle: "Заблокированные темы",
-    blockedTopicsDescription: "Зависимости, которые блокируют следующий шаг.",
-    blockedTopicsLoadFailed: "Не удалось загрузить заблокированные темы.",
-    blockedTopicsEmpty: "Заблокированных тем нет. Отличный темп.",
-    blocked: "Заблокировано",
     chartsTitle: "Графики обучения",
     chartsDescription: "Краткая аналитика по темам и дедлайнам на ближайшую неделю.",
     chartsLoadFailed: "Не удалось загрузить блок графиков.",
     chartsEmpty: "Пока нет данных для графиков.",
     chartTopicsByStatusTitle: "Темы по статусам",
     chartDeadlinesTitle: "Дедлайны на 7 дней",
-    chartTopicAccessTitle: "Доступность тем",
     chartStatusNotStarted: "Не начато",
     chartStatusInProgress: "В работе",
     chartStatusPaused: "На паузе",
     chartStatusCompleted: "Завершено",
-    chartAccessBlocked: "Заблокировано",
-    chartAccessAvailable: "Доступно",
     chartDeadlinesDayLabel: (date) => date,
     chartCountLabel: (count) => `${count}`
   }
@@ -280,7 +262,6 @@ const EN_COPY: AppCopy = {
     dailySummaryLoadFailed: "Daily summary failed to load.",
     dailySummaryEmpty: "Daily summary is empty. Add tasks or materials to see your snapshot.",
     upcomingTasksMetric: (count) => `${count} upcoming tasks`,
-    blockedTopicsMetric: (count) => `${count} blocked topics`,
     roadmapProgressTitle: "Roadmap progress",
     roadmapProgressLoadFailed: "Progress failed to load.",
     roadmapProgressLoading: "Loading...",
@@ -312,24 +293,16 @@ const EN_COPY: AppCopy = {
     dueAt: (topic, value) => `${topic} · due ${value}`,
     overdue: "Overdue",
     planned: "Planned",
-    blockedTopicsTitle: "Blocked topics",
-    blockedTopicsDescription: "Dependencies that block your next step.",
-    blockedTopicsLoadFailed: "Blocked topics failed to load.",
-    blockedTopicsEmpty: "No blocked topics. Great momentum.",
-    blocked: "Blocked",
     chartsTitle: "Learning charts",
     chartsDescription: "Quick analytics across topic statuses and near-term deadlines.",
     chartsLoadFailed: "Charts block failed to load.",
     chartsEmpty: "No chart data yet.",
     chartTopicsByStatusTitle: "Topics by status",
     chartDeadlinesTitle: "Deadlines for 7 days",
-    chartTopicAccessTitle: "Topic accessibility",
     chartStatusNotStarted: "Not started",
     chartStatusInProgress: "In progress",
     chartStatusPaused: "Paused",
     chartStatusCompleted: "Completed",
-    chartAccessBlocked: "Blocked",
-    chartAccessAvailable: "Available",
     chartDeadlinesDayLabel: (date) => date,
     chartCountLabel: (count) => `${count}`
   }

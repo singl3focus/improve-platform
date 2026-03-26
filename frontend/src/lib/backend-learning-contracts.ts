@@ -8,8 +8,6 @@ export interface BackendRoadmapTopic {
   start_date: string | null;
   target_date: string | null;
   completed_date: string | null;
-  is_blocked: boolean;
-  block_reasons: string[];
   dependencies: string[];
 }
 

@@ -20,12 +20,6 @@ export interface DashboardTask {
   dueAt: string;
 }
 
-export interface DashboardBlockedTopic {
-  id: string;
-  title: string;
-  blockedReason: string;
-}
-
 export interface DashboardRecentMaterial {
   id: string;
   title: string;
@@ -46,7 +40,6 @@ export interface DashboardHistoryEvent {
 
 export interface DashboardDailySummary {
   nextTaskTitle: string | null;
-  blockedTopicsCount: number;
   upcomingTasksCount: number;
 }
 
@@ -62,13 +55,7 @@ export interface DashboardDeadlinesByDayChartItem {
   count: number;
 }
 
-export interface DashboardTopicAccessChart {
-  blocked: number;
-  available: number;
-}
-
 export interface DashboardChartsPayload {
   topicsByStatus: DashboardTopicsByStatusChart;
   upcomingDeadlines: DashboardDeadlinesByDayChartItem[];
-  topicAccess: DashboardTopicAccessChart;
 }

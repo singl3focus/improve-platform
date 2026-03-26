@@ -8,8 +8,6 @@ export interface RoadmapTopic {
   position: number;
   status: RoadmapTopicStatus;
   progressPercent: number;
-  isBlocked: boolean;
-  blockedReason: string | null;
   tasksCount: number;
   materialsCount: number;
   prerequisiteTopicIds: string[];

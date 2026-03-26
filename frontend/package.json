@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "verify:mvp": "node ./scripts/mvp-verification-smoke.mjs",
+    "test:e2e": "playwright test",
     "test": "node -e \"require('node:fs').rmSync('.test-dist',{recursive:true,force:true})\" && tsc -p tsconfig.test.json && node --test .test-dist"
   },
   "dependencies": {
@@ -22,6 +23,7 @@
     "tailwindcss-animate": "^1.0.7"
   },
   "devDependencies": {
+    "@playwright/test": "^1.49.1",
     "@types/node": "^20.16.11",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",

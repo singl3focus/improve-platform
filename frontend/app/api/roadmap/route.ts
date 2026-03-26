@@ -24,8 +24,6 @@ interface BackendFlatRoadmapTopic {
   description: string;
   position: number;
   status: BackendRoadmapTopic["status"];
-  is_blocked: boolean;
-  block_reasons: string[];
   dependencies: string[];
   stage_id?: string;
 }
@@ -38,14 +36,6 @@ interface BackendFlatRoadmapResponse {
 
 function canSkipTopicMetricsError(status: number): boolean {
   return status >= 500;
-}
-
-function getBlockedReason(topic: { block_reasons?: string[] }): string | null {
-  if (!Array.isArray(topic.block_reasons) || topic.block_reasons.length === 0) {
-    return null;
-  }
-
-  return topic.block_reasons.join(". ");
 }
 
 async function loadTopicMetrics(
@@ -181,8 +171,6 @@ export async function GET(request: NextRequest) {
               : topicIndex + 1,
           status: topic.status,
           progressPercent: metricsResult.metrics?.progressPercent ?? 0,
-          isBlocked: topic.is_blocked,
-          blockedReason: getBlockedReason(topic),
           tasksCount: metricsResult.metrics?.tasksCount ?? 0,
           materialsCount: metricsResult.metrics?.materialsCount ?? 0,
           prerequisiteTopicIds: Array.isArray(topic.dependencies) ? topic.dependencies : []

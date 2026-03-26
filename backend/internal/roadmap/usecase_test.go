@@ -72,6 +72,7 @@ func (m *mockRepo) GetTopicMetricsByUserID(ctx context.Context, userID string) (
 
 func TestCreateTopic_DirectionalSuccess(t *testing.T) {
 	called := false
+	var depTopicID, depDependsOnID string
 	repo := &mockRepo{
 		createTopicDirectionalFn: func(_ context.Context, userID, currentTopicID, title, description string, direction roadmap.TopicCreateDirection) (roadmap.Topic, error) {
 			called = true
@@ -85,6 +86,11 @@ func TestCreateTopic_DirectionalSuccess(t *testing.T) {
 				t.Fatalf("unexpected payload: %s / %s", title, description)
 			}
 			return roadmap.Topic{ID: "topic-new", Title: title, Description: description, Position: 4}, nil
+		},
+		addDependencyFn: func(_ context.Context, topicID, dependsOnTopicID, _ string) error {
+			depTopicID = topicID
+			depDependsOnID = dependsOnTopicID
+			return nil
 		},
 	}
 
@@ -103,6 +109,12 @@ func TestCreateTopic_DirectionalSuccess(t *testing.T) {
 	}
 	if resp.ID != "topic-new" {
 		t.Fatalf("expected topic-new, got %s", resp.ID)
+	}
+	if depTopicID != "topic-new" || depDependsOnID != "11111111-1111-1111-1111-111111111111" {
+		t.Fatalf("expected dependency topic-new → 11111111-1111-1111-1111-111111111111, got %s → %s", depTopicID, depDependsOnID)
+	}
+	if len(resp.Dependencies) != 1 || resp.Dependencies[0] != "11111111-1111-1111-1111-111111111111" {
+		t.Fatalf("expected response to include dependency, got %v", resp.Dependencies)
 	}
 }
 
@@ -261,22 +273,11 @@ func TestRemoveDependency_NotFound(t *testing.T) {
 
 // --- Status transition tests ---
 
-func TestUpdateTopicStatus_ToInProgress_Unblocked(t *testing.T) {
+func TestUpdateTopicStatus_ToInProgress(t *testing.T) {
 	var updatedStatus string
 	repo := &mockRepo{
 		getTopicByIDFn: func(_ context.Context, _ string, _ string) (roadmap.Topic, error) {
 			return roadmap.Topic{ID: "t1", Status: "not_started"}, nil
-		},
-		getTopicsByUserIDFn: func(_ context.Context, _ string) ([]roadmap.Topic, error) {
-			return []roadmap.Topic{
-				{ID: "t1", Status: "not_started"},
-				{ID: "t2", Status: "completed"},
-			}, nil
-		},
-		getDependenciesFn: func(_ context.Context, _ string) ([]roadmap.TopicDep, error) {
-			return []roadmap.TopicDep{
-				{TopicID: "t1", DependsOnTopicID: "t2", UserID: "u"},
-			}, nil
 		},
 		updateTopicStatusFn: func(_ context.Context, _, _, status string, _, _ *time.Time) error {
 			updatedStatus = status
@@ -291,31 +292,6 @@ func TestUpdateTopicStatus_ToInProgress_Unblocked(t *testing.T) {
 	}
 	if updatedStatus != "in_progress" {
 		t.Errorf("expected status 'in_progress', got %s", updatedStatus)
-	}
-}
-
-func TestUpdateTopicStatus_ToInProgress_Blocked(t *testing.T) {
-	repo := &mockRepo{
-		getTopicByIDFn: func(_ context.Context, _ string, _ string) (roadmap.Topic, error) {
-			return roadmap.Topic{ID: "t1", Status: "not_started"}, nil
-		},
-		getTopicsByUserIDFn: func(_ context.Context, _ string) ([]roadmap.Topic, error) {
-			return []roadmap.Topic{
-				{ID: "t1", Status: "not_started"},
-				{ID: "t2", Status: "not_started"},
-			}, nil
-		},
-		getDependenciesFn: func(_ context.Context, _ string) ([]roadmap.TopicDep, error) {
-			return []roadmap.TopicDep{
-				{TopicID: "t1", DependsOnTopicID: "t2", UserID: "u"},
-			}, nil
-		},
-	}
-	uc := roadmap.NewUseCase(repo)
-
-	err := uc.UpdateTopicStatus(context.Background(), "u", "t1", roadmap.UpdateStatusRequest{Status: "in_progress"})
-	if !errors.Is(err, roadmap.ErrTopicBlocked) {
-		t.Fatalf("expected ErrTopicBlocked, got %v", err)
 	}
 }
 
@@ -339,12 +315,6 @@ func TestUpdateTopicStatus_ToCompleted(t *testing.T) {
 		getTopicByIDFn: func(_ context.Context, _ string, _ string) (roadmap.Topic, error) {
 			return roadmap.Topic{ID: "t1", Status: "in_progress"}, nil
 		},
-		getTopicsByUserIDFn: func(_ context.Context, _ string) ([]roadmap.Topic, error) {
-			return []roadmap.Topic{{ID: "t1", Status: "in_progress"}}, nil
-		},
-		getDependenciesFn: func(_ context.Context, _ string) ([]roadmap.TopicDep, error) {
-			return nil, nil
-		},
 		updateTopicStatusFn: func(_ context.Context, _, _, _ string, _ *time.Time, cd *time.Time) error {
 			gotCompletedDate = cd
 			return nil
@@ -361,40 +331,11 @@ func TestUpdateTopicStatus_ToCompleted(t *testing.T) {
 	}
 }
 
-func TestUpdateTopicStatus_ToCompleted_Blocked(t *testing.T) {
-	repo := &mockRepo{
-		getTopicByIDFn: func(_ context.Context, _ string, _ string) (roadmap.Topic, error) {
-			return roadmap.Topic{ID: "t1", Status: "in_progress"}, nil
-		},
-		getTopicsByUserIDFn: func(_ context.Context, _ string) ([]roadmap.Topic, error) {
-			return []roadmap.Topic{
-				{ID: "t1", Status: "in_progress"},
-				{ID: "t2", Status: "not_started"},
-			}, nil
-		},
-		getDependenciesFn: func(_ context.Context, _ string) ([]roadmap.TopicDep, error) {
-			return []roadmap.TopicDep{{TopicID: "t1", DependsOnTopicID: "t2", UserID: "u"}}, nil
-		},
-	}
-	uc := roadmap.NewUseCase(repo)
-
-	err := uc.UpdateTopicStatus(context.Background(), "u", "t1", roadmap.UpdateStatusRequest{Status: "completed"})
-	if !errors.Is(err, roadmap.ErrTopicBlocked) {
-		t.Fatalf("expected ErrTopicBlocked, got %v", err)
-	}
-}
-
 func TestUpdateTopicStatus_ToInProgress_SetsStartDate(t *testing.T) {
 	var gotStartDate *time.Time
 	repo := &mockRepo{
 		getTopicByIDFn: func(_ context.Context, _ string, _ string) (roadmap.Topic, error) {
 			return roadmap.Topic{ID: "t1", Status: "not_started", StartDate: nil}, nil
-		},
-		getTopicsByUserIDFn: func(_ context.Context, _ string) ([]roadmap.Topic, error) {
-			return []roadmap.Topic{{ID: "t1", Status: "not_started"}}, nil
-		},
-		getDependenciesFn: func(_ context.Context, _ string) ([]roadmap.TopicDep, error) {
-			return nil, nil
 		},
 		updateTopicStatusFn: func(_ context.Context, _, _, _ string, sd, _ *time.Time) error {
 			gotStartDate = sd
@@ -449,20 +390,11 @@ func TestGetFullRoadmap_WithBlockageInfo(t *testing.T) {
 	}
 
 	topicA := resp.Topics[0]
-	if topicA.IsBlocked {
-		t.Error("Topic A should not be blocked (no dependencies)")
-	}
 	if topicA.TasksCount != 0 || topicA.MaterialsCount != 1 || topicA.ProgressPercent != 0 {
 		t.Errorf("unexpected metrics for topic A: tasks=%d materials=%d progress=%d", topicA.TasksCount, topicA.MaterialsCount, topicA.ProgressPercent)
 	}
 
 	topicB := resp.Topics[1]
-	if !topicB.IsBlocked {
-		t.Error("Topic B should be blocked (depends on incomplete Topic A)")
-	}
-	if len(topicB.BlockReasons) == 0 {
-		t.Error("Topic B should have block reasons")
-	}
 	if len(topicB.Dependencies) != 1 || topicB.Dependencies[0] != "t1" {
 		t.Errorf("Topic B dependencies should be [t1], got %v", topicB.Dependencies)
 	}

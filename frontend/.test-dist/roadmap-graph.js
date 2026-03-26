@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ROADMAP_WHEEL_SCALE_STEP = exports.ROADMAP_CONNECTION_RIGHT_SIDE_GAP = exports.ROADMAP_CONNECTION_ARROW_GAP = void 0;
+exports.ROADMAP_WHEEL_SCALE_STEP = exports.ROADMAP_MIN_BEZIER_CONTROL = exports.ROADMAP_CONNECTION_RIGHT_SIDE_GAP = exports.ROADMAP_CONNECTION_ARROW_GAP = void 0;
 exports.getConnectionAnchorOffsetDistance = getConnectionAnchorOffsetDistance;
 exports.parsePositiveInteger = parsePositiveInteger;
 exports.buildConnectionPath = buildConnectionPath;
@@ -11,8 +11,9 @@ exports.clampGraphScale = clampGraphScale;
 exports.getGraphOffsetForScale = getGraphOffsetForScale;
 exports.getRoadmapWheelZoomBehavior = getRoadmapWheelZoomBehavior;
 exports.isDragGesture = isDragGesture;
-exports.ROADMAP_CONNECTION_ARROW_GAP = 18;
-exports.ROADMAP_CONNECTION_RIGHT_SIDE_GAP = 32;
+exports.ROADMAP_CONNECTION_ARROW_GAP = 0;
+exports.ROADMAP_CONNECTION_RIGHT_SIDE_GAP = 0;
+exports.ROADMAP_MIN_BEZIER_CONTROL = 18;
 exports.ROADMAP_WHEEL_SCALE_STEP = 0.12;
 function getConnectionAnchorOffsetDistance(side) {
     return side === "right" ? exports.ROADMAP_CONNECTION_RIGHT_SIDE_GAP : exports.ROADMAP_CONNECTION_ARROW_GAP;
@@ -28,10 +29,10 @@ function buildConnectionPath(x1, y1, x2, y2) {
     const deltaX = x2 - x1;
     const deltaY = y2 - y1;
     if (Math.abs(deltaX) > Math.abs(deltaY)) {
-        const controlX = x1 + Math.sign(deltaX || 1) * Math.max(Math.abs(deltaX) * 0.5, 36);
+        const controlX = x1 + Math.sign(deltaX || 1) * Math.max(Math.abs(deltaX) * 0.5, exports.ROADMAP_MIN_BEZIER_CONTROL);
         return `M ${x1} ${y1} C ${controlX} ${y1}, ${controlX} ${y2}, ${x2} ${y2}`;
     }
-    const controlY = y1 + Math.sign(deltaY || 1) * Math.max(Math.abs(deltaY) * 0.5, 36);
+    const controlY = y1 + Math.sign(deltaY || 1) * Math.max(Math.abs(deltaY) * 0.5, exports.ROADMAP_MIN_BEZIER_CONTROL);
     return `M ${x1} ${y1} C ${x1} ${controlY}, ${x2} ${controlY}, ${x2} ${y2}`;
 }
 function getConnectionAnchorSides(sourcePoint, targetPoint) {

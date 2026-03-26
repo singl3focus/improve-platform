@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useUserPreferences } from "@/components/providers/user-preferences-provider";
 import type {
   DashboardChartsPayload,
-  DashboardBlockedTopic,
   DashboardDailySummary,
   DashboardHistoryEvent,
   DashboardProgress,
@@ -134,7 +133,7 @@ export function isDashboardTaskOverdue(value: string): boolean {
 }
 
 export function hasDailySummaryContent(data: DashboardDailySummary): boolean {
-  return data.upcomingTasksCount > 0 || data.blockedTopicsCount > 0;
+  return data.upcomingTasksCount > 0;
 }
 
 export function hasRoadmapProgress(data: DashboardProgress): boolean {
@@ -158,10 +157,6 @@ export function useDashboardViewModel() {
   );
   const upcomingTasks = useDashboardResource<DashboardTask[]>(
     "/api/dashboard/upcoming-tasks",
-    dashboardCopy
-  );
-  const blockedTopics = useDashboardResource<DashboardBlockedTopic[]>(
-    "/api/dashboard/blocked-topics",
     dashboardCopy
   );
   const charts = useDashboardResource<DashboardChartsPayload>("/api/dashboard/charts", dashboardCopy);
@@ -210,7 +205,6 @@ export function useDashboardViewModel() {
     dailySummary,
     topicsInProgress,
     upcomingTasks,
-    blockedTopics,
     charts,
     recentMaterials,
     history,

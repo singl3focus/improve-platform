@@ -23,8 +23,6 @@ function createRoadmapFixture(): RoadmapResponse {
             position: 1,
             status: "in_progress",
             progressPercent: 20,
-            isBlocked: false,
-            blockedReason: null,
             tasksCount: 0,
             materialsCount: 0,
             prerequisiteTopicIds: []
@@ -37,8 +35,6 @@ function createRoadmapFixture(): RoadmapResponse {
             position: 2,
             status: "not_started",
             progressPercent: 0,
-            isBlocked: false,
-            blockedReason: null,
             tasksCount: 0,
             materialsCount: 0,
             prerequisiteTopicIds: ["topic-a"]
@@ -59,8 +55,6 @@ function createStageFreeRoadmapFixture(): RoadmapResponse {
         position: 1,
         status: "in_progress",
         progressPercent: 20,
-        isBlocked: false,
-        blockedReason: null,
         tasksCount: 0,
         materialsCount: 0,
         prerequisiteTopicIds: []
@@ -72,8 +66,6 @@ function createStageFreeRoadmapFixture(): RoadmapResponse {
         position: 2,
         status: "not_started",
         progressPercent: 0,
-        isBlocked: false,
-        blockedReason: null,
         tasksCount: 0,
         materialsCount: 0,
         prerequisiteTopicIds: ["topic-a"]
@@ -111,9 +103,9 @@ test("buildRoadmapConnections builds edge coordinates for prerequisite links", (
     {
       fromId: "topic-a",
       toId: "topic-b",
-      x1: 232,
+      x1: 200,
       y1: 70,
-      x2: 302,
+      x2: 320,
       y2: 290
     }
   ]);
@@ -165,9 +157,9 @@ test("buildRoadmapConnections supports stage-free flat topics payload", () => {
     {
       fromId: "topic-a",
       toId: "topic-b",
-      x1: 232,
+      x1: 200,
       y1: 70,
-      x2: 302,
+      x2: 320,
       y2: 290
     }
   ]);
@@ -222,8 +214,6 @@ test("buildTopicGridColumnById spreads topics with duplicate positions into sepa
             position: 4,
             status: "not_started",
             progressPercent: 0,
-            isBlocked: false,
-            blockedReason: null,
             tasksCount: 0,
             materialsCount: 0,
             prerequisiteTopicIds: []
@@ -236,8 +226,6 @@ test("buildTopicGridColumnById spreads topics with duplicate positions into sepa
             position: 4,
             status: "in_progress",
             progressPercent: 30,
-            isBlocked: false,
-            blockedReason: null,
             tasksCount: 0,
             materialsCount: 0,
             prerequisiteTopicIds: []
@@ -250,8 +238,6 @@ test("buildTopicGridColumnById spreads topics with duplicate positions into sepa
             position: 6,
             status: "not_started",
             progressPercent: 0,
-            isBlocked: false,
-            blockedReason: null,
             tasksCount: 0,
             materialsCount: 0,
             prerequisiteTopicIds: []
@@ -283,8 +269,6 @@ test("child-topic layout keeps parent and child separate while dependency edge i
             position: 1,
             status: "in_progress",
             progressPercent: 20,
-            isBlocked: false,
-            blockedReason: null,
             tasksCount: 1,
             materialsCount: 1,
             prerequisiteTopicIds: []
@@ -297,8 +281,6 @@ test("child-topic layout keeps parent and child separate while dependency edge i
             position: 1,
             status: "not_started",
             progressPercent: 0,
-            isBlocked: true,
-            blockedReason: "blocked",
             tasksCount: 0,
             materialsCount: 0,
             prerequisiteTopicIds: ["topic-parent"]
@@ -343,9 +325,9 @@ test("child-topic layout keeps parent and child separate while dependency edge i
     {
       fromId: "topic-parent",
       toId: "topic-child",
-      x1: 232,
+      x1: 200,
       y1: 70,
-      x2: 302,
+      x2: 320,
       y2: 290
     }
   ]);
@@ -366,8 +348,6 @@ test("buildRoadmapConnections keeps side anchors for topics on the same row", ()
             position: 1,
             status: "in_progress",
             progressPercent: 20,
-            isBlocked: false,
-            blockedReason: null,
             tasksCount: 1,
             materialsCount: 1,
             prerequisiteTopicIds: []
@@ -380,8 +360,6 @@ test("buildRoadmapConnections keeps side anchors for topics on the same row", ()
             position: 2,
             status: "not_started",
             progressPercent: 0,
-            isBlocked: false,
-            blockedReason: null,
             tasksCount: 0,
             materialsCount: 0,
             prerequisiteTopicIds: ["topic-parent"]
@@ -417,15 +395,15 @@ test("buildRoadmapConnections keeps side anchors for topics on the same row", ()
     {
       fromId: "topic-parent",
       toId: "topic-child",
-      x1: 232,
+      x1: 200,
       y1: 70,
-      x2: 302,
+      x2: 320,
       y2: 82
     }
   ]);
 });
 
-test("buildRoadmapConnections keeps enough right-side clearance for visible arrowheads and link handles", () => {
+test("buildRoadmapConnections links left topic to right topic using inner horizontal anchors", () => {
   const roadmap: RoadmapResponse = {
     stages: [
       {
@@ -440,8 +418,6 @@ test("buildRoadmapConnections keeps enough right-side clearance for visible arro
             position: 1,
             status: "not_started",
             progressPercent: 0,
-            isBlocked: false,
-            blockedReason: null,
             tasksCount: 0,
             materialsCount: 0,
             prerequisiteTopicIds: ["topic-right"]
@@ -454,8 +430,6 @@ test("buildRoadmapConnections keeps enough right-side clearance for visible arro
             position: 2,
             status: "in_progress",
             progressPercent: 30,
-            isBlocked: false,
-            blockedReason: null,
             tasksCount: 1,
             materialsCount: 1,
             prerequisiteTopicIds: []
@@ -492,9 +466,9 @@ test("buildRoadmapConnections keeps enough right-side clearance for visible arro
     {
       fromId: "topic-right",
       toId: "topic-left",
-      x1: 302,
+      x1: 320,
       y1: 70,
-      x2: 232,
+      x2: 200,
       y2: 82
     }
   ]);
@@ -515,8 +489,6 @@ test("buildTopicGridPlacementById keeps directional semantics for left right and
             position: 5,
             status: "in_progress",
             progressPercent: 10,
-            isBlocked: false,
-            blockedReason: null,
             tasksCount: 0,
             materialsCount: 0,
             prerequisiteTopicIds: []
@@ -529,8 +501,6 @@ test("buildTopicGridPlacementById keeps directional semantics for left right and
             position: 4,
             status: "not_started",
             progressPercent: 0,
-            isBlocked: false,
-            blockedReason: null,
             tasksCount: 0,
             materialsCount: 0,
             prerequisiteTopicIds: ["topic-parent"]
@@ -543,8 +513,6 @@ test("buildTopicGridPlacementById keeps directional semantics for left right and
             position: 6,
             status: "not_started",
             progressPercent: 0,
-            isBlocked: false,
-            blockedReason: null,
             tasksCount: 0,
             materialsCount: 0,
             prerequisiteTopicIds: ["topic-parent"]
@@ -557,8 +525,6 @@ test("buildTopicGridPlacementById keeps directional semantics for left right and
             position: 5,
             status: "not_started",
             progressPercent: 0,
-            isBlocked: true,
-            blockedReason: "blocked",
             tasksCount: 0,
             materialsCount: 0,
             prerequisiteTopicIds: ["topic-parent"]
@@ -601,8 +567,6 @@ test("buildTopicGridPlacementById avoids collisions for sequential directional c
             position: 10,
             status: "in_progress",
             progressPercent: 10,
-            isBlocked: false,
-            blockedReason: null,
             tasksCount: 0,
             materialsCount: 0,
             prerequisiteTopicIds: []
@@ -615,8 +579,6 @@ test("buildTopicGridPlacementById avoids collisions for sequential directional c
             position: 11,
             status: "not_started",
             progressPercent: 0,
-            isBlocked: false,
-            blockedReason: null,
             tasksCount: 0,
             materialsCount: 0,
             prerequisiteTopicIds: ["topic-parent"]
@@ -629,8 +591,6 @@ test("buildTopicGridPlacementById avoids collisions for sequential directional c
             position: 11,
             status: "not_started",
             progressPercent: 0,
-            isBlocked: false,
-            blockedReason: null,
             tasksCount: 0,
             materialsCount: 0,
             prerequisiteTopicIds: ["topic-parent"]
@@ -643,8 +603,6 @@ test("buildTopicGridPlacementById avoids collisions for sequential directional c
             position: 10,
             status: "not_started",
             progressPercent: 0,
-            isBlocked: true,
-            blockedReason: "blocked",
             tasksCount: 0,
             materialsCount: 0,
             prerequisiteTopicIds: ["topic-parent"]
@@ -657,8 +615,6 @@ test("buildTopicGridPlacementById avoids collisions for sequential directional c
             position: 10,
             status: "not_started",
             progressPercent: 0,
-            isBlocked: true,
-            blockedReason: "blocked",
             tasksCount: 0,
             materialsCount: 0,
             prerequisiteTopicIds: ["topic-parent"]
@@ -676,4 +632,18 @@ test("buildTopicGridPlacementById avoids collisions for sequential directional c
     assert.equal(occupiedKeys.has(key), false);
     occupiedKeys.add(key);
   }
+
+  const parent = placementById.get("topic-parent");
+  const below1 = placementById.get("topic-below-1");
+  const below2 = placementById.get("topic-below-2");
+
+  assert.ok(parent);
+  assert.ok(below1);
+  assert.ok(below2);
+
+  assert.equal(below1!.column, parent!.column);
+  assert.equal(below2!.column, parent!.column);
+
+  assert.equal(below1!.row, parent!.row + 1);
+  assert.equal(below2!.row, parent!.row + 2);
 });

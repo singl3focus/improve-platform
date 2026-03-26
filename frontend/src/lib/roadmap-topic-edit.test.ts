@@ -5,8 +5,7 @@ import { prepareRoadmapTopicEditSubmission } from "./roadmap-topic-edit";
 test("prepareRoadmapTopicEditSubmission returns trimmed payload for a valid status change from edit modal", () => {
   const result = prepareRoadmapTopicEditSubmission({
     topic: {
-      status: "in_progress",
-      isBlocked: false
+      status: "in_progress"
     },
     draft: {
       title: "  CSS layout  ",
@@ -29,8 +28,7 @@ test("prepareRoadmapTopicEditSubmission returns trimmed payload for a valid stat
 test("prepareRoadmapTopicEditSubmission rejects invalid transition before modal submit reaches API flow", () => {
   const result = prepareRoadmapTopicEditSubmission({
     topic: {
-      status: "not_started",
-      isBlocked: false
+      status: "not_started"
     },
     draft: {
       title: "JavaScript basics",
@@ -50,25 +48,25 @@ test("prepareRoadmapTopicEditSubmission rejects invalid transition before modal 
   });
 });
 
-test("prepareRoadmapTopicEditSubmission rejects blocked transition before modal submit reaches API flow", () => {
+test("prepareRoadmapTopicEditSubmission allows transition from not_started to in_progress", () => {
   const result = prepareRoadmapTopicEditSubmission({
     topic: {
-      status: "not_started",
-      isBlocked: true
+      status: "not_started"
     },
     draft: {
       title: "JavaScript basics",
-      description: "Blocked by prerequisites",
+      description: "Prerequisites pending",
       status: "in_progress"
     }
   });
 
   assert.deepEqual(result, {
-    ok: false,
-    reason: "blocked",
-    validationResult: {
-      ok: false,
-      reason: "blocked"
-    }
+    ok: true,
+    payload: {
+      title: "JavaScript basics",
+      description: "Prerequisites pending",
+      status: "in_progress"
+    },
+    statusChanged: true
   });
 });

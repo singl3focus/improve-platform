@@ -12,7 +12,6 @@ var (
 	ErrTopicNotFound      = errors.New("topic not found")
 	ErrInvalidDirection   = errors.New("invalid create direction")
 	ErrCycleDetected      = errors.New("dependency would create a cycle")
-	ErrTopicBlocked       = errors.New("topic is blocked by incomplete prerequisites")
 	ErrInvalidStatus      = errors.New("invalid status transition")
 	ErrDependencyExists   = errors.New("dependency already exists")
 	ErrDependencyNotFound = errors.New("dependency not found")
@@ -134,8 +133,6 @@ type TopicResponse struct {
 	TasksCount      int       `json:"tasks_count"`
 	MaterialsCount  int       `json:"materials_count"`
 	ProgressPercent int       `json:"progress_percent"`
-	IsBlocked       bool      `json:"is_blocked"`
-	BlockReasons    []string  `json:"block_reasons"`
 	Dependencies    []string  `json:"dependencies"`
 	CreatedAt       time.Time `json:"created_at"`
 	UpdatedAt       time.Time `json:"updated_at"`

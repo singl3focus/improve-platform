@@ -37,11 +37,11 @@ const roadmap_graph_1 = require("./roadmap-graph");
     strict_1.default.deepEqual((0, roadmap_graph_1.offsetConnectionAnchorPoint)({ x: 120, y: 90 }, "right", 12), { x: 132, y: 90 });
     strict_1.default.deepEqual((0, roadmap_graph_1.offsetConnectionAnchorPoint)({ x: 120, y: 90 }, "top", 12), { x: 120, y: 78 });
 });
-(0, node_test_1.default)("getConnectionAnchorOffsetDistance reserves extra space on the right side for the link handle", () => {
-    strict_1.default.equal((0, roadmap_graph_1.getConnectionAnchorOffsetDistance)("left"), 18);
-    strict_1.default.equal((0, roadmap_graph_1.getConnectionAnchorOffsetDistance)("top"), 18);
-    strict_1.default.equal((0, roadmap_graph_1.getConnectionAnchorOffsetDistance)("bottom"), 18);
-    strict_1.default.equal((0, roadmap_graph_1.getConnectionAnchorOffsetDistance)("right"), 32);
+(0, node_test_1.default)("getConnectionAnchorOffsetDistance keeps arrow tips on the card border (no outward gap)", () => {
+    strict_1.default.equal((0, roadmap_graph_1.getConnectionAnchorOffsetDistance)("left"), 0);
+    strict_1.default.equal((0, roadmap_graph_1.getConnectionAnchorOffsetDistance)("top"), 0);
+    strict_1.default.equal((0, roadmap_graph_1.getConnectionAnchorOffsetDistance)("bottom"), 0);
+    strict_1.default.equal((0, roadmap_graph_1.getConnectionAnchorOffsetDistance)("right"), 0);
 });
 (0, node_test_1.default)("normalizeGraphPoint converts client coordinates into graph-relative point", () => {
     const point = (0, roadmap_graph_1.normalizeGraphPoint)(160, 210, { left: 40, top: 120 });
