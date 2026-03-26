@@ -250,8 +250,8 @@ test("buildTopicGridColumnById spreads topics with duplicate positions into sepa
   const topicColumns = buildTopicGridColumnById(roadmap.stages ?? []);
 
   assert.equal(topicColumns.get("topic-a"), 1);
-  assert.equal(topicColumns.get("topic-b"), 2);
-  assert.equal(topicColumns.get("topic-c"), 3);
+  assert.equal(topicColumns.get("topic-b"), 3);
+  assert.equal(topicColumns.get("topic-c"), 5);
 });
 
 test("child-topic layout keeps parent and child separate while dependency edge is preserved", () => {
@@ -550,6 +550,7 @@ test("buildTopicGridPlacementById keeps directional semantics for left right and
   assert.ok(left!.column < parent!.column);
   assert.ok(right!.column > parent!.column);
   assert.ok(below!.row > parent!.row);
+  assert.equal(below!.column, parent!.column);
 });
 
 test("buildTopicGridPlacementById avoids collisions for sequential directional children", () => {
@@ -629,10 +630,212 @@ test("buildTopicGridPlacementById avoids collisions for sequential directional c
 
   for (const placement of placementById.values()) {
     const key = `${placement.row}:${placement.column}`;
-    assert.equal(occupiedKeys.has(key), false);
+    assert.equal(occupiedKeys.has(key), false, `Collision at ${key}`);
     occupiedKeys.add(key);
   }
 
+  const parent = placementById.get("topic-parent");
+  const right1 = placementById.get("topic-right-1");
+  const right2 = placementById.get("topic-right-2");
+  const below1 = placementById.get("topic-below-1");
+  const below2 = placementById.get("topic-below-2");
+
+  assert.ok(parent);
+  assert.ok(right1);
+  assert.ok(right2);
+  assert.ok(below1);
+  assert.ok(below2);
+
+  // Right children stack vertically in a column to the right
+  assert.equal(right1!.column, parent!.column + 1);
+  assert.equal(right2!.column, parent!.column + 1);
+  assert.equal(right1!.row, parent!.row);
+  assert.equal(right2!.row, parent!.row + 1);
+
+  // Below children spread horizontally in a row, placed after side children
+  assert.ok(below1!.row > right2!.row);
+  assert.equal(below1!.row, below2!.row);
+  assert.equal(below1!.column, parent!.column);
+  assert.equal(below2!.column, parent!.column + 1);
+});
+
+test("buildTopicGridPlacementById stacks left children vertically in a column", () => {
+  const roadmap: RoadmapResponse = {
+    stages: [
+      {
+        id: "stage-a",
+        title: "Stage A",
+        topics: [
+          {
+            id: "topic-parent",
+            stageId: "stage-a",
+            title: "Parent",
+            description: "",
+            position: 10,
+            status: "in_progress",
+            progressPercent: 10,
+            tasksCount: 0,
+            materialsCount: 0,
+            prerequisiteTopicIds: []
+          },
+          {
+            id: "topic-left-1",
+            stageId: "stage-a",
+            title: "Left 1",
+            description: "",
+            position: 9,
+            status: "not_started",
+            progressPercent: 0,
+            tasksCount: 0,
+            materialsCount: 0,
+            prerequisiteTopicIds: ["topic-parent"]
+          },
+          {
+            id: "topic-left-2",
+            stageId: "stage-a",
+            title: "Left 2",
+            description: "",
+            position: 9,
+            status: "not_started",
+            progressPercent: 0,
+            tasksCount: 0,
+            materialsCount: 0,
+            prerequisiteTopicIds: ["topic-parent"]
+          }
+        ]
+      }
+    ]
+  };
+
+  const placementById = buildTopicGridPlacementById(roadmap.stages ?? []);
+  const parent = placementById.get("topic-parent");
+  const left1 = placementById.get("topic-left-1");
+  const left2 = placementById.get("topic-left-2");
+
+  assert.ok(parent);
+  assert.ok(left1);
+  assert.ok(left2);
+
+  // Same column, different rows
+  assert.equal(left1!.column, parent!.column - 1);
+  assert.equal(left2!.column, parent!.column - 1);
+  assert.equal(left1!.row, parent!.row);
+  assert.equal(left2!.row, parent!.row + 1);
+});
+
+test("buildTopicGridPlacementById stacks right children vertically in a column", () => {
+  const roadmap: RoadmapResponse = {
+    stages: [
+      {
+        id: "stage-a",
+        title: "Stage A",
+        topics: [
+          {
+            id: "topic-parent",
+            stageId: "stage-a",
+            title: "Parent",
+            description: "",
+            position: 10,
+            status: "in_progress",
+            progressPercent: 10,
+            tasksCount: 0,
+            materialsCount: 0,
+            prerequisiteTopicIds: []
+          },
+          {
+            id: "topic-right-1",
+            stageId: "stage-a",
+            title: "Right 1",
+            description: "",
+            position: 11,
+            status: "not_started",
+            progressPercent: 0,
+            tasksCount: 0,
+            materialsCount: 0,
+            prerequisiteTopicIds: ["topic-parent"]
+          },
+          {
+            id: "topic-right-2",
+            stageId: "stage-a",
+            title: "Right 2",
+            description: "",
+            position: 11,
+            status: "not_started",
+            progressPercent: 0,
+            tasksCount: 0,
+            materialsCount: 0,
+            prerequisiteTopicIds: ["topic-parent"]
+          }
+        ]
+      }
+    ]
+  };
+
+  const placementById = buildTopicGridPlacementById(roadmap.stages ?? []);
+  const parent = placementById.get("topic-parent");
+  const right1 = placementById.get("topic-right-1");
+  const right2 = placementById.get("topic-right-2");
+
+  assert.ok(parent);
+  assert.ok(right1);
+  assert.ok(right2);
+
+  // Same column, different rows
+  assert.equal(right1!.column, parent!.column + 1);
+  assert.equal(right2!.column, parent!.column + 1);
+  assert.equal(right1!.row, parent!.row);
+  assert.equal(right2!.row, parent!.row + 1);
+});
+
+test("buildTopicGridPlacementById spreads below children horizontally in a row", () => {
+  const roadmap: RoadmapResponse = {
+    stages: [
+      {
+        id: "stage-a",
+        title: "Stage A",
+        topics: [
+          {
+            id: "topic-parent",
+            stageId: "stage-a",
+            title: "Parent",
+            description: "",
+            position: 10,
+            status: "in_progress",
+            progressPercent: 10,
+            tasksCount: 0,
+            materialsCount: 0,
+            prerequisiteTopicIds: []
+          },
+          {
+            id: "topic-below-1",
+            stageId: "stage-a",
+            title: "Below 1",
+            description: "",
+            position: 10,
+            status: "not_started",
+            progressPercent: 0,
+            tasksCount: 0,
+            materialsCount: 0,
+            prerequisiteTopicIds: ["topic-parent"]
+          },
+          {
+            id: "topic-below-2",
+            stageId: "stage-a",
+            title: "Below 2",
+            description: "",
+            position: 10,
+            status: "not_started",
+            progressPercent: 0,
+            tasksCount: 0,
+            materialsCount: 0,
+            prerequisiteTopicIds: ["topic-parent"]
+          }
+        ]
+      }
+    ]
+  };
+
+  const placementById = buildTopicGridPlacementById(roadmap.stages ?? []);
   const parent = placementById.get("topic-parent");
   const below1 = placementById.get("topic-below-1");
   const below2 = placementById.get("topic-below-2");
@@ -641,9 +844,294 @@ test("buildTopicGridPlacementById avoids collisions for sequential directional c
   assert.ok(below1);
   assert.ok(below2);
 
-  assert.equal(below1!.column, parent!.column);
-  assert.equal(below2!.column, parent!.column);
-
+  // Same row, adjacent columns starting from parent column
   assert.equal(below1!.row, parent!.row + 1);
-  assert.equal(below2!.row, parent!.row + 2);
+  assert.equal(below2!.row, parent!.row + 1);
+  assert.equal(below1!.column, parent!.column);
+  assert.equal(below2!.column, parent!.column + 1);
+});
+
+test("buildTopicGridPlacementById centers parent among 3 right children", () => {
+  const roadmap: RoadmapResponse = {
+    stages: [
+      {
+        id: "stage-a",
+        title: "Stage A",
+        topics: [
+          {
+            id: "topic-parent",
+            stageId: "stage-a",
+            title: "Parent",
+            description: "",
+            position: 10,
+            status: "in_progress",
+            progressPercent: 10,
+            tasksCount: 0,
+            materialsCount: 0,
+            prerequisiteTopicIds: []
+          },
+          {
+            id: "topic-r1",
+            stageId: "stage-a",
+            title: "R1",
+            description: "",
+            position: 11,
+            status: "not_started",
+            progressPercent: 0,
+            tasksCount: 0,
+            materialsCount: 0,
+            prerequisiteTopicIds: ["topic-parent"]
+          },
+          {
+            id: "topic-r2",
+            stageId: "stage-a",
+            title: "R2",
+            description: "",
+            position: 11,
+            status: "not_started",
+            progressPercent: 0,
+            tasksCount: 0,
+            materialsCount: 0,
+            prerequisiteTopicIds: ["topic-parent"]
+          },
+          {
+            id: "topic-r3",
+            stageId: "stage-a",
+            title: "R3",
+            description: "",
+            position: 11,
+            status: "not_started",
+            progressPercent: 0,
+            tasksCount: 0,
+            materialsCount: 0,
+            prerequisiteTopicIds: ["topic-parent"]
+          }
+        ]
+      }
+    ]
+  };
+
+  const placementById = buildTopicGridPlacementById(roadmap.stages ?? []);
+  const parent = placementById.get("topic-parent");
+  const r1 = placementById.get("topic-r1");
+  const r2 = placementById.get("topic-r2");
+  const r3 = placementById.get("topic-r3");
+
+  assert.ok(parent);
+  assert.ok(r1);
+  assert.ok(r2);
+  assert.ok(r3);
+
+  // Parent centered at same row as middle child
+  assert.equal(parent!.row, r2!.row);
+  assert.equal(r1!.row, parent!.row - 1);
+  assert.equal(r3!.row, parent!.row + 1);
+  assert.equal(r1!.column, parent!.column + 1);
+  assert.equal(r2!.column, parent!.column + 1);
+  assert.equal(r3!.column, parent!.column + 1);
+});
+
+test("buildTopicGridPlacementById centers parent among 3 left children", () => {
+  const roadmap: RoadmapResponse = {
+    stages: [
+      {
+        id: "stage-a",
+        title: "Stage A",
+        topics: [
+          {
+            id: "topic-parent",
+            stageId: "stage-a",
+            title: "Parent",
+            description: "",
+            position: 10,
+            status: "in_progress",
+            progressPercent: 10,
+            tasksCount: 0,
+            materialsCount: 0,
+            prerequisiteTopicIds: []
+          },
+          {
+            id: "topic-l1",
+            stageId: "stage-a",
+            title: "L1",
+            description: "",
+            position: 9,
+            status: "not_started",
+            progressPercent: 0,
+            tasksCount: 0,
+            materialsCount: 0,
+            prerequisiteTopicIds: ["topic-parent"]
+          },
+          {
+            id: "topic-l2",
+            stageId: "stage-a",
+            title: "L2",
+            description: "",
+            position: 9,
+            status: "not_started",
+            progressPercent: 0,
+            tasksCount: 0,
+            materialsCount: 0,
+            prerequisiteTopicIds: ["topic-parent"]
+          },
+          {
+            id: "topic-l3",
+            stageId: "stage-a",
+            title: "L3",
+            description: "",
+            position: 9,
+            status: "not_started",
+            progressPercent: 0,
+            tasksCount: 0,
+            materialsCount: 0,
+            prerequisiteTopicIds: ["topic-parent"]
+          }
+        ]
+      }
+    ]
+  };
+
+  const placementById = buildTopicGridPlacementById(roadmap.stages ?? []);
+  const parent = placementById.get("topic-parent");
+  const l1 = placementById.get("topic-l1");
+  const l2 = placementById.get("topic-l2");
+  const l3 = placementById.get("topic-l3");
+
+  assert.ok(parent);
+  assert.ok(l1);
+  assert.ok(l2);
+  assert.ok(l3);
+
+  // Parent centered at same row as middle child
+  assert.equal(parent!.row, l2!.row);
+  assert.equal(l1!.row, parent!.row - 1);
+  assert.equal(l3!.row, parent!.row + 1);
+  assert.equal(l1!.column, parent!.column - 1);
+  assert.equal(l2!.column, parent!.column - 1);
+  assert.equal(l3!.column, parent!.column - 1);
+});
+
+test("buildTopicGridPlacementById separates subtrees of sibling roots", () => {
+  const roadmap: RoadmapResponse = {
+    stages: [
+      {
+        id: "stage-a",
+        title: "Stage A",
+        topics: [
+          {
+            id: "X",
+            stageId: "stage-a",
+            title: "X",
+            description: "",
+            position: 1,
+            status: "in_progress",
+            progressPercent: 10,
+            tasksCount: 0,
+            materialsCount: 0,
+            prerequisiteTopicIds: []
+          },
+          {
+            id: "Y",
+            stageId: "stage-a",
+            title: "Y",
+            description: "",
+            position: 2,
+            status: "in_progress",
+            progressPercent: 10,
+            tasksCount: 0,
+            materialsCount: 0,
+            prerequisiteTopicIds: []
+          },
+          {
+            id: "x1",
+            stageId: "stage-a",
+            title: "x1",
+            description: "",
+            position: 1,
+            status: "not_started",
+            progressPercent: 0,
+            tasksCount: 0,
+            materialsCount: 0,
+            prerequisiteTopicIds: ["X"]
+          },
+          {
+            id: "x2",
+            stageId: "stage-a",
+            title: "x2",
+            description: "",
+            position: 1,
+            status: "not_started",
+            progressPercent: 0,
+            tasksCount: 0,
+            materialsCount: 0,
+            prerequisiteTopicIds: ["X"]
+          },
+          {
+            id: "x3",
+            stageId: "stage-a",
+            title: "x3",
+            description: "",
+            position: 1,
+            status: "not_started",
+            progressPercent: 0,
+            tasksCount: 0,
+            materialsCount: 0,
+            prerequisiteTopicIds: ["X"]
+          },
+          {
+            id: "y1",
+            stageId: "stage-a",
+            title: "y1",
+            description: "",
+            position: 2,
+            status: "not_started",
+            progressPercent: 0,
+            tasksCount: 0,
+            materialsCount: 0,
+            prerequisiteTopicIds: ["Y"]
+          },
+          {
+            id: "y2",
+            stageId: "stage-a",
+            title: "y2",
+            description: "",
+            position: 2,
+            status: "not_started",
+            progressPercent: 0,
+            tasksCount: 0,
+            materialsCount: 0,
+            prerequisiteTopicIds: ["Y"]
+          }
+        ]
+      }
+    ]
+  };
+
+  const placementById = buildTopicGridPlacementById(roadmap.stages ?? []);
+  const X = placementById.get("X");
+  const Y = placementById.get("Y");
+  const x1 = placementById.get("x1");
+  const x3 = placementById.get("x3");
+  const y1 = placementById.get("y1");
+
+  assert.ok(X);
+  assert.ok(Y);
+  assert.ok(x1);
+  assert.ok(x3);
+  assert.ok(y1);
+
+  // No collision: all unique positions
+  const occupiedKeys = new Set<string>();
+  for (const placement of placementById.values()) {
+    const key = `${placement.row}:${placement.column}`;
+    assert.equal(occupiedKeys.has(key), false, `Collision at ${key}`);
+    occupiedKeys.add(key);
+  }
+
+  // Subtrees are separated: Y's leftmost column > X's rightmost column
+  const xCols = [x1, placementById.get("x2"), x3].map((p) => p!.column);
+  const yCols = [y1, placementById.get("y2")].map((p) => p!.column);
+  const xMaxCol = Math.max(...xCols);
+  const yMinCol = Math.min(...yCols);
+  assert.ok(yMinCol > xMaxCol + 1, `Gap between subtrees: xMax=${xMaxCol}, yMin=${yMinCol}`);
 });

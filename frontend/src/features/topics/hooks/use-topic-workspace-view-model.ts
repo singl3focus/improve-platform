@@ -56,7 +56,7 @@ function initialTaskDraft(): TopicTaskDraft {
   return { title: "", description: "", deadline: "" };
 }
 
-function initialMaterialDraft(): TopicMaterialDraft {
+function initialMaterialDraft(nextPosition?: number): TopicMaterialDraft {
   const type: MaterialType = "book";
   return {
     title: "",
@@ -65,8 +65,15 @@ function initialMaterialDraft(): TopicMaterialDraft {
     unit: resolveUnitByType(type),
     totalAmount: "0",
     completedAmount: "0",
-    position: "1"
+    position: String(nextPosition ?? 1)
   };
+}
+
+function computeNextMaterialPosition(materials: ReadonlyArray<{ position: number }>): number {
+  if (materials.length === 0) {
+    return 1;
+  }
+  return Math.max(...materials.map((m) => m.position)) + 1;
 }
 
 async function parseErrorMessage(response: Response, fallback: string): Promise<string> {
@@ -182,6 +189,18 @@ export function useTopicWorkspaceViewModel(topicId: string | null, copy: TopicWo
     return () => controller.abort();
   }, [topicId, reloadKey, copy.loadError]);
 
+  useEffect(() => {
+    if (state.status === "success" && state.data) {
+      setMaterialDraft((current) => {
+        if (current.title === "" && current.description === "") {
+          const nextPosition = computeNextMaterialPosition(state.data!.materials);
+          return { ...current, position: String(nextPosition) };
+        }
+        return current;
+      });
+    }
+  }, [state.status, state.data]);
+
   const dependencySummary = useMemo(() => {
     const topic = state.data;
     if (!topic) {
@@ -260,6 +279,7 @@ export function useTopicWorkspaceViewModel(topicId: string | null, copy: TopicWo
     setMaterialMutationError(null);
     setIsCreatingMaterial(true);
     try {
+      const submittedPosition = parsePositiveInteger(materialDraft.position, 1);
       await createMaterialForTopic({
         title,
         description,
@@ -267,9 +287,13 @@ export function useTopicWorkspaceViewModel(topicId: string | null, copy: TopicWo
         type: materialDraft.type,
         totalAmount,
         completedAmount,
-        position: parsePositiveInteger(materialDraft.position, 1)
+        position: submittedPosition
       });
-      setMaterialDraft(initialMaterialDraft());
+      const maxExisting = state.data?.materials
+        ? Math.max(0, ...state.data.materials.map((m) => m.position))
+        : 0;
+      const nextPosition = Math.max(maxExisting, submittedPosition) + 1;
+      setMaterialDraft(initialMaterialDraft(nextPosition));
       reload();
       return true;
     } catch (error) {
