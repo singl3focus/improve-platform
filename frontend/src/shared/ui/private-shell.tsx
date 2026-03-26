@@ -8,6 +8,7 @@ import {
   Map,
   ListTodo,
   Library,
+  LogOut,
   LucideIcon,
 } from "lucide-react";
 import { useUserPreferences } from "@shared/providers/user-preferences-provider";
@@ -81,10 +82,11 @@ export function PrivateShell({ children }: { children: ReactNode }) {
         <div className="nav-list nav-list-bottom" aria-label={copy.settings.title}>
           <button
             type="button"
-            className="sidebar-text-action"
+            className="sidebar-logout-action"
             onClick={handleLogout}
             disabled={isLoggingOut}
           >
+            <LogOut size={16} />
             {isLoggingOut ? copy.navigation.signingOut : copy.navigation.signOut}
           </button>
         </div>

@@ -6,6 +6,7 @@ interface DashboardCalendarRibbonProps {
 interface CalendarDay {
   key: string;
   isToday: boolean;
+  isWeekend: boolean;
   weekdayLabel: string;
   dayNumber: number;
   title: string;
@@ -29,9 +30,11 @@ export function DashboardCalendarRibbon({ locale }: DashboardCalendarRibbonProps
       date.setDate(today.getDate() + shift);
       const dateKey = `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
 
+      const dayOfWeek = date.getDay();
       result.push({
         key: dateKey,
         isToday: shift === 0,
+        isWeekend: dayOfWeek === 0 || dayOfWeek === 6,
         weekdayLabel: weekdayFormatter.format(date),
         dayNumber: date.getDate(),
         title: titleFormatter.format(date)
@@ -48,7 +51,9 @@ export function DashboardCalendarRibbon({ locale }: DashboardCalendarRibbonProps
           <div
             key={day.key}
             role="listitem"
-            className={day.isToday ? "dashboard-calendar-day dashboard-calendar-day-current" : "dashboard-calendar-day"}
+            className={
+              `dashboard-calendar-day${day.isToday ? " dashboard-calendar-day-current" : ""}${day.isWeekend && !day.isToday ? " dashboard-calendar-day-weekend" : ""}`
+            }
             title={day.title}
             aria-current={day.isToday ? "date" : undefined}
           >

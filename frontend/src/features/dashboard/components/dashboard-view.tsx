@@ -149,6 +149,7 @@ function DashboardCharts({
       className: "dashboard-chart-bar-completed"
     }
   ];
+  const topicsByStatusTotal = topicsByStatusItems.reduce((sum, item) => sum + item.value, 0);
   const topicsByStatusMax = Math.max(1, ...topicsByStatusItems.map((item) => item.value));
   const deadlinesMax = Math.max(1, ...charts.upcomingDeadlines.map((entry) => entry.count));
   const isEmpty =
@@ -168,18 +169,21 @@ function DashboardCharts({
           <section className="dashboard-chart-card">
             <h4>{copy.chartTopicsByStatusTitle}</h4>
             <ul className="dashboard-chart-list">
-              {topicsByStatusItems.map((item) => (
-                <li key={item.label} className="dashboard-chart-list-item">
-                  <span>{item.label}</span>
-                  <div className="dashboard-chart-bar-track" aria-hidden="true">
-                    <span
-                      className={`dashboard-chart-bar-fill ${item.className}`}
-                      style={{ width: `${Math.round((item.value / topicsByStatusMax) * 100)}%` }}
-                    />
-                  </div>
-                  <strong>{copy.chartCountLabel(item.value)}</strong>
-                </li>
-              ))}
+              {topicsByStatusItems.map((item) => {
+                const pct = topicsByStatusTotal > 0 ? Math.round((item.value / topicsByStatusTotal) * 100) : 0;
+                return (
+                  <li key={item.label} className="dashboard-chart-list-item">
+                    <span>{item.label}</span>
+                    <div className="dashboard-chart-bar-track" aria-hidden="true">
+                      <span
+                        className={`dashboard-chart-bar-fill ${item.className}`}
+                        style={{ width: `${Math.round((item.value / topicsByStatusMax) * 100)}%` }}
+                      />
+                    </div>
+                    <strong>{item.value} ({pct}%)</strong>
+                  </li>
+                );
+              })}
             </ul>
           </section>
 
