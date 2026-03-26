@@ -3,8 +3,8 @@ import {
   createBackendClient,
   createBackendErrorResponse,
   createBackendUnavailableResponse
-} from "@/lib/backend-api";
-import { normalizeText } from "@/lib/payload-parsers";
+} from "@shared/api/backend-client";
+import { normalizeText } from "@shared/api/payload-parsers";
 
 interface RouteContext {
   params: {

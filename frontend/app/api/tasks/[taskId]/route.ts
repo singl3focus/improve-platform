@@ -2,15 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import type {
   BackendRoadmapResponse,
   BackendTaskResponse
-} from "@/lib/backend-learning-contracts";
-import { mapBackendTaskStatusToBoard } from "@/lib/backend-learning-mappers";
+} from "@shared/api/backend-contracts";
+import { mapBackendTaskStatusToBoard } from "@features/tasks/lib/backend-learning-mappers";
 import {
   createBackendClient,
   createBackendErrorResponse,
   createBackendUnavailableResponse,
   isBackendErrorCode
-} from "@/lib/backend-api";
-import { buildRoadmapTopicTitleMap } from "@/lib/roadmap-topic-helpers";
+} from "@shared/api/backend-client";
+import { buildRoadmapTopicTitleMap } from "@features/roadmap/lib/roadmap-topic-helpers";
 
 interface RouteContext {
   params: {

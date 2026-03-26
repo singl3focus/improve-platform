@@ -4,7 +4,7 @@ import {
   callBackendAuth,
   clearSessionCookies
 } from "../_shared";
-import { REFRESH_TOKEN_COOKIE } from "@/lib/auth/session";
+import { REFRESH_TOKEN_COOKIE } from "@features/auth/lib/session";
 
 export async function POST(request: NextRequest) {
   const refreshToken = request.cookies.get(REFRESH_TOKEN_COOKIE)?.value;

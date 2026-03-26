@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { Montserrat } from "next/font/google";
-import { GlobalUiControls } from "@/components/layout/global-ui-controls";
-import { AppQueryProvider } from "@/components/providers/app-query-provider";
-import { UserPreferencesProvider } from "@/components/providers/user-preferences-provider";
+import { GlobalUiControls } from "@shared/ui/global-ui-controls";
+import { AppQueryProvider } from "@shared/providers/app-query-provider";
+import { UserPreferencesProvider } from "@shared/providers/user-preferences-provider";
 import "./globals.css";
 
 const montserrat = Montserrat({

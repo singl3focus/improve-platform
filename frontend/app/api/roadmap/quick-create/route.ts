@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { BackendRoadmapResponse } from "@/lib/backend-learning-contracts";
+import type { BackendRoadmapResponse } from "@shared/api/backend-contracts";
 import {
   createBackendClient,
   createBackendErrorResponse,
   createBackendUnavailableResponse,
   isBackendErrorCode
-} from "@/lib/backend-api";
+} from "@shared/api/backend-client";
 
 interface QuickCreatePayload {
   roadmapTitle?: unknown;

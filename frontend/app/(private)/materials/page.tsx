@@ -1,4 +1,4 @@
-import { MaterialsLibraryView } from "@/components/materials-library-view";
+import { MaterialsLibraryView } from "@features/materials/components/materials-library-view";
 
 export default function MaterialsPage() {
   return <MaterialsLibraryView />;

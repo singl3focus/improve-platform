@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
-import type { BackendHistoryEventResponse } from "@/lib/backend-learning-contracts";
-import { createBackendErrorResponse } from "@/lib/backend-api";
+import type { BackendHistoryEventResponse } from "@shared/api/backend-contracts";
+import { createBackendErrorResponse } from "@shared/api/backend-client";
 import {
   applyDashboardError,
   createDashboardClient,

@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { RoadmapResponse, RoadmapTopic } from "@/lib/roadmap-types";
+import type { RoadmapResponse, RoadmapTopic } from "@features/roadmap/types";
 import type {
   BackendRoadmapResponse,
   BackendRoadmapTopic,
   BackendTopicTasksResponse
-} from "@/lib/backend-learning-contracts";
+} from "@shared/api/backend-contracts";
 import {
   createBackendClient,
   createBackendErrorResponse,
   createBackendUnavailableResponse,
   isBackendErrorCode
-} from "@/lib/backend-api";
+} from "@shared/api/backend-client";
 
 interface TopicMetrics {
   tasksCount: number;

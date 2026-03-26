@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { TopicChecklistStatus } from "@/lib/topic-workspace-types";
-import { mapChecklistStatusToBackend } from "@/lib/backend-learning-mappers";
+import type { TopicChecklistStatus } from "@features/topics/types";
+import { mapChecklistStatusToBackend } from "@features/tasks/lib/backend-learning-mappers";
 import {
   createBackendClient,
   createBackendErrorResponse,
   createBackendUnavailableResponse
-} from "@/lib/backend-api";
+} from "@shared/api/backend-client";
 
 interface RouteContext {
   params: {

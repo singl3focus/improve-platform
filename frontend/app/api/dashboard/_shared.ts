@@ -3,14 +3,14 @@ import type {
   BackendMaterialResponse,
   BackendRoadmapResponse,
   BackendTaskResponse
-} from "@/lib/backend-learning-contracts";
+} from "@shared/api/backend-contracts";
 import {
   createBackendClient,
   createBackendErrorResponse,
   createBackendUnavailableResponse,
   isBackendErrorCode
-} from "@/lib/backend-api";
-import { buildRoadmapTopicTitleMap } from "@/lib/roadmap-topic-helpers";
+} from "@shared/api/backend-client";
+import { buildRoadmapTopicTitleMap } from "@features/roadmap/lib/roadmap-topic-helpers";
 
 export interface MaterialWithTopic {
   material: BackendMaterialResponse;

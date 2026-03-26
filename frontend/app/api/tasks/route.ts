@@ -2,20 +2,20 @@ import { NextRequest, NextResponse } from "next/server";
 import type {
   BackendRoadmapResponse,
   BackendTaskResponse
-} from "@/lib/backend-learning-contracts";
+} from "@shared/api/backend-contracts";
 import {
   isTaskDueWithinWeek,
   isTaskOverdue,
   mapBackendTaskStatusToBoard
-} from "@/lib/backend-learning-mappers";
-import type { TaskBoardDueFilter } from "@/lib/tasks-board-types";
+} from "@features/tasks/lib/backend-learning-mappers";
+import type { TaskBoardDueFilter } from "@features/tasks/types";
 import {
   createBackendClient,
   createBackendErrorResponse,
   createBackendUnavailableResponse,
   isBackendErrorCode
-} from "@/lib/backend-api";
-import { buildRoadmapTopicTitleMap } from "@/lib/roadmap-topic-helpers";
+} from "@shared/api/backend-client";
+import { buildRoadmapTopicTitleMap } from "@features/roadmap/lib/roadmap-topic-helpers";
 
 function parseDueFilter(value: string | null): TaskBoardDueFilter {
   if (value === "overdue" || value === "week") {

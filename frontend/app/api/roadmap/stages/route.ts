@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { BackendRoadmapResponse } from "@/lib/backend-learning-contracts";
+import type { BackendRoadmapResponse } from "@shared/api/backend-contracts";
 import {
   createBackendClient,
   createBackendErrorResponse,
   createBackendUnavailableResponse
-} from "@/lib/backend-api";
-import { normalizeText, parseInteger } from "@/lib/payload-parsers";
+} from "@shared/api/backend-client";
+import { normalizeText, parseInteger } from "@shared/api/payload-parsers";
 
 interface StageCreatePayload {
   title?: unknown;

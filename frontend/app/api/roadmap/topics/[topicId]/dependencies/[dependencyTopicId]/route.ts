@@ -3,7 +3,7 @@ import {
   createBackendClient,
   createBackendErrorResponse,
   createBackendUnavailableResponse
-} from "@/lib/backend-api";
+} from "@shared/api/backend-client";
 
 interface RouteContext {
   params: {

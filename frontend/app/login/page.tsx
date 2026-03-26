@@ -1,4 +1,4 @@
-import { AuthForm } from "@/components/auth/auth-form";
+import { AuthForm } from "@features/auth/components/auth-form";
 
 interface AuthPageProps {
   searchParams?: Record<string, string | string[] | undefined>;

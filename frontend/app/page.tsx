@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { ACCESS_TOKEN_COOKIE, REFRESH_TOKEN_COOKIE } from "@/lib/auth/session";
+import { ACCESS_TOKEN_COOKIE, REFRESH_TOKEN_COOKIE } from "@features/auth/lib/session";
 
 export default function HomePage() {
   const cookieStore = cookies();

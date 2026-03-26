@@ -3,13 +3,13 @@ import {
   createBackendClient,
   createBackendErrorResponse,
   createBackendUnavailableResponse
-} from "@/lib/backend-api";
-import { getStringValue, isRecord } from "@/lib/backend-shared";
-import { normalizeText } from "@/lib/payload-parsers";
+} from "@shared/api/backend-client";
+import { getStringValue, isRecord } from "@shared/api/backend-shared";
+import { normalizeText } from "@shared/api/payload-parsers";
 import {
   isRoadmapTopicStatus
-} from "@/lib/roadmap-topic-status";
-import { buildRoadmapTopicUpdatePlan } from "@/lib/roadmap-topic-update-flow";
+} from "@features/roadmap/lib/roadmap-topic-status";
+import { buildRoadmapTopicUpdatePlan } from "@features/roadmap/lib/roadmap-topic-update-flow";
 
 interface RouteContext {
   params: {

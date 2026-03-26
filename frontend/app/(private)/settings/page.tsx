@@ -1,6 +1,6 @@
 "use client";
 
-import { useUserPreferences } from "@/components/providers/user-preferences-provider";
+import { useUserPreferences } from "@shared/providers/user-preferences-provider";
 
 export default function SettingsPage() {
   const { copy } = useUserPreferences();

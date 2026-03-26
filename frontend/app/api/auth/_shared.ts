@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ACCESS_TOKEN_COOKIE, REFRESH_TOKEN_COOKIE } from "@/lib/auth/session";
-import type { AuthCredentials, AuthRegisterCredentials, AuthUser } from "@/lib/auth/contracts";
+import { ACCESS_TOKEN_COOKIE, REFRESH_TOKEN_COOKIE } from "@features/auth/lib/session";
+import type { AuthCredentials, AuthRegisterCredentials, AuthUser } from "@features/auth/lib/contracts";
 import {
   getBackendApiUrl,
   getNumberValue,
   getResponseCandidates,
   getStringValue,
   isRecord
-} from "@/lib/backend-shared";
+} from "@shared/api/backend-shared";
 
 export const BACKEND_AUTH_PATHS = {
   login: "/api/v1/auth/login",

@@ -2,23 +2,23 @@ import { NextRequest, NextResponse } from "next/server";
 import type {
   BackendMaterialResponse,
   BackendRoadmapResponse
-} from "@/lib/backend-learning-contracts";
+} from "@shared/api/backend-contracts";
 import {
   createBackendClient,
   createBackendErrorResponse,
   createBackendUnavailableResponse,
   isBackendErrorCode
-} from "@/lib/backend-api";
-import { normalizeText, parseInteger } from "@/lib/payload-parsers";
+} from "@shared/api/backend-client";
+import { normalizeText, parseInteger } from "@shared/api/payload-parsers";
 import {
   buildTopicTitleMap,
   extractTopicTitleOptions,
   type TopicTitleOption
-} from "@/lib/roadmap-topic-helpers";
+} from "@features/roadmap/lib/roadmap-topic-helpers";
 import {
   mapBackendMaterialToLibraryMaterial,
   toBackendCreateMaterialPayload
-} from "@/lib/materials-api-mapping";
+} from "@features/materials/lib/materials-api-mapping";
 
 const ALLOWED_MATERIAL_TYPES = new Set(["book", "article", "course", "video"]);
 

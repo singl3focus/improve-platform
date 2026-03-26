@@ -3,9 +3,9 @@ import {
   createBackendClient,
   createBackendErrorResponse,
   createBackendUnavailableResponse
-} from "@/lib/backend-api";
-import { normalizeText } from "@/lib/payload-parsers";
-import { getNextTopicPosition } from "@/lib/roadmap-topic-position";
+} from "@shared/api/backend-client";
+import { normalizeText } from "@shared/api/payload-parsers";
+import { getNextTopicPosition } from "@features/roadmap/lib/roadmap-topic-position";
 
 interface TopicCreatePayload {
   title?: unknown;

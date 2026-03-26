@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import type { BackendTopicTasksResponse } from "@/lib/backend-learning-contracts";
+import type { BackendTopicTasksResponse } from "@shared/api/backend-contracts";
 import {
   applyDashboardError,
   createDashboardClient,
@@ -8,7 +8,7 @@ import {
   flattenRoadmapTopics,
   loadRoadmapOrEmpty
 } from "../_shared";
-import { createBackendErrorResponse, isBackendErrorCode } from "@/lib/backend-api";
+import { createBackendErrorResponse, isBackendErrorCode } from "@shared/api/backend-client";
 
 export async function GET(request: NextRequest) {
   const client = createDashboardClient(request);

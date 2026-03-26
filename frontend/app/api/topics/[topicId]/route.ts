@@ -4,15 +4,15 @@ import type {
   BackendRoadmapResponse,
   BackendRoadmapTopic,
   BackendTopicTasksResponse
-} from "@/lib/backend-learning-contracts";
-import { mapBackendTaskStatusToChecklist } from "@/lib/backend-learning-mappers";
-import type { TopicWorkspace } from "@/lib/topic-workspace-types";
+} from "@shared/api/backend-contracts";
+import { mapBackendTaskStatusToChecklist } from "@features/tasks/lib/backend-learning-mappers";
+import type { TopicWorkspace } from "@features/topics/types";
 import {
   createBackendClient,
   createBackendErrorResponse,
   createBackendUnavailableResponse,
   isBackendErrorCode
-} from "@/lib/backend-api";
+} from "@shared/api/backend-client";
 
 interface RouteContext {
   params: {

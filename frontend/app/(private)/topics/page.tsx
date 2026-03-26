@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { TopicWorkspaceView } from "@/components/topic-workspace-view";
+import { TopicWorkspaceView } from "@features/topics/components/topic-workspace-view";
 
 interface TopicsPageProps {
   searchParams?: Record<string, string | string[] | undefined>;

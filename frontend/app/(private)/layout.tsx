@@ -1,9 +1,9 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
-import { PrivateShell } from "@/components/layout/private-shell";
-import { REFRESH_TOKEN_COOKIE } from "@/lib/auth/session";
-import { hasValidServerSession } from "@/lib/auth/server-session";
+import { PrivateShell } from "@shared/ui/private-shell";
+import { REFRESH_TOKEN_COOKIE } from "@features/auth/lib/session";
+import { hasValidServerSession } from "@features/auth/lib/server-session";
 
 export default async function PrivateLayout({
   children

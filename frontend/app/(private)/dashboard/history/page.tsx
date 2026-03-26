@@ -1,4 +1,4 @@
-import { DashboardHistoryView } from "@/components/dashboard-history-view";
+import { DashboardHistoryView } from "@features/history/components/dashboard-history-view";
 
 export default function DashboardHistoryPage() {
   return <DashboardHistoryView />;

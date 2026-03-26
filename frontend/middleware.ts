@@ -5,7 +5,7 @@ import {
   REFRESH_TOKEN_COOKIE,
   isAuthRoute,
   isProtectedRoute
-} from "@/lib/auth/session";
+} from "@features/auth/lib/session";
 
 type SessionValidation = "valid" | "invalid" | "unknown";
 
