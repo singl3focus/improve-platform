@@ -26,6 +26,7 @@ export interface MaterialsFilters {
 export interface MaterialDraft {
   title: string;
   description: string;
+  url: string;
   topicId: string;
   type: MaterialType;
   unit: string;
@@ -37,6 +38,7 @@ export interface MaterialDraft {
 interface CreateMaterialPayload {
   title: string;
   description: string;
+  url: string;
   topicId: string;
   type: MaterialType;
   totalAmount: number;
@@ -63,6 +65,7 @@ function initialMaterialDraft(): MaterialDraft {
   return {
     title: "",
     description: "",
+    url: "",
     topicId: "",
     type,
     unit: resolveUnitByType(type),
@@ -157,6 +160,7 @@ function createDraftFromMaterial(material: LibraryMaterial): MaterialDraft {
   return {
     title: material.title,
     description: material.description,
+    url: material.url,
     topicId: material.topicId,
     type: material.type,
     unit: material.unit,
@@ -236,7 +240,7 @@ export function useMaterialsLibraryViewModel(copy: MaterialsCopyForViewModel) {
 
     const title = createDraft.title.trim();
     const description = createDraft.description.trim();
-    if (!title || !description) {
+    if (!title) {
       setMutationError(copy.titleDescriptionRequired);
       return false;
     }
@@ -254,6 +258,7 @@ export function useMaterialsLibraryViewModel(copy: MaterialsCopyForViewModel) {
       await createMaterialMutation.mutateAsync({
         title,
         description,
+        url: createDraft.url.trim(),
         topicId,
         type: createDraft.type,
         totalAmount,
@@ -294,7 +299,7 @@ export function useMaterialsLibraryViewModel(copy: MaterialsCopyForViewModel) {
 
     const title = editDraft.title.trim();
     const description = editDraft.description.trim();
-    if (!title || !description || !editDraft.topicId) {
+    if (!title || !editDraft.topicId) {
       setMutationError(copy.titleDescriptionRequired);
       return;
     }
@@ -314,6 +319,7 @@ export function useMaterialsLibraryViewModel(copy: MaterialsCopyForViewModel) {
         payload: {
           title,
           description,
+          url: editDraft.url.trim(),
           topicId: editDraft.topicId,
           type: editDraft.type,
           totalAmount,

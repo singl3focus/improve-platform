@@ -12,6 +12,11 @@ import {
 import type { DashboardChartsPayload, DashboardHistoryEvent } from "@features/dashboard/types";
 import type { DashboardCopy } from "@shared/i18n/ui-copy";
 import { DashboardCalendarRibbon } from "@features/dashboard/components/dashboard-calendar-ribbon";
+import {
+  formatHistoryEventTitle,
+  formatHistoryEventSubtitle,
+  formatHistoryEventBadge
+} from "@features/history/lib/format-history-event";
 
 function DashboardPanel({
   title,
@@ -112,7 +117,7 @@ function formatChartDayLabel(value: string, locale: string): string {
   }).format(date);
 }
 
-function formatHistorySubtitle(entry: DashboardHistoryEvent, locale: string, copy: DashboardCopy): string {
+function formatHistorySubtitleLegacy(entry: DashboardHistoryEvent, locale: string, copy: DashboardCopy): string {
   return `${entry.entityType} · ${entry.eventType} · ${formatDashboardDate(entry.createdAt, locale, copy.noDate)}`;
 }
 
@@ -218,6 +223,7 @@ export function DashboardView() {
   const router = useRouter();
   const {
     dashboardCopy,
+    language,
     locale,
     progress,
     dailySummary,
@@ -493,12 +499,12 @@ export function DashboardView() {
                   {history.state.data.map((entry) => (
                     <li key={entry.id} className="dashboard-list-item">
                       <div>
-                        <p className="dashboard-list-title">{entry.eventName}</p>
+                        <p className="dashboard-list-title">{formatHistoryEventTitle(entry, language)}</p>
                         <p className="dashboard-list-subtitle">
-                          {formatHistorySubtitle(entry, locale, dashboardCopy)}
+                          {formatHistoryEventSubtitle(entry, language, formatDashboardDate(entry.createdAt, locale, dashboardCopy.noDate))}
                         </p>
                       </div>
-                      <span className="dashboard-badge">{entry.eventType}</span>
+                      <span className="dashboard-badge">{formatHistoryEventBadge(entry, language)}</span>
                     </li>
                   ))}
                 </ul>

@@ -14,7 +14,7 @@ type mockRepo struct {
 	createFn      func(ctx context.Context, m material.Material) (material.Material, error)
 	getByIDFn     func(ctx context.Context, id, userID string) (material.Material, error)
 	listByTopicFn func(ctx context.Context, topicID, userID string) ([]material.Material, error)
-	updateFn      func(ctx context.Context, id, userID, title, description, materialType, unit string, totalAmount, completedAmount, position int) error
+	updateFn      func(ctx context.Context, id, userID, title, description, url, materialType, unit string, totalAmount, completedAmount, position int) error
 	deleteFn      func(ctx context.Context, id, userID string) error
 }
 
@@ -27,8 +27,8 @@ func (m *mockRepo) GetByID(ctx context.Context, id, userID string) (material.Mat
 func (m *mockRepo) ListByTopic(ctx context.Context, topicID, userID string) ([]material.Material, error) {
 	return m.listByTopicFn(ctx, topicID, userID)
 }
-func (m *mockRepo) Update(ctx context.Context, id, userID, title, description, materialType, unit string, totalAmount, completedAmount, position int) error {
-	return m.updateFn(ctx, id, userID, title, description, materialType, unit, totalAmount, completedAmount, position)
+func (m *mockRepo) Update(ctx context.Context, id, userID, title, description, url, materialType, unit string, totalAmount, completedAmount, position int) error {
+	return m.updateFn(ctx, id, userID, title, description, url, materialType, unit, totalAmount, completedAmount, position)
 }
 func (m *mockRepo) Delete(ctx context.Context, id, userID string) error {
 	return m.deleteFn(ctx, id, userID)
@@ -201,7 +201,7 @@ func TestListByTopic_Empty(t *testing.T) {
 
 func TestUpdateMaterial_Success(t *testing.T) {
 	repo := &mockRepo{
-		updateFn: func(_ context.Context, _, _, _, _, materialType, unit string, totalAmount, completedAmount, _ int) error {
+		updateFn: func(_ context.Context, _, _, _, _, _, materialType, unit string, totalAmount, completedAmount, _ int) error {
 			if materialType != "video" {
 				t.Errorf("expected type video, got %s", materialType)
 			}
@@ -244,7 +244,7 @@ func TestUpdateMaterial_InvalidAmount(t *testing.T) {
 
 func TestUpdateMaterial_NotFound(t *testing.T) {
 	repo := &mockRepo{
-		updateFn: func(_ context.Context, _, _, _, _, _, _ string, _, _, _ int) error {
+		updateFn: func(_ context.Context, _, _, _, _, _, _, _ string, _, _, _ int) error {
 			return material.ErrMaterialNotFound
 		},
 	}

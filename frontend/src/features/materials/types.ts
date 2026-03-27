@@ -17,6 +17,7 @@ export interface LibraryMaterial {
   id: string;
   title: string;
   description: string;
+  url: string;
   topicId: string;
   topicTitle: string;
   type: MaterialType;
@@ -35,6 +36,7 @@ export interface MaterialsLibraryPayload {
 export interface CreateLibraryMaterialInput {
   title: string;
   description: string;
+  url: string;
   topicId: string;
   type: MaterialType;
   totalAmount: number;
@@ -45,6 +47,7 @@ export interface CreateLibraryMaterialInput {
 export interface UpdateLibraryMaterialInput {
   title?: string;
   description?: string;
+  url?: string;
   topicId?: string;
   type?: MaterialType;
   totalAmount?: number;

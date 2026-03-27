@@ -84,6 +84,7 @@ const ROADMAP_COPY = {
     zoomIn: "Увеличить",
     zoomOut: "Уменьшить",
     recenter: "Центр",
+    fitAll: "Показать всё",
     errorFallback: "Не удалось загрузить roadmap.",
     stageAria: "Этапы roadmap",
     topicsCount: (count: number) => `${count} тем`,
@@ -191,6 +192,7 @@ const ROADMAP_COPY = {
     zoomIn: "Zoom in",
     zoomOut: "Zoom out",
     recenter: "Recenter",
+    fitAll: "Fit all",
     errorFallback: "Roadmap failed to load.",
     stageAria: "Roadmap stages",
     topicsCount: (count: number) => `${count} topics`,
@@ -1396,6 +1398,53 @@ export function RoadmapView() {
     };
   }
 
+  function handleFitAll() {
+    const graphElement = graphRef.current;
+    if (!graphElement || allTopics.length === 0) return;
+
+    let minX = Number.POSITIVE_INFINITY;
+    let minY = Number.POSITIVE_INFINITY;
+    let maxX = Number.NEGATIVE_INFINITY;
+    let maxY = Number.NEGATIVE_INFINITY;
+
+    for (const topic of allTopics) {
+      const el = topicRefs.current.get(topic.id);
+      if (!el) continue;
+      const tr = el.getBoundingClientRect();
+      const gr = graphElement.getBoundingClientRect();
+      const left = (tr.left - gr.left - sceneTransform.offsetX) / sceneTransform.scale;
+      const top = (tr.top - gr.top - sceneTransform.offsetY) / sceneTransform.scale;
+      const width = tr.width / sceneTransform.scale;
+      const height = tr.height / sceneTransform.scale;
+      minX = Math.min(minX, left);
+      minY = Math.min(minY, top);
+      maxX = Math.max(maxX, left + width);
+      maxY = Math.max(maxY, top + height);
+    }
+
+    if (!Number.isFinite(minX)) return;
+
+    const padding = 40;
+    const contentWidth = maxX - minX + padding * 2;
+    const contentHeight = maxY - minY + padding * 2;
+    const scaleX = graphElement.clientWidth / contentWidth;
+    const scaleY = graphElement.clientHeight / contentHeight;
+    const fitScale = clampGraphScale(
+      Math.min(scaleX, scaleY),
+      ROADMAP_MIN_SCALE,
+      ROADMAP_MAX_SCALE
+    );
+
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
+
+    setSceneTransform({
+      scale: fitScale,
+      offsetX: graphElement.clientWidth / 2 - centerX * fitScale,
+      offsetY: graphElement.clientHeight / 2 - centerY * fitScale
+    });
+  }
+
   function handleZoomIn() {
     const graphElement = graphRef.current;
     if (!graphElement) {
@@ -1471,6 +1520,13 @@ export function RoadmapView() {
                   onClick={() => recenterGraphScene(1)}
                 >
                   {copy.recenter}
+                </button>
+                <button
+                  type="button"
+                  className="button button-outline"
+                  onClick={handleFitAll}
+                >
+                  {copy.fitAll}
                 </button>
               </div>
               <button

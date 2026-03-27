@@ -51,6 +51,7 @@ export interface TaskCreateDraft {
   description: string;
   topicId: string;
   deadline: string;
+  status?: TaskBoardStatus;
 }
 
 interface TasksBoardCopyForViewModel {
@@ -220,6 +221,20 @@ function doesTaskMatchFilters(task: TaskBoardItem, filters: TaskBoardFilters): b
   }
 
   return true;
+}
+
+export function getTaskStatusLabel(status: TaskBoardStatus, language: AppLanguage): string {
+  if (language === "ru") {
+    if (status === "new") return "Новая";
+    if (status === "in_progress") return "В работе";
+    if (status === "paused") return "На паузе";
+    return "Выполнена";
+  }
+
+  if (status === "new") return "New";
+  if (status === "in_progress") return "In progress";
+  if (status === "paused") return "Paused";
+  return "Completed";
 }
 
 export function getTaskColumnConfig(language: AppLanguage): Array<{
@@ -454,6 +469,9 @@ export function useTasksBoardViewModel(copy: TasksBoardCopyForViewModel) {
     setMutationError(null);
     setUpdatingTaskId(taskId);
 
+    const currentTask = state.data.tasks.find((task) => task.id === taskId);
+    const statusChanged = draft.status && currentTask && draft.status !== currentTask.status;
+
     try {
       const updatedTask = await updateTask(taskId, {
         title,
@@ -461,6 +479,15 @@ export function useTasksBoardViewModel(copy: TasksBoardCopyForViewModel) {
         topicId: topicId || null,
         ...(deadline ? { deadline } : {})
       });
+
+      if (statusChanged && draft.status) {
+        try {
+          const statusUpdated = await patchTaskStatus(taskId, draft.status);
+          Object.assign(updatedTask, statusUpdated);
+        } catch {
+          // Status update failed, but the other fields were saved
+        }
+      }
 
       setState((current) => {
         if (current.status !== "success" || !current.data) {

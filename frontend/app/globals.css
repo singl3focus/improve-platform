@@ -209,6 +209,63 @@ a {
   line-height: 1.2;
 }
 
+.user-identity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 18px;
+  padding: 8px 6px;
+  border-radius: 12px;
+  text-decoration: none;
+  transition: background 120ms ease;
+}
+
+.user-identity:hover {
+  background: rgba(42, 125, 225, 0.07);
+}
+
+.user-avatar {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.user-avatar-placeholder {
+  background: var(--border);
+}
+
+.user-full-name {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-avatar-lg {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 1.4rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+}
+
 .sidebar-logout-action {
   display: inline-flex;
   align-items: center;
@@ -360,6 +417,23 @@ a {
 .settings-view h2 {
   margin: 0;
   font-size: 1.25rem;
+}
+
+.settings-info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.9rem;
+}
+
+.settings-info-row span {
+  color: var(--muted);
+}
+
+.settings-info-row strong {
+  color: var(--text);
 }
 
 .settings-control-grid {
@@ -2425,7 +2499,6 @@ a {
 .tasks-card-head a,
 .tasks-card-head span {
   font-size: 0.69rem;
-  text-transform: uppercase;
   letter-spacing: 0.03em;
   color: #64748b;
   font-weight: 700;
@@ -2795,6 +2868,17 @@ a {
   width: 100%;
 }
 
+.materials-url-link {
+  display: block;
+  font-size: 0.82rem;
+  color: var(--link);
+  word-break: break-all;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
 .materials-card-actions {
   display: flex;
   gap: 8px;
@@ -2819,6 +2903,12 @@ a {
 .materials-edit-form {
   border-top: 1px dashed var(--border);
   padding-top: 10px;
+  grid-template-columns: 1fr;
+}
+
+.materials-edit-form .materials-form-field-title,
+.materials-edit-form .materials-form-field-description {
+  grid-column: auto;
 }
 
 .materials-edit-actions {
@@ -3057,4 +3147,110 @@ a {
   .materials-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* Profile page */
+
+.profile-view {
+  display: grid;
+  gap: 24px;
+  width: 100%;
+}
+
+.profile-header {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 4px 14px rgba(18, 58, 98, 0.05);
+}
+
+.profile-avatar-lg {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 1.4rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.profile-header-info {
+  display: grid;
+  gap: 2px;
+}
+
+.profile-name {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.profile-email {
+  margin: 0;
+  font-size: 0.92rem;
+  color: var(--muted);
+}
+
+.profile-since {
+  margin: 4px 0 0;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.profile-sections {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.profile-section {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 20px;
+  background: var(--surface);
+  display: grid;
+  gap: 14px;
+}
+
+.profile-section-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.profile-form {
+  display: grid;
+  gap: 10px;
+}
+
+.profile-save-btn {
+  justify-self: start;
+  padding: 0 20px;
+}
+
+.profile-success {
+  margin: 0;
+  font-size: 0.88rem;
+  color: #059669;
+  font-weight: 600;
+}
+
+.profile-error {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--danger-text);
+}
+
+.muted-text {
+  color: var(--muted);
+  font-size: 0.92rem;
 }

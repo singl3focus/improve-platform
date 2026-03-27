@@ -9,6 +9,7 @@ export interface BackendCreateMaterialPayload {
   topic_id: string;
   title: string;
   description: string;
+  url: string;
   type: MaterialType;
   total_amount: number;
   completed_amount: number;
@@ -18,6 +19,7 @@ export interface BackendCreateMaterialPayload {
 export interface BackendUpdateMaterialPayload {
   title: string;
   description: string;
+  url: string;
   type: MaterialType;
   total_amount: number;
   completed_amount: number;
@@ -32,6 +34,7 @@ export function mapBackendMaterialToLibraryMaterial(
     id: material.id,
     title: material.title,
     description: material.description,
+    url: material.url ?? "",
     topicId: material.topic_id,
     topicTitle,
     type: material.type,
@@ -50,6 +53,7 @@ export function toBackendCreateMaterialPayload(
     topic_id: input.topicId,
     title: input.title,
     description: input.description,
+    url: input.url,
     type: input.type,
     total_amount: input.totalAmount,
     completed_amount: input.completedAmount,
@@ -60,6 +64,7 @@ export function toBackendCreateMaterialPayload(
 export function toBackendUpdateMaterialPayload(input: {
   title: string;
   description: string;
+  url: string;
   type: MaterialType;
   totalAmount: number;
   completedAmount: number;
@@ -68,6 +73,7 @@ export function toBackendUpdateMaterialPayload(input: {
   return {
     title: input.title,
     description: input.description,
+    url: input.url,
     type: input.type,
     total_amount: input.totalAmount,
     completed_amount: input.completedAmount,

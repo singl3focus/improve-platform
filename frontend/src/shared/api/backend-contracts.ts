@@ -48,6 +48,7 @@ export interface BackendMaterialResponse {
   topic_id: string;
   title: string;
   description: string;
+  url?: string;
   type: "book" | "article" | "course" | "video";
   unit: "pages" | "lessons" | "hours";
   total_amount: number;

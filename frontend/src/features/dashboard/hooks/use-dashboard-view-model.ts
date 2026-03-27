@@ -133,7 +133,7 @@ export function isDashboardTaskOverdue(value: string): boolean {
 }
 
 export function hasDailySummaryContent(data: DashboardDailySummary): boolean {
-  return data.upcomingTasksCount > 0;
+  return data.upcomingTasksCount > 0 || data.nextTaskTitle !== null;
 }
 
 export function hasRoadmapProgress(data: DashboardProgress): boolean {
@@ -199,6 +199,7 @@ export function useDashboardViewModel() {
 
   return {
     dashboardCopy,
+    language,
     locale,
     session,
     progress,

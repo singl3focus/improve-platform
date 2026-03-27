@@ -66,3 +66,22 @@ func (r *UserRepo) FindByID(ctx context.Context, id string) (User, error) {
 	}
 	return u, apperr.E(op, err)
 }
+
+func (r *UserRepo) UpdateUser(ctx context.Context, id, fullName, email, passwordHash string) (User, error) {
+	const op apperr.Op = "UserRepo.UpdateUser"
+	var u User
+	err := r.pool.QueryRow(ctx,
+		`UPDATE users SET full_name = $1, email = $2, password_hash = $3, updated_at = now()
+		 WHERE id = $4
+		 RETURNING id, full_name, email, password_hash, created_at, updated_at`,
+		fullName, email, passwordHash, id,
+	).Scan(&u.ID, &u.FullName, &u.Email, &u.PasswordHash, &u.CreatedAt, &u.UpdatedAt)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if apperr.As(err, &pgErr) && pgErr.Code == uniqueViolation {
+			return User{}, apperr.E(op, ErrEmailExists)
+		}
+		return User{}, apperr.E(op, err)
+	}
+	return u, nil
+}

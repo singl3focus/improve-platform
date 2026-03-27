@@ -95,6 +95,55 @@ func (uc *UseCase) Logout(_ context.Context, refreshToken string) error {
 	return nil
 }
 
+func (uc *UseCase) UpdateProfile(ctx context.Context, userID string, req UpdateProfileRequest) (UserResponse, error) {
+	const op apperr.Op = "UseCase.UpdateProfile"
+
+	user, err := uc.repo.FindByID(ctx, userID)
+	if err != nil {
+		return UserResponse{}, apperr.E(op, err)
+	}
+
+	if req.Email != nil || req.NewPassword != nil {
+		if req.CurrentPassword == nil || *req.CurrentPassword == "" {
+			return UserResponse{}, apperr.E(op, ErrWrongPassword)
+		}
+		if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(*req.CurrentPassword)); err != nil {
+			return UserResponse{}, apperr.E(op, ErrWrongPassword)
+		}
+	}
+
+	newFullName := user.FullName
+	if req.FullName != nil && *req.FullName != "" {
+		newFullName = *req.FullName
+	}
+
+	newEmail := user.Email
+	if req.Email != nil && *req.Email != "" {
+		newEmail = *req.Email
+	}
+
+	newPasswordHash := user.PasswordHash
+	if req.NewPassword != nil && *req.NewPassword != "" {
+		hash, err := bcrypt.GenerateFromPassword([]byte(*req.NewPassword), bcrypt.DefaultCost)
+		if err != nil {
+			return UserResponse{}, apperr.E(op, apperr.Fmt("hash password: %w", err))
+		}
+		newPasswordHash = string(hash)
+	}
+
+	updated, err := uc.repo.UpdateUser(ctx, userID, newFullName, newEmail, newPasswordHash)
+	if err != nil {
+		return UserResponse{}, apperr.E(op, err)
+	}
+
+	return UserResponse{
+		ID:        updated.ID,
+		FullName:  updated.FullName,
+		Email:     updated.Email,
+		CreatedAt: updated.CreatedAt,
+	}, nil
+}
+
 func (uc *UseCase) GetCurrentUser(ctx context.Context, userID string) (UserResponse, error) {
 	const op apperr.Op = "UseCase.GetCurrentUser"
 	user, err := uc.repo.FindByID(ctx, userID)

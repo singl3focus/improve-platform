@@ -15,6 +15,8 @@ export interface RoadmapTopicUpdateRequest {
   title: string;
   description: string;
   status: RoadmapTopicStatus | null;
+  startDate?: string | null;
+  targetDate?: string | null;
 }
 
 export type RoadmapTopicUpdatePlan =
@@ -76,8 +78,8 @@ export function buildRoadmapTopicUpdatePlan(input: {
       title: request.title,
       description: request.description,
       position: currentTopic.position,
-      start_date: currentTopic.startDate,
-      target_date: currentTopic.targetDate
+      start_date: request.startDate !== undefined ? request.startDate : currentTopic.startDate,
+      target_date: request.targetDate !== undefined ? request.targetDate : currentTopic.targetDate
     }
   };
 }

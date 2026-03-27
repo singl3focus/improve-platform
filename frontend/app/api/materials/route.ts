@@ -157,6 +157,7 @@ export async function POST(request: NextRequest) {
   let payload: {
     title?: unknown;
     description?: unknown;
+    url?: unknown;
     topicId?: unknown;
     type?: unknown;
     totalAmount?: unknown;
@@ -168,6 +169,7 @@ export async function POST(request: NextRequest) {
     payload = (await request.json()) as {
       title?: unknown;
       description?: unknown;
+      url?: unknown;
       topicId?: unknown;
       type?: unknown;
       totalAmount?: unknown;
@@ -180,6 +182,7 @@ export async function POST(request: NextRequest) {
 
   const title = normalizeText(payload.title);
   const description = normalizeText(payload.description);
+  const url = typeof payload.url === "string" ? payload.url.trim() : "";
   const topicId = normalizeText(payload.topicId);
   const materialType = normalizeText(payload.type);
   const totalAmount = parseInteger(payload.totalAmount);
@@ -188,7 +191,6 @@ export async function POST(request: NextRequest) {
 
   if (
     !title ||
-    !description ||
     !topicId ||
     !materialType ||
     totalAmount === null ||
@@ -198,7 +200,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         message:
-          "Invalid material payload. Required: title, description, topicId, type, totalAmount, completedAmount, position."
+          "Invalid material payload. Required: title, topicId, type, totalAmount, completedAmount, position."
       },
       { status: 422 }
     );
@@ -243,7 +245,8 @@ export async function POST(request: NextRequest) {
       body: toBackendCreateMaterialPayload({
         topicId,
         title,
-        description,
+        description: description ?? "",
+        url,
         type: materialType as "book" | "article" | "course" | "video",
         totalAmount,
         completedAmount,

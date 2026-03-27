@@ -58,6 +58,7 @@ type Material struct {
 	TopicID         string
 	Title           string
 	Description     string
+	URL             string
 	Type            string
 	Unit            string
 	TotalAmount     int
@@ -73,6 +74,7 @@ type CreateRequest struct {
 	TopicID         string `json:"topic_id"`
 	Title           string `json:"title"`
 	Description     string `json:"description"`
+	URL             string `json:"url"`
 	Type            string `json:"type"`
 	TotalAmount     int    `json:"total_amount"`
 	CompletedAmount int    `json:"completed_amount"`
@@ -82,6 +84,7 @@ type CreateRequest struct {
 type UpdateRequest struct {
 	Title           string `json:"title"`
 	Description     string `json:"description"`
+	URL             string `json:"url"`
 	Type            string `json:"type"`
 	TotalAmount     int    `json:"total_amount"`
 	CompletedAmount int    `json:"completed_amount"`
@@ -95,6 +98,7 @@ type MaterialResponse struct {
 	TopicID         string    `json:"topic_id"`
 	Title           string    `json:"title"`
 	Description     string    `json:"description"`
+	URL             string    `json:"url"`
 	Type            string    `json:"type"`
 	Unit            string    `json:"unit"`
 	TotalAmount     int       `json:"total_amount"`
@@ -111,7 +115,7 @@ type Repository interface {
 	Create(ctx context.Context, m Material) (Material, error)
 	GetByID(ctx context.Context, id, userID string) (Material, error)
 	ListByTopic(ctx context.Context, topicID, userID string) ([]Material, error)
-	Update(ctx context.Context, id, userID, title, description, materialType, unit string, totalAmount, completedAmount, position int) error
+	Update(ctx context.Context, id, userID, title, description, url, materialType, unit string, totalAmount, completedAmount, position int) error
 	Delete(ctx context.Context, id, userID string) error
 }
 

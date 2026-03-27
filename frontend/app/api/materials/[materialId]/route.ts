@@ -59,6 +59,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   let payload: {
     title?: unknown;
     description?: unknown;
+    url?: unknown;
     topicId?: unknown;
     type?: unknown;
     totalAmount?: unknown;
@@ -69,6 +70,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     payload = (await request.json()) as {
       title?: unknown;
       description?: unknown;
+      url?: unknown;
       topicId?: unknown;
       type?: unknown;
       totalAmount?: unknown;
@@ -90,14 +92,11 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   }
 
   if ("description" in payload) {
-    const description = normalizeText(payload.description);
-    if (!description) {
-      return NextResponse.json(
-        { message: "Description must be a non-empty string." },
-        { status: 422 }
-      );
-    }
-    updates.description = description;
+    updates.description = typeof payload.description === "string" ? payload.description.trim() : "";
+  }
+
+  if ("url" in payload) {
+    updates.url = typeof payload.url === "string" ? payload.url.trim() : "";
   }
 
   if ("topicId" in payload) {
@@ -201,6 +200,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         body: toBackendUpdateMaterialPayload({
           title: updates.title ?? currentMaterial.title,
           description: updates.description ?? currentMaterial.description,
+          url: updates.url ?? currentMaterial.url ?? "",
           type: updates.type ?? currentMaterial.type,
           totalAmount: nextTotalAmount,
           completedAmount: nextCompletedAmount,

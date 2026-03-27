@@ -39,16 +39,19 @@ const TOPIC_COPY = {
     dependenciesSummary: (completed: number, pending: number) =>
       `Выполнено: ${completed} · Ожидают: ${pending}`,
     noDependencies: "Для этой темы нет зависимостей.",
+    addDependency: "Добавить зависимость",
+    removeDependency: "Убрать",
+    selectTopic: "Выберите тему...",
     dependencyRequired: "Обязательная зависимость",
     dependencyOptional: "Необязательная зависимость",
     dependencyReady: "Готово",
     dependencyPending: "Ожидает",
     checklistTitle: "Чеклист / Задачи",
-    checklistSubtitle: "Статусы доступны для изменения в разделе /tasks.",
+    checklistSubtitle: "Отслеживайте выполнение задач по теме.",
     checklistEmpty: "Для этой темы чеклист пуст.",
     statusLabel: "Статус",
     materialsTitle: "Материалы",
-    materialsSubtitle: "Сортировка по позиции из backend.",
+    materialsSubtitle: "Ресурсы для изучения, упорядоченные по позиции.",
     materialsEmpty: "Пока нет материалов по этой теме.",
     progress: "Прогресс",
     addTask: "Добавить задачу",
@@ -98,16 +101,19 @@ const TOPIC_COPY = {
     dependenciesSummary: (completed: number, pending: number) =>
       `Completed: ${completed} · Pending: ${pending}`,
     noDependencies: "No dependencies for this topic.",
+    addDependency: "Add dependency",
+    removeDependency: "Remove",
+    selectTopic: "Select topic...",
     dependencyRequired: "Required dependency",
     dependencyOptional: "Optional dependency",
     dependencyReady: "Ready",
     dependencyPending: "Pending",
     checklistTitle: "Checklist / Tasks",
-    checklistSubtitle: "Statuses can be changed in the /tasks section.",
+    checklistSubtitle: "Track task completion for this topic.",
     checklistEmpty: "Checklist is empty for this topic.",
     statusLabel: "Status",
     materialsTitle: "Materials",
-    materialsSubtitle: "Ordered by backend position field.",
+    materialsSubtitle: "Learning resources, ordered by position.",
     materialsEmpty: "No materials in this topic yet.",
     progress: "Progress",
     addTask: "Add task",
@@ -216,11 +222,13 @@ function mapChecklistStatusClassName(status: TopicChecklistStatus): string {
 function TopicHeroPanel({
   topic,
   copy,
-  language
+  language,
+  handleUpdateDates
 }: {
   topic: TopicWorkspace;
   copy: TopicCopy;
   language: AppLanguage;
+  handleUpdateDates: (dates: { startDate?: string | null; targetDate?: string | null }) => void;
 }) {
   return (
     <section className="topic-hero panel">
@@ -243,14 +251,28 @@ function TopicHeroPanel({
       </div>
 
       <div className="topic-date-grid">
-        <div>
+        <label>
           <span>{copy.startDate}</span>
-          <strong>{formatDate(topic.startDate, language, copy.notSet)}</strong>
-        </div>
-        <div>
+          <input
+            type="date"
+            className="input"
+            value={topic.startDate ?? ""}
+            onChange={(event) =>
+              handleUpdateDates({ startDate: event.target.value || null })
+            }
+          />
+        </label>
+        <label>
           <span>{copy.targetDate}</span>
-          <strong>{formatDate(topic.targetDate, language, copy.notSet)}</strong>
-        </div>
+          <input
+            type="date"
+            className="input"
+            value={topic.targetDate ?? ""}
+            onChange={(event) =>
+              handleUpdateDates({ targetDate: event.target.value || null })
+            }
+          />
+        </label>
         <div>
           <span>{copy.completedAt}</span>
           <strong>{formatDate(topic.completedAt, language, copy.notSet)}</strong>
@@ -264,12 +286,18 @@ function TopicDependenciesPanel({
   topic,
   copy,
   completed,
-  pending
+  pending,
+  dependencyOptions,
+  onAddDependency,
+  onRemoveDependency
 }: {
   topic: TopicWorkspace;
   copy: TopicCopy;
   completed: number;
   pending: number;
+  dependencyOptions: Array<{ id: string; title: string }>;
+  onAddDependency: (topicId: string) => void;
+  onRemoveDependency: (topicId: string) => void;
 }) {
   return (
     <aside className="topic-dependencies panel">
@@ -289,17 +317,51 @@ function TopicDependenciesPanel({
                   {dependency.isRequired ? copy.dependencyRequired : copy.dependencyOptional}
                 </p>
               </div>
-              {dependency.isCompleted ? (
-                <span className="roadmap-status-badge roadmap-status-completed">
-                  {copy.dependencyReady}
-                </span>
-              ) : (
-                <span className="roadmap-pending-badge">{copy.dependencyPending}</span>
-              )}
+              <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                {dependency.isCompleted ? (
+                  <span className="roadmap-status-badge roadmap-status-completed">
+                    {copy.dependencyReady}
+                  </span>
+                ) : (
+                  <span className="roadmap-pending-badge">{copy.dependencyPending}</span>
+                )}
+                <button
+                  type="button"
+                  className="button button-outline"
+                  style={{ fontSize: "0.72rem", padding: "2px 8px", height: "auto" }}
+                  onClick={() => onRemoveDependency(dependency.topicId)}
+                >
+                  {copy.removeDependency}
+                </button>
+              </div>
             </li>
           ))}
         </ul>
       )}
+
+      {dependencyOptions.length > 0 ? (
+        <div style={{ marginTop: "8px" }}>
+          <select
+            className="input"
+            defaultValue=""
+            onChange={(event) => {
+              if (event.target.value) {
+                onAddDependency(event.target.value);
+                event.target.value = "";
+              }
+            }}
+          >
+            <option value="" disabled>
+              {copy.addDependency}
+            </option>
+            {dependencyOptions.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.title}
+              </option>
+            ))}
+          </select>
+        </div>
+      ) : null}
     </aside>
   );
 }
@@ -778,7 +840,11 @@ export function TopicWorkspaceView() {
     isCreatingMaterial,
     materialMutationError,
     clearMaterialMutationError,
-    handleCreateMaterial
+    handleCreateMaterial,
+    handleUpdateDates,
+    handleAddDependency,
+    handleRemoveDependency,
+    dependencyOptions
   } = useTopicWorkspaceViewModel(topicId, {
     loadError: copy.loadError,
     taskTitleRequired: copy.taskTitleRequired,
@@ -832,7 +898,7 @@ export function TopicWorkspaceView() {
 
       {state.status === "success" && state.data ? (
         <div className="topic-workspace-layout">
-          <TopicHeroPanel topic={state.data} copy={copy} language={language} />
+          <TopicHeroPanel topic={state.data} copy={copy} language={language} handleUpdateDates={handleUpdateDates} />
 
           <div className="topic-grid">
             <TopicDependenciesPanel
@@ -840,6 +906,9 @@ export function TopicWorkspaceView() {
               copy={copy}
               completed={dependencySummary.completed}
               pending={dependencySummary.pending}
+              dependencyOptions={dependencyOptions}
+              onAddDependency={handleAddDependency}
+              onRemoveDependency={handleRemoveDependency}
             />
             <TopicChecklistPanel
               topic={state.data}

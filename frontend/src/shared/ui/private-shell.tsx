@@ -13,6 +13,28 @@ import {
 } from "lucide-react";
 import { useUserPreferences } from "@shared/providers/user-preferences-provider";
 import { logout } from "@features/auth/lib/client";
+import { useCurrentUser } from "@features/profile/hooks/use-profile-view-model";
+
+function getInitials(name: string): string {
+  return name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? "")
+    .join("");
+}
+
+function getAvatarColor(name: string): string {
+  const colors = [
+    "#2a7de1", "#7c3aed", "#059669", "#d97706",
+    "#dc2626", "#0891b2", "#be185d", "#65a30d"
+  ];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
+  }
+  return colors[hash % colors.length];
+}
 
 type NavItemKey =
   | "dashboardLabel"
@@ -42,6 +64,7 @@ export function PrivateShell({ children }: { children: ReactNode }) {
   const router = useRouter();
   const { copy } = useUserPreferences();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const { data: currentUser } = useCurrentUser();
 
   async function handleLogout() {
     setIsLoggingOut(true);
@@ -57,9 +80,21 @@ export function PrivateShell({ children }: { children: ReactNode }) {
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <div className="brand">
-          <strong>{copy.navigation.brand}</strong>
-        </div>
+        <Link href="/profile" className="user-identity">
+          {currentUser ? (
+            <>
+              <span
+                className="user-avatar"
+                style={{ background: getAvatarColor(currentUser.full_name) }}
+              >
+                {getInitials(currentUser.full_name)}
+              </span>
+              <span className="user-full-name">{currentUser.full_name}</span>
+            </>
+          ) : (
+            <span className="user-avatar user-avatar-placeholder" />
+          )}
+        </Link>
         <nav className="nav-list nav-list-main" aria-label={copy.navigation.ariaPrimary}>
           {MAIN_NAV_ITEMS.map((item) => {
             const isActive = isItemActive(pathname, item.href);

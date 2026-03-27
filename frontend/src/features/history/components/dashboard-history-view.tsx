@@ -6,6 +6,11 @@ import { authFetch } from "@features/auth/lib/auth-fetch";
 import type { DashboardHistoryEvent } from "@features/dashboard/types";
 import { useUserPreferences } from "@shared/providers/user-preferences-provider";
 import { formatDashboardDate } from "@features/dashboard/hooks/use-dashboard-view-model";
+import {
+  formatHistoryEventTitle,
+  formatHistoryEventSubtitle,
+  formatHistoryEventBadge
+} from "@features/history/lib/format-history-event";
 
 type LoadStatus = "loading" | "success" | "error";
 
@@ -132,12 +137,12 @@ export function DashboardHistoryView() {
             {state.data.map((entry) => (
               <li key={entry.id} className="dashboard-list-item">
                 <div>
-                  <p className="dashboard-list-title">{entry.eventName}</p>
+                  <p className="dashboard-list-title">{formatHistoryEventTitle(entry, language)}</p>
                   <p className="dashboard-list-subtitle">
-                    {formatHistorySubtitle(entry, locale, dashboardCopy.noDate)}
+                    {formatHistoryEventSubtitle(entry, language, formatDashboardDate(entry.createdAt, locale, dashboardCopy.noDate))}
                   </p>
                 </div>
-                <span className="dashboard-badge">{entry.eventType}</span>
+                <span className="dashboard-badge">{formatHistoryEventBadge(entry, language)}</span>
               </li>
             ))}
           </ul>

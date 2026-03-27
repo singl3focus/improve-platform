@@ -11,6 +11,7 @@ var (
 	ErrEmailExists         = errors.New("email already exists")
 	ErrInvalidCredentials  = errors.New("invalid credentials")
 	ErrInvalidRefreshToken = errors.New("invalid refresh token")
+	ErrWrongPassword       = errors.New("wrong current password")
 )
 
 type User struct {
@@ -36,10 +37,18 @@ type UserResponse struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+type UpdateProfileRequest struct {
+	FullName        *string `json:"full_name"`
+	Email           *string `json:"email"`
+	CurrentPassword *string `json:"current_password"`
+	NewPassword     *string `json:"new_password"`
+}
+
 type Repository interface {
 	Create(ctx context.Context, fullName, email, passwordHash string) (User, error)
 	FindByEmail(ctx context.Context, email string) (User, error)
 	FindByID(ctx context.Context, id string) (User, error)
+	UpdateUser(ctx context.Context, id, fullName, email, passwordHash string) (User, error)
 }
 
 type Service interface {
@@ -48,4 +57,5 @@ type Service interface {
 	Refresh(ctx context.Context, refreshToken string) (TokenResponse, error)
 	Logout(ctx context.Context, refreshToken string) error
 	GetCurrentUser(ctx context.Context, userID string) (UserResponse, error)
+	UpdateProfile(ctx context.Context, userID string, req UpdateProfileRequest) (UserResponse, error)
 }

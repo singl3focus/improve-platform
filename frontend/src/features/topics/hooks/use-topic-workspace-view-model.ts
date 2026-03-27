@@ -118,6 +118,68 @@ async function createTaskForTopic(payload: {
   }
 }
 
+async function updateTopicDates(
+  topicId: string,
+  dates: { startDate?: string | null; targetDate?: string | null }
+): Promise<void> {
+  const response = await authFetch(`/api/roadmap/topics/${encodeURIComponent(topicId)}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      start_date: dates.startDate ?? null,
+      target_date: dates.targetDate ?? null
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error(await parseErrorMessage(response, "Topic date update failed."));
+  }
+}
+
+async function addTopicDependency(topicId: string, dependsOnTopicId: string): Promise<void> {
+  const response = await authFetch(
+    `/api/roadmap/topics/${encodeURIComponent(topicId)}/dependencies`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ depends_on_topic_id: dependsOnTopicId })
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(await parseErrorMessage(response, "Failed to add dependency."));
+  }
+}
+
+async function removeTopicDependency(topicId: string, dependsOnTopicId: string): Promise<void> {
+  const response = await authFetch(
+    `/api/roadmap/topics/${encodeURIComponent(topicId)}/dependencies/${encodeURIComponent(dependsOnTopicId)}`,
+    { method: "DELETE" }
+  );
+
+  if (!response.ok) {
+    throw new Error(await parseErrorMessage(response, "Failed to remove dependency."));
+  }
+}
+
+interface TopicOption {
+  id: string;
+  title: string;
+}
+
+async function fetchAllTopics(): Promise<TopicOption[]> {
+  const response = await authFetch("/api/roadmap", { method: "GET" });
+  if (!response.ok) return [];
+  const roadmap = (await response.json()) as { stages?: Array<{ topics?: Array<{ id: string; title: string }> }> };
+  const topics: TopicOption[] = [];
+  for (const stage of roadmap.stages ?? []) {
+    for (const topic of stage.topics ?? []) {
+      topics.push({ id: topic.id, title: topic.title });
+    }
+  }
+  return topics;
+}
+
 async function createMaterialForTopic(payload: {
   title: string;
   description: string;
@@ -148,6 +210,9 @@ export function useTopicWorkspaceViewModel(topicId: string | null, copy: TopicWo
   const [taskDraft, setTaskDraft] = useState<TopicTaskDraft>(initialTaskDraft());
   const [isCreatingTask, setIsCreatingTask] = useState(false);
   const [taskMutationError, setTaskMutationError] = useState<string | null>(null);
+
+  // Dependency state
+  const [availableTopics, setAvailableTopics] = useState<TopicOption[]>([]);
 
   // Material creation state
   const [materialDraft, setMaterialDraft] = useState<TopicMaterialDraft>(initialMaterialDraft());
@@ -188,6 +253,12 @@ export function useTopicWorkspaceViewModel(topicId: string | null, copy: TopicWo
     void load();
     return () => controller.abort();
   }, [topicId, reloadKey, copy.loadError]);
+
+  useEffect(() => {
+    if (topicId) {
+      fetchAllTopics().then(setAvailableTopics).catch(() => setAvailableTopics([]));
+    }
+  }, [topicId, reloadKey]);
 
   useEffect(() => {
     if (state.status === "success" && state.data) {
@@ -304,10 +375,53 @@ export function useTopicWorkspaceViewModel(topicId: string | null, copy: TopicWo
     }
   }
 
+  async function handleUpdateDates(dates: {
+    startDate?: string | null;
+    targetDate?: string | null;
+  }): Promise<void> {
+    if (!topicId) return;
+    try {
+      await updateTopicDates(topicId, dates);
+      reload();
+    } catch {
+      // Silently fail, user can retry
+    }
+  }
+
+  async function handleAddDependency(dependsOnTopicId: string): Promise<void> {
+    if (!topicId) return;
+    try {
+      await addTopicDependency(topicId, dependsOnTopicId);
+      reload();
+    } catch {
+      // Silently fail
+    }
+  }
+
+  async function handleRemoveDependency(dependsOnTopicId: string): Promise<void> {
+    if (!topicId) return;
+    try {
+      await removeTopicDependency(topicId, dependsOnTopicId);
+      reload();
+    } catch {
+      // Silently fail
+    }
+  }
+
+  const dependencyOptions = availableTopics.filter((topic) => {
+    if (topic.id === topicId) return false;
+    if (!state.data) return true;
+    return !state.data.dependencies.some((dep) => dep.topicId === topic.id);
+  });
+
   return {
     state,
     reload,
     dependencySummary,
+    handleUpdateDates,
+    handleAddDependency,
+    handleRemoveDependency,
+    dependencyOptions,
     // Task creation
     taskDraft,
     setTaskDraft,

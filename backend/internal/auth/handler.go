@@ -17,11 +17,12 @@ type Handler struct {
 type authOperation string
 
 const (
-	authOperationRegister authOperation = "register"
-	authOperationLogin    authOperation = "login"
-	authOperationRefresh  authOperation = "refresh"
-	authOperationLogout   authOperation = "logout"
-	authOperationMe       authOperation = "me"
+	authOperationRegister      authOperation = "register"
+	authOperationLogin         authOperation = "login"
+	authOperationRefresh       authOperation = "refresh"
+	authOperationLogout        authOperation = "logout"
+	authOperationMe            authOperation = "me"
+	authOperationUpdateProfile authOperation = "update_profile"
 )
 
 func NewHandler(svc Service) *Handler {
@@ -118,6 +119,43 @@ func (h *Handler) Me() http.HandlerFunc {
 	}
 }
 
+func (h *Handler) UpdateProfile() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := UserIDFromContext(r.Context())
+		if !ok {
+			httpresp.Error(w, http.StatusUnauthorized, "unauthorized", "user not authenticated")
+			return
+		}
+
+		var req UpdateProfileRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			httpresp.Error(w, http.StatusBadRequest, "bad_request", "invalid request body")
+			return
+		}
+
+		if req.FullName != nil {
+			trimmed := strings.TrimSpace(*req.FullName)
+			req.FullName = &trimmed
+		}
+		if req.Email != nil {
+			trimmed := strings.TrimSpace(*req.Email)
+			req.Email = &trimmed
+		}
+		if req.NewPassword != nil && len(*req.NewPassword) < 8 {
+			httpresp.Error(w, http.StatusBadRequest, "validation_error", "new password must be at least 8 characters")
+			return
+		}
+
+		resp, err := h.svc.UpdateProfile(r.Context(), userID, req)
+		if err != nil {
+			handleError(w, err, authOperationUpdateProfile)
+			return
+		}
+
+		httpresp.JSON(w, http.StatusOK, resp)
+	}
+}
+
 func (h *Handler) Refresh() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		refreshToken, err := parseRefreshTokenRequest(r)
@@ -202,6 +240,21 @@ func handleError(w http.ResponseWriter, err error, op authOperation) {
 		}
 		slog.Error("unhandled error", "ops", apperr.OpsTrace(err), "error", err)
 		httpresp.Error(w, http.StatusInternalServerError, "internal_error", "logout failed")
+	case authOperationUpdateProfile:
+		if apperr.Is(err, ErrWrongPassword) {
+			httpresp.Error(w, http.StatusBadRequest, "wrong_password", "current password is incorrect")
+			return
+		}
+		if apperr.Is(err, ErrEmailExists) {
+			httpresp.Error(w, http.StatusConflict, "email_exists", "user with this email already exists")
+			return
+		}
+		if apperr.Is(err, ErrUserNotFound) {
+			httpresp.Error(w, http.StatusNotFound, "not_found", "user not found")
+			return
+		}
+		slog.Error("unhandled error", "ops", apperr.OpsTrace(err), "error", err)
+		httpresp.Error(w, http.StatusInternalServerError, "internal_error", "failed to update profile")
 	default:
 		slog.Error("unhandled error", "ops", apperr.OpsTrace(err), "error", err)
 		httpresp.Error(w, http.StatusInternalServerError, "internal_error", "internal server error")

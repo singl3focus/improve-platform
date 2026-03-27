@@ -21,6 +21,8 @@ interface TopicUpdatePayload {
   title?: unknown;
   description?: unknown;
   status?: unknown;
+  start_date?: unknown;
+  target_date?: unknown;
 }
 
 export async function PUT(request: NextRequest, context: RouteContext) {
@@ -86,6 +88,9 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     const position = Number.isFinite(currentPositionValue) && currentPositionValue > 0
       ? Math.floor(currentPositionValue)
       : 1;
+    const requestStartDate = typeof payload.start_date === "string" ? payload.start_date : undefined;
+    const requestTargetDate = typeof payload.target_date === "string" ? payload.target_date : undefined;
+
     const updatePlan = buildRoadmapTopicUpdatePlan({
       currentTopic: {
         status: currentStatusValue,
@@ -96,7 +101,9 @@ export async function PUT(request: NextRequest, context: RouteContext) {
       request: {
         title,
         description,
-        status: nextStatus
+        status: nextStatus,
+        startDate: requestStartDate !== undefined ? (requestStartDate || null) : undefined,
+        targetDate: requestTargetDate !== undefined ? (requestTargetDate || null) : undefined
       }
     });
     if (!updatePlan.ok) {

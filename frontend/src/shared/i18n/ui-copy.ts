@@ -30,6 +30,25 @@ export interface NavigationCopy {
   signingOut: string;
 }
 
+export interface ProfileCopy {
+  title: string;
+  memberSince: string;
+  editNameTitle: string;
+  fullNameLabel: string;
+  saveNameButton: string;
+  changeEmailTitle: string;
+  newEmailLabel: string;
+  changePasswordTitle: string;
+  currentPasswordLabel: string;
+  newPasswordLabel: string;
+  saveButton: string;
+  saving: string;
+  successMessage: string;
+  errorWrongPassword: string;
+  errorEmailExists: string;
+  errorFallback: string;
+}
+
 export interface SettingsCopy {
   title: string;
   description: string;
@@ -105,6 +124,7 @@ export interface AppCopy {
   auth: AuthCopy;
   navigation: NavigationCopy;
   settings: SettingsCopy;
+  profile: ProfileCopy;
   dashboard: DashboardCopy;
 }
 
@@ -147,6 +167,24 @@ const RU_COPY: AppCopy = {
     themeDark: "Тёмная",
     applyNote: "Изменения применяются сразу и сохраняются после перезагрузки."
   },
+  profile: {
+    title: "Профиль",
+    memberSince: "Участник с",
+    editNameTitle: "Имя",
+    fullNameLabel: "Полное имя",
+    saveNameButton: "Сохранить имя",
+    changeEmailTitle: "Email",
+    newEmailLabel: "Новый email",
+    changePasswordTitle: "Пароль",
+    currentPasswordLabel: "Текущий пароль",
+    newPasswordLabel: "Новый пароль",
+    saveButton: "Сохранить",
+    saving: "Сохранение...",
+    successMessage: "Изменения сохранены",
+    errorWrongPassword: "Неверный текущий пароль",
+    errorEmailExists: "Этот email уже занят",
+    errorFallback: "Не удалось сохранить изменения"
+  },
   dashboard: {
     requestFailed: (status) => `Ошибка запроса (${status})`,
     blockLoadFailed: "Не удалось загрузить блок дашборда.",
@@ -160,7 +198,7 @@ const RU_COPY: AppCopy = {
     today: (date) => `Сегодня ${date}`,
     snapshotTitle: "Срез обучения на сегодня",
     dailySummaryLoadFailed: "Не удалось загрузить ежедневную сводку.",
-    dailySummaryEmpty: "Сводка пуста. Добавьте задачи или материалы.",
+    dailySummaryEmpty: "Нет ближайших задач. Создайте задачу с дедлайном, чтобы видеть сводку.",
     upcomingTasksMetric: (count) => `Скоро задач: ${count}`,
     roadmapProgressTitle: "Прогресс roadmap",
     roadmapProgressLoadFailed: "Не удалось загрузить прогресс roadmap.",
@@ -247,6 +285,24 @@ const EN_COPY: AppCopy = {
     themeDark: "Dark",
     applyNote: "Changes are applied instantly and saved after reload."
   },
+  profile: {
+    title: "Profile",
+    memberSince: "Member since",
+    editNameTitle: "Name",
+    fullNameLabel: "Full name",
+    saveNameButton: "Save name",
+    changeEmailTitle: "Email",
+    newEmailLabel: "New email",
+    changePasswordTitle: "Password",
+    currentPasswordLabel: "Current password",
+    newPasswordLabel: "New password",
+    saveButton: "Save",
+    saving: "Saving...",
+    successMessage: "Changes saved",
+    errorWrongPassword: "Current password is incorrect",
+    errorEmailExists: "This email is already taken",
+    errorFallback: "Failed to save changes"
+  },
   dashboard: {
     requestFailed: (status) => `Request failed (${status})`,
     blockLoadFailed: "Dashboard block failed to load.",
@@ -260,7 +316,7 @@ const EN_COPY: AppCopy = {
     today: (date) => `Today ${date}`,
     snapshotTitle: "Today learning snapshot",
     dailySummaryLoadFailed: "Daily summary failed to load.",
-    dailySummaryEmpty: "Daily summary is empty. Add tasks or materials to see your snapshot.",
+    dailySummaryEmpty: "No upcoming tasks. Create a task with a deadline to see your snapshot.",
     upcomingTasksMetric: (count) => `${count} upcoming tasks`,
     roadmapProgressTitle: "Roadmap progress",
     roadmapProgressLoadFailed: "Progress failed to load.",

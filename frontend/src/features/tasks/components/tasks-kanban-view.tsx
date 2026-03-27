@@ -8,6 +8,7 @@ import { useUserPreferences } from "@shared/providers/user-preferences-provider"
 import {
   formatTaskDueDate,
   getTaskColumnConfig,
+  getTaskStatusLabel,
   isTaskOverdue,
   type TaskCreateDraft,
   useTasksBoardViewModel
@@ -21,7 +22,7 @@ import type {
 
 const TASKS_COPY = {
   title: "Мой канбан",
-  subtitle: "Отслеживайте задачи по статусам и перемещайте карточки через API-обновления.",
+  subtitle: "Отслеживайте задачи по статусам и перемещайте карточки между колонками.",
   filterButton: "Фильтр",
   filterModalTitle: "Фильтры задач",
   closeFilterAria: "Закрыть окно фильтров",
@@ -60,6 +61,11 @@ const TASKS_COPY = {
   saveButton: "Сохранить",
   savingButton: "Сохранение...",
   noDate: "Нет даты",
+  fieldStatus: "Статус",
+  statusNew: "Новая",
+  statusInProgress: "В работе",
+  statusPaused: "На паузе",
+  statusCompleted: "Выполнена",
   deleteTaskAria: "Удалить задачу",
   deleteConfirm: (title: string) => `Удалить задачу «${title}»?`,
   deleteFailed: "Не удалось удалить задачу."
@@ -341,7 +347,7 @@ function TasksBoardColumn({
                 {isTaskOverdue(task) ? (
                   <span className="dashboard-badge dashboard-badge-overdue">{copy.overdue}</span>
                 ) : (
-                  <span className="dashboard-badge">{copy.planned}</span>
+                  <span className="dashboard-badge">{getTaskStatusLabel(task.status, language)}</span>
                 )}
               </div>
             </li>
@@ -518,6 +524,25 @@ function TasksEditPanel({
           />
         </label>
 
+        <label className="tasks-create-field">
+          <span>{copy.fieldStatus}</span>
+          <select
+            className="input"
+            value={editDraft.status ?? "new"}
+            onChange={(event) =>
+              setEditDraft((current) => ({
+                ...current,
+                status: event.target.value as TaskBoardStatus
+              }))
+            }
+          >
+            <option value="new">{copy.statusNew}</option>
+            <option value="in_progress">{copy.statusInProgress}</option>
+            <option value="paused">{copy.statusPaused}</option>
+            <option value="completed">{copy.statusCompleted}</option>
+          </select>
+        </label>
+
         <label className="tasks-create-field tasks-create-field-description">
           <span>{copy.fieldDescription}</span>
           <textarea
@@ -683,7 +708,8 @@ export function TasksKanbanView() {
       title: task.title,
       description: task.description,
       topicId: task.topicId ?? "",
-      deadline: task.dueAt
+      deadline: task.dueAt,
+      status: task.status
     });
     setIsEditModalOpen(true);
   }

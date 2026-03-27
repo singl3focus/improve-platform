@@ -26,12 +26,20 @@ export async function GET(request: NextRequest) {
   try {
     const roadmapResult = await loadRoadmapOrEmpty(client);
     if (roadmapResult.errorResponse) {
-      return applyDashboardError(client, roadmapResult.errorResponse);
+      // Graceful fallback: return empty summary instead of error for new users
+      return dashboardJson(client, {
+        nextTaskTitle: null,
+        upcomingTasksCount: 0
+      });
     }
 
     const tasksResult = await loadTasks(client);
     if (tasksResult.errorResponse) {
-      return applyDashboardError(client, tasksResult.errorResponse);
+      // Graceful fallback: return empty summary instead of error
+      return dashboardJson(client, {
+        nextTaskTitle: null,
+        upcomingTasksCount: 0
+      });
     }
 
     const now = Date.now();

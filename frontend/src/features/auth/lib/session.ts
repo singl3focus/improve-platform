@@ -8,7 +8,8 @@ export const PROTECTED_ROUTES = [
   "/topics",
   "/tasks",
   "/materials",
-  "/settings"
+  "/settings",
+  "/profile"
 ] as const;
 
 export function isAuthRoute(pathname: string): boolean {

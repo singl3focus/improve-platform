@@ -84,6 +84,7 @@ func (s *Server) routes() {
 	s.router.Group(func(r chi.Router) {
 		r.Use(auth.Middleware([]byte(s.cfg.JWTSecret)))
 		r.Get("/api/v1/me", authH.Me())
+		r.Patch("/api/v1/auth/profile", authH.UpdateProfile())
 
 		r.Get("/api/v1/roadmap", rmH.GetRoadmap())
 		r.Post("/api/v1/roadmap", rmH.CreateRoadmap())

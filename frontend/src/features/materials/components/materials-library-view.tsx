@@ -23,6 +23,7 @@ const MATERIALS_COPY = {
   fieldTotalAmount: "Полная мера",
   fieldCompletedAmount: "Выполнено",
   fieldPosition: "Позиция",
+  fieldUrl: "Ссылка",
   fieldTopic: "Тема",
   typeBook: "Книга",
   typeArticle: "Статья",
@@ -33,13 +34,14 @@ const MATERIALS_COPY = {
   unitHours: "часы",
   createPlaceholderTitle: "Название материала",
   createPlaceholderDescription: "Описание материала",
+  createPlaceholderUrl: "https://...",
   noTopicsAvailable: "Нет доступных тем",
   createButton: "Создать материал",
   createModalTitle: "Создать материал",
   closeModalAria: "Закрыть окно создания материала",
   creatingButton: "Создание...",
   topicRequired: "Для создания материала нужна тема.",
-  titleDescriptionRequired: "Название и описание обязательны.",
+  titleDescriptionRequired: "Название обязательно.",
   amountInvalid: "Выполненная мера должна быть меньше или равна полной мере.",
   createFailed: "Не удалось создать материал.",
   updateFailed: "Не удалось обновить материал.",
@@ -163,7 +165,8 @@ function MaterialsCreatePanel({
   availableTopics,
   isCreating,
   onSubmit,
-  includePanelStyles = true
+  includePanelStyles = true,
+  error
 }: {
   copy: MaterialsCopy;
   createDraft: MaterialDraft;
@@ -172,6 +175,7 @@ function MaterialsCreatePanel({
   isCreating: boolean;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   includePanelStyles?: boolean;
+  error?: string | null;
 }) {
   const rootClassName = includePanelStyles ? "panel materials-create-panel" : "materials-create-panel";
 
@@ -313,6 +317,28 @@ function MaterialsCreatePanel({
           />
         </label>
 
+        <label className="materials-form-field" style={{ gridColumn: "1 / -1" }}>
+          <span>{copy.fieldUrl}</span>
+          <input
+            type="url"
+            className="input"
+            value={createDraft.url}
+            onChange={(event) =>
+              setCreateDraft((current) => ({
+                ...current,
+                url: event.target.value
+              }))
+            }
+            placeholder={copy.createPlaceholderUrl}
+          />
+        </label>
+
+        {error ? (
+          <div className="dashboard-error" style={{ gridColumn: "1 / -1" }}>
+            <p>{error}</p>
+          </div>
+        ) : null}
+
         <button type="submit" className="button button-primary" disabled={isCreating}>
           {isCreating ? copy.creatingButton : copy.createButton}
         </button>
@@ -371,6 +397,11 @@ function MaterialsCard({
 
       <h3>{material.title}</h3>
       <p>{material.description}</p>
+      {material.url ? (
+        <a href={material.url} target="_blank" rel="noopener noreferrer" className="materials-url-link">
+          {material.url}
+        </a>
+      ) : null}
 
       <div className="materials-card-progress-head">
         <span>{copy.progress}</span>
@@ -562,6 +593,26 @@ function MaterialsCard({
             />
           </label>
 
+          <label className="materials-form-field">
+            <span>{copy.fieldUrl}</span>
+            <input
+              type="url"
+              className="input"
+              value={editDraft.url}
+              onChange={(event) =>
+                setEditDraft((current) =>
+                  current
+                    ? {
+                        ...current,
+                        url: event.target.value
+                      }
+                    : current
+                )
+              }
+              placeholder={copy.createPlaceholderUrl}
+            />
+          </label>
+
           <div className="materials-edit-actions">
             <button
               type="submit"
@@ -710,13 +761,8 @@ export function MaterialsLibraryView() {
               isCreating={isCreating}
               onSubmit={handleCreateSubmit}
               includePanelStyles={false}
+              error={mutationError}
             />
-
-            {mutationError ? (
-              <div className="dashboard-error">
-                <p>{mutationError}</p>
-              </div>
-            ) : null}
 
           </section>
         </div>
