@@ -75,7 +75,7 @@ func TestFrontendProtectedRoutes_RequireAuthorization(t *testing.T) {
 		path string
 	}{
 		{name: "me", path: "/api/v1/me"},
-		{name: "roadmap", path: "/api/v1/roadmap"},
+		{name: "roadmaps", path: "/api/v1/roadmaps"},
 		{name: "tasks", path: "/api/v1/tasks"},
 		{name: "materials", path: "/api/v1/materials/mat-1"},
 		{name: "history", path: "/api/v1/history"},

@@ -49,19 +49,29 @@ export async function POST(request: NextRequest) {
   try {
     let resolvedPosition = position;
     if (resolvedPosition === null) {
-      const roadmapResult = await client.call("/api/v1/roadmap", { method: "GET" });
-      if (!roadmapResult.response.ok) {
+      const listResult = await client.call("/api/v1/roadmaps", { method: "GET" });
+      if (!listResult.response.ok) {
         const errorResponse = createBackendErrorResponse(
-          roadmapResult.response,
-          roadmapResult.payload,
+          listResult.response,
+          listResult.payload,
           "Roadmap load failed."
         );
         client.applyUpdatedSession(errorResponse);
         return errorResponse;
       }
 
-      const roadmap = roadmapResult.payload as BackendRoadmapResponse;
-      resolvedPosition = getNextStagePosition(roadmap);
+      const roadmapList = listResult.payload as Array<{ id: string }>;
+      if (roadmapList.length > 0) {
+        const rmResult = await client.call(`/api/v1/roadmaps/${encodeURIComponent(roadmapList[0].id)}`, { method: "GET" });
+        if (rmResult.response.ok) {
+          const roadmap = rmResult.payload as BackendRoadmapResponse;
+          resolvedPosition = getNextStagePosition(roadmap);
+        } else {
+          resolvedPosition = 1;
+        }
+      } else {
+        resolvedPosition = 1;
+      }
     }
 
     const createResult = await client.call("/api/v1/roadmap/stages", {

@@ -3,9 +3,11 @@
 import {
   createContext,
   type ReactNode,
+  useCallback,
   useContext,
   useEffect,
-  useMemo
+  useMemo,
+  useState
 } from "react";
 import { type AppCopy, type AppLanguage, type AppTheme, getAppCopy } from "@shared/i18n/ui-copy";
 
@@ -13,9 +15,13 @@ interface UserPreferencesContextValue {
   language: AppLanguage;
   theme: AppTheme;
   copy: AppCopy;
+  activeRoadmapId: string | null;
   setLanguage: (language: AppLanguage) => void;
   setTheme: (theme: AppTheme) => void;
+  setActiveRoadmapId: (id: string) => void;
 }
+
+const ACTIVE_ROADMAP_KEY = "improve:activeRoadmapId";
 
 const UserPreferencesContext = createContext<UserPreferencesContextValue | null>(null);
 
@@ -27,6 +33,16 @@ export function UserPreferencesProvider({
   const language: AppLanguage = "ru";
   const theme: AppTheme = "light";
 
+  const [activeRoadmapId, setActiveRoadmapIdState] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    return localStorage.getItem(ACTIVE_ROADMAP_KEY);
+  });
+
+  const setActiveRoadmapId = useCallback((id: string) => {
+    setActiveRoadmapIdState(id);
+    localStorage.setItem(ACTIVE_ROADMAP_KEY, id);
+  }, []);
+
   useEffect(() => {
     document.documentElement.lang = language;
     document.documentElement.dataset.theme = theme;
@@ -37,10 +53,12 @@ export function UserPreferencesProvider({
       language,
       theme,
       copy: getAppCopy(language),
+      activeRoadmapId,
       setLanguage: () => {},
-      setTheme: () => {}
+      setTheme: () => {},
+      setActiveRoadmapId
     };
-  }, [language, theme]);
+  }, [language, theme, activeRoadmapId, setActiveRoadmapId]);
 
   return (
     <UserPreferencesContext.Provider value={contextValue}>

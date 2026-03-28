@@ -26,6 +26,10 @@ func (m *mockRepo) FindByID(ctx context.Context, id string) (auth.User, error) {
 	return m.findByIDFn(ctx, id)
 }
 
+func (m *mockRepo) UpdateUser(_ context.Context, _, _, _, _ string) (auth.User, error) {
+	return auth.User{}, nil
+}
+
 func TestUseCase_Register_Success(t *testing.T) {
 	repo := &mockRepo{
 		createFn: func(_ context.Context, fullName, email, hash string) (auth.User, error) {

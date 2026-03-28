@@ -240,6 +240,32 @@ function TopicHeroPanel({
       <h2>{topic.title}</h2>
       <p>{topic.description}</p>
 
+      {topic.goal ? (
+        <p style={{ fontSize: "0.9rem", color: "var(--color-text-muted)", fontStyle: "italic", marginTop: "0.25rem" }}>
+          {topic.goal}
+        </p>
+      ) : (
+        <p style={{ fontSize: "0.85rem", color: "var(--color-text-muted)", opacity: 0.7, marginTop: "0.25rem" }}>
+          {language === "ru" ? "Добавьте цель — это поможет оставаться в фокусе" : "Add a goal to stay focused"}
+        </p>
+      )}
+
+      {topic.status === "completed" && topic.confidence !== null && (
+        <div style={{ marginTop: "0.25rem", display: "flex", gap: "0.15rem" }}>
+          {[1, 2, 3, 4, 5].map((star) => (
+            <span key={star} style={{ fontSize: "1rem", color: star <= (topic.confidence ?? 0) ? "#f59e0b" : "#d1d5db" }}>
+              ★
+            </span>
+          ))}
+          <span style={{ marginLeft: "0.25rem", fontSize: "0.8rem", color: "var(--color-text-muted)" }}>
+            {(language === "ru"
+              ? ["Поверхностно", "Знаю основы", "Понимаю", "Уверенно", "Могу объяснить"]
+              : ["Scratched surface", "Know basics", "Understand", "Confident", "Can teach"]
+            )[(topic.confidence ?? 1) - 1]}
+          </span>
+        </div>
+      )}
+
       <div className="topic-progress-wrap">
         <div className="topic-progress-head">
           <span>{copy.topicProgress}</span>

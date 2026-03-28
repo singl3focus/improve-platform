@@ -6,6 +6,7 @@ import {
   createBackendUnavailableResponse,
   isBackendErrorCode
 } from "@shared/api/backend-client";
+import { normalizeText } from "@shared/api/payload-parsers";
 
 interface QuickCreatePayload {
   roadmapTitle?: unknown;
@@ -14,15 +15,6 @@ interface QuickCreatePayload {
 }
 
 const DEFAULT_ROADMAP_TITLE = "Learning roadmap";
-
-function normalizeNonEmptyText(value: unknown): string | null {
-  if (typeof value !== "string") {
-    return null;
-  }
-
-  const normalized = value.trim();
-  return normalized.length > 0 ? normalized : null;
-}
 
 function getRoadmapTopics(roadmap: BackendRoadmapResponse): Array<{ position?: number }> {
   if (Array.isArray((roadmap as { topics?: unknown }).topics)) {
@@ -57,7 +49,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: "Invalid JSON body." }, { status: 400 });
   }
 
-  const topicTitle = normalizeNonEmptyText(payload.topicTitle);
+  const topicTitle = normalizeText(payload.topicTitle);
   if (!topicTitle) {
     return NextResponse.json({ message: "Topic title must be a non-empty string." }, { status: 422 });
   }
@@ -68,11 +60,11 @@ export async function POST(request: NextRequest) {
 
   const topicDescription =
     typeof payload.topicDescription === "string" ? payload.topicDescription.trim() : "";
-  const roadmapTitle = normalizeNonEmptyText(payload.roadmapTitle) ?? DEFAULT_ROADMAP_TITLE;
+  const roadmapTitle = normalizeText(payload.roadmapTitle) ?? DEFAULT_ROADMAP_TITLE;
   const client = createBackendClient(request);
 
   try {
-    const createRoadmapResult = await client.call("/api/v1/roadmap", {
+    const createRoadmapResult = await client.call("/api/v1/roadmaps", {
       method: "POST",
       body: { title: roadmapTitle }
     });
@@ -95,20 +87,26 @@ export async function POST(request: NextRequest) {
 
     let nextTopicPosition = 1;
     if (createRoadmapResult.response.status !== 201) {
-      const roadmapResult = await client.call("/api/v1/roadmap", { method: "GET" });
-      if (!roadmapResult.response.ok) {
-        if (roadmapResult.response.status < 500) {
+      const listResult = await client.call("/api/v1/roadmaps", { method: "GET" });
+      if (!listResult.response.ok) {
+        if (listResult.response.status < 500) {
           const errorResponse = createBackendErrorResponse(
-            roadmapResult.response,
-            roadmapResult.payload,
+            listResult.response,
+            listResult.payload,
             "Roadmap load failed."
           );
           client.applyUpdatedSession(errorResponse);
           return errorResponse;
         }
       } else {
-        const roadmap = roadmapResult.payload as BackendRoadmapResponse;
-        nextTopicPosition = getNextTopicPosition(roadmap);
+        const roadmapList = listResult.payload as Array<{ id: string }>;
+        if (roadmapList.length > 0) {
+          const rmResult = await client.call(`/api/v1/roadmaps/${encodeURIComponent(roadmapList[0].id)}`, { method: "GET" });
+          if (rmResult.response.ok) {
+            const roadmap = rmResult.payload as BackendRoadmapResponse;
+            nextTopicPosition = getNextTopicPosition(roadmap);
+          }
+        }
       }
     }
 

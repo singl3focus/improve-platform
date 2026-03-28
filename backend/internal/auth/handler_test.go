@@ -21,6 +21,7 @@ type mockService struct {
 	refreshFn        func(ctx context.Context, refreshToken string) (auth.TokenResponse, error)
 	logoutFn         func(ctx context.Context, refreshToken string) error
 	getCurrentUserFn func(ctx context.Context, userID string) (auth.UserResponse, error)
+	updateProfileFn  func(ctx context.Context, userID string, req auth.UpdateProfileRequest) (auth.UserResponse, error)
 }
 
 func (m *mockService) Register(ctx context.Context, fullName, email, password string) (auth.TokenResponse, error) {
@@ -41,6 +42,13 @@ func (m *mockService) Logout(ctx context.Context, refreshToken string) error {
 
 func (m *mockService) GetCurrentUser(ctx context.Context, userID string) (auth.UserResponse, error) {
 	return m.getCurrentUserFn(ctx, userID)
+}
+
+func (m *mockService) UpdateProfile(ctx context.Context, userID string, req auth.UpdateProfileRequest) (auth.UserResponse, error) {
+	if m.updateProfileFn != nil {
+		return m.updateProfileFn(ctx, userID, req)
+	}
+	return auth.UserResponse{}, nil
 }
 
 func TestHandler_Register_Success(t *testing.T) {

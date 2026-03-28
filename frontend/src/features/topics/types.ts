@@ -28,7 +28,9 @@ export interface TopicWorkspace {
   id: string;
   title: string;
   description: string;
+  goal: string;
   status: TopicWorkspaceStatus;
+  confidence: number | null;
   progressPercent: number;
   startDate: string;
   targetDate: string;

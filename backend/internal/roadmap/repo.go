@@ -51,7 +51,7 @@ func (r *Repo) GetRoadmapByUserID(ctx context.Context, userID string) (Roadmap, 
 	var rm Roadmap
 	err := r.pool.QueryRow(ctx,
 		`SELECT id, user_id, title, created_at, updated_at
-		 FROM roadmaps WHERE user_id = $1`,
+		 FROM roadmaps WHERE user_id = $1 ORDER BY created_at ASC LIMIT 1`,
 		userID,
 	).Scan(&rm.ID, &rm.UserID, &rm.Title, &rm.CreatedAt, &rm.UpdatedAt)
 	if apperr.Is(err, pgx.ErrNoRows) {
@@ -60,11 +60,71 @@ func (r *Repo) GetRoadmapByUserID(ctx context.Context, userID string) (Roadmap, 
 	return rm, apperr.E(op, err)
 }
 
-func (r *Repo) UpdateRoadmapTitle(ctx context.Context, userID, title string) error {
+func (r *Repo) GetRoadmapByID(ctx context.Context, id, userID string) (Roadmap, error) {
+	const op apperr.Op = "Repo.GetRoadmapByID"
+	var rm Roadmap
+	err := r.pool.QueryRow(ctx,
+		`SELECT id, user_id, title, created_at, updated_at
+		 FROM roadmaps WHERE id = $1 AND user_id = $2`,
+		id, userID,
+	).Scan(&rm.ID, &rm.UserID, &rm.Title, &rm.CreatedAt, &rm.UpdatedAt)
+	if apperr.Is(err, pgx.ErrNoRows) {
+		return Roadmap{}, apperr.E(op, ErrRoadmapNotFound)
+	}
+	return rm, apperr.E(op, err)
+}
+
+func (r *Repo) ListRoadmaps(ctx context.Context, userID string) ([]Roadmap, error) {
+	const op apperr.Op = "Repo.ListRoadmaps"
+	rows, err := r.pool.Query(ctx,
+		`SELECT r.id, r.user_id, r.title, r.created_at, r.updated_at,
+		        COALESCE(s.total, 0), COALESCE(s.completed, 0)
+		 FROM roadmaps r
+		 LEFT JOIN LATERAL (
+		   SELECT COUNT(*) AS total,
+		          COUNT(*) FILTER (WHERE status = 'completed') AS completed
+		   FROM topics t WHERE t.roadmap_id = r.id AND t.user_id = r.user_id
+		 ) s ON true
+		 WHERE r.user_id = $1 ORDER BY r.created_at ASC`,
+		userID,
+	)
+	if err != nil {
+		return nil, apperr.E(op, err)
+	}
+	defer rows.Close()
+
+	var roadmaps []Roadmap
+	for rows.Next() {
+		var rm Roadmap
+		if err := rows.Scan(&rm.ID, &rm.UserID, &rm.Title, &rm.CreatedAt, &rm.UpdatedAt,
+			&rm.TotalTopics, &rm.CompletedTopics); err != nil {
+			return nil, apperr.E(op, err)
+		}
+		roadmaps = append(roadmaps, rm)
+	}
+	return roadmaps, apperr.E(op, rows.Err())
+}
+
+func (r *Repo) UpdateRoadmapTitle(ctx context.Context, id, userID, title string) error {
 	const op apperr.Op = "Repo.UpdateRoadmapTitle"
 	tag, err := r.pool.Exec(ctx,
-		`UPDATE roadmaps SET title = $1, updated_at = now() WHERE user_id = $2`,
-		title, userID,
+		`UPDATE roadmaps SET title = $1, updated_at = now() WHERE id = $2 AND user_id = $3`,
+		title, id, userID,
+	)
+	if err != nil {
+		return apperr.E(op, err)
+	}
+	if tag.RowsAffected() == 0 {
+		return apperr.E(op, ErrRoadmapNotFound)
+	}
+	return nil
+}
+
+func (r *Repo) DeleteRoadmap(ctx context.Context, id, userID string) error {
+	const op apperr.Op = "Repo.DeleteRoadmap"
+	tag, err := r.pool.Exec(ctx,
+		`DELETE FROM roadmaps WHERE id = $1 AND user_id = $2`,
+		id, userID,
 	)
 	if err != nil {
 		return apperr.E(op, err)
@@ -77,21 +137,21 @@ func (r *Repo) UpdateRoadmapTitle(ctx context.Context, userID, title string) err
 
 // --- Topics ---
 
-func (r *Repo) CreateTopic(ctx context.Context, userID, title, description string, position int) (Topic, error) {
+func (r *Repo) CreateTopic(ctx context.Context, userID, roadmapID, title, description string, position int) (Topic, error) {
 	const op apperr.Op = "Repo.CreateTopic"
 	var t Topic
 	err := r.pool.QueryRow(ctx,
-		`INSERT INTO topics (user_id, title, description, position)
-		 VALUES ($1, $2, $3, $4)
-		 RETURNING id, user_id, title, description, status,
+		`INSERT INTO topics (user_id, roadmap_id, title, description, position)
+		 VALUES ($1, $2, $3, $4, $5)
+		 RETURNING id, user_id, roadmap_id, title, description, goal, status, confidence,
 		           start_date, target_date, completed_date, position, created_at, updated_at`,
-		userID, title, description, position,
-	).Scan(&t.ID, &t.UserID, &t.Title, &t.Description, &t.Status,
+		userID, roadmapID, title, description, position,
+	).Scan(&t.ID, &t.UserID, &t.RoadmapID, &t.Title, &t.Description, &t.Goal, &t.Status, &t.Confidence,
 		&t.StartDate, &t.TargetDate, &t.CompletedDate, &t.Position, &t.CreatedAt, &t.UpdatedAt)
 	return t, apperr.E(op, err)
 }
 
-func (r *Repo) CreateTopicDirectional(ctx context.Context, userID, currentTopicID, title, description string, direction TopicCreateDirection) (Topic, error) {
+func (r *Repo) CreateTopicDirectional(ctx context.Context, userID, roadmapID, currentTopicID, title, description string, direction TopicCreateDirection) (Topic, error) {
 	const op apperr.Op = "Repo.CreateTopicDirectional"
 
 	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{})
@@ -102,7 +162,7 @@ func (r *Repo) CreateTopicDirectional(ctx context.Context, userID, currentTopicI
 		_ = tx.Rollback(ctx)
 	}()
 
-	rows, err := tx.Query(ctx, `SELECT id, position FROM topics WHERE user_id = $1 FOR UPDATE`, userID)
+	rows, err := tx.Query(ctx, `SELECT id, position FROM topics WHERE roadmap_id = $1 AND user_id = $2 FOR UPDATE`, roadmapID, userID)
 	if err != nil {
 		return Topic{}, apperr.E(op, err)
 	}
@@ -150,8 +210,8 @@ func (r *Repo) CreateTopicDirectional(ctx context.Context, userID, currentTopicI
 		if _, err = tx.Exec(ctx,
 			`UPDATE topics
 			 SET position = position + 1, updated_at = now()
-			 WHERE user_id = $1 AND position >= $2`,
-			userID, insertPlan.insertPosition,
+			 WHERE roadmap_id = $1 AND user_id = $2 AND position >= $3`,
+			roadmapID, userID, insertPlan.insertPosition,
 		); err != nil {
 			return Topic{}, apperr.E(op, err)
 		}
@@ -159,12 +219,12 @@ func (r *Repo) CreateTopicDirectional(ctx context.Context, userID, currentTopicI
 
 	var created Topic
 	err = tx.QueryRow(ctx,
-		`INSERT INTO topics (user_id, title, description, position)
-		 VALUES ($1, $2, $3, $4)
-		 RETURNING id, user_id, title, description, status,
+		`INSERT INTO topics (user_id, roadmap_id, title, description, position)
+		 VALUES ($1, $2, $3, $4, $5)
+		 RETURNING id, user_id, roadmap_id, title, description, goal, status, confidence,
 		           start_date, target_date, completed_date, position, created_at, updated_at`,
-		userID, title, description, insertPlan.insertPosition,
-	).Scan(&created.ID, &created.UserID, &created.Title, &created.Description, &created.Status,
+		userID, roadmapID, title, description, insertPlan.insertPosition,
+	).Scan(&created.ID, &created.UserID, &created.RoadmapID, &created.Title, &created.Description, &created.Goal, &created.Status, &created.Confidence,
 		&created.StartDate, &created.TargetDate, &created.CompletedDate, &created.Position, &created.CreatedAt, &created.UpdatedAt)
 	if err != nil {
 		return Topic{}, apperr.E(op, err)
@@ -206,11 +266,11 @@ func (r *Repo) GetTopicByID(ctx context.Context, id, userID string) (Topic, erro
 	const op apperr.Op = "Repo.GetTopicByID"
 	var t Topic
 	err := r.pool.QueryRow(ctx,
-		`SELECT id, user_id, title, description, status,
+		`SELECT id, user_id, roadmap_id, title, description, goal, status, confidence,
 		        start_date, target_date, completed_date, position, created_at, updated_at
 		 FROM topics WHERE id = $1 AND user_id = $2`,
 		id, userID,
-	).Scan(&t.ID, &t.UserID, &t.Title, &t.Description, &t.Status,
+	).Scan(&t.ID, &t.UserID, &t.RoadmapID, &t.Title, &t.Description, &t.Goal, &t.Status, &t.Confidence,
 		&t.StartDate, &t.TargetDate, &t.CompletedDate, &t.Position, &t.CreatedAt, &t.UpdatedAt)
 	if apperr.Is(err, pgx.ErrNoRows) {
 		return Topic{}, apperr.E(op, ErrTopicNotFound)
@@ -218,13 +278,13 @@ func (r *Repo) GetTopicByID(ctx context.Context, id, userID string) (Topic, erro
 	return t, apperr.E(op, err)
 }
 
-func (r *Repo) GetTopicsByUserID(ctx context.Context, userID string) ([]Topic, error) {
-	const op apperr.Op = "Repo.GetTopicsByUserID"
+func (r *Repo) GetTopicsByRoadmapID(ctx context.Context, roadmapID, userID string) ([]Topic, error) {
+	const op apperr.Op = "Repo.GetTopicsByRoadmapID"
 	rows, err := r.pool.Query(ctx,
-		`SELECT id, user_id, title, description, status,
+		`SELECT id, user_id, roadmap_id, title, description, goal, status, confidence,
 		        start_date, target_date, completed_date, position, created_at, updated_at
-		 FROM topics WHERE user_id = $1 ORDER BY position, created_at`,
-		userID,
+		 FROM topics WHERE roadmap_id = $1 AND user_id = $2 ORDER BY position, created_at`,
+		roadmapID, userID,
 	)
 	if err != nil {
 		return nil, apperr.E(op, err)
@@ -234,7 +294,7 @@ func (r *Repo) GetTopicsByUserID(ctx context.Context, userID string) ([]Topic, e
 	var topics []Topic
 	for rows.Next() {
 		var t Topic
-		if err := rows.Scan(&t.ID, &t.UserID, &t.Title, &t.Description, &t.Status,
+		if err := rows.Scan(&t.ID, &t.UserID, &t.RoadmapID, &t.Title, &t.Description, &t.Goal, &t.Status, &t.Confidence,
 			&t.StartDate, &t.TargetDate, &t.CompletedDate, &t.Position, &t.CreatedAt, &t.UpdatedAt); err != nil {
 			return nil, apperr.E(op, err)
 		}
@@ -243,14 +303,29 @@ func (r *Repo) GetTopicsByUserID(ctx context.Context, userID string) ([]Topic, e
 	return topics, apperr.E(op, rows.Err())
 }
 
-func (r *Repo) UpdateTopic(ctx context.Context, id, userID, title, description string, startDate, targetDate *time.Time, position int) error {
+func (r *Repo) UpdateTopic(ctx context.Context, id, userID, title, description, goal string, startDate, targetDate *time.Time, position int) error {
 	const op apperr.Op = "Repo.UpdateTopic"
 	tag, err := r.pool.Exec(ctx,
 		`UPDATE topics
-		 SET title = $1, description = $2,
-		     start_date = $3, target_date = $4, position = $5, updated_at = now()
-		 WHERE id = $6 AND user_id = $7`,
-		title, description, startDate, targetDate, position, id, userID,
+		 SET title = $1, description = $2, goal = $3,
+		     start_date = $4, target_date = $5, position = $6, updated_at = now()
+		 WHERE id = $7 AND user_id = $8`,
+		title, description, goal, startDate, targetDate, position, id, userID,
+	)
+	if err != nil {
+		return apperr.E(op, err)
+	}
+	if tag.RowsAffected() == 0 {
+		return apperr.E(op, ErrTopicNotFound)
+	}
+	return nil
+}
+
+func (r *Repo) SetTopicConfidence(ctx context.Context, id, userID string, confidence int) error {
+	const op apperr.Op = "Repo.SetTopicConfidence"
+	tag, err := r.pool.Exec(ctx,
+		`UPDATE topics SET confidence = $1, updated_at = now() WHERE id = $2 AND user_id = $3`,
+		confidence, id, userID,
 	)
 	if err != nil {
 		return apperr.E(op, err)
@@ -329,12 +404,14 @@ func (r *Repo) RemoveDependency(ctx context.Context, topicID, dependsOnTopicID, 
 	return nil
 }
 
-func (r *Repo) GetDependenciesByUserID(ctx context.Context, userID string) ([]TopicDep, error) {
-	const op apperr.Op = "Repo.GetDependenciesByUserID"
+func (r *Repo) GetDependenciesByRoadmapID(ctx context.Context, roadmapID, userID string) ([]TopicDep, error) {
+	const op apperr.Op = "Repo.GetDependenciesByRoadmapID"
 	rows, err := r.pool.Query(ctx,
-		`SELECT topic_id, depends_on_topic_id, user_id
-		 FROM topic_dependencies WHERE user_id = $1`,
-		userID,
+		`SELECT td.topic_id, td.depends_on_topic_id, td.user_id
+		 FROM topic_dependencies td
+		 JOIN topics t ON t.id = td.topic_id
+		 WHERE td.user_id = $1 AND t.roadmap_id = $2`,
+		userID, roadmapID,
 	)
 	if err != nil {
 		return nil, apperr.E(op, err)
@@ -352,8 +429,8 @@ func (r *Repo) GetDependenciesByUserID(ctx context.Context, userID string) ([]To
 	return deps, apperr.E(op, rows.Err())
 }
 
-func (r *Repo) GetTopicMetricsByUserID(ctx context.Context, userID string) (map[string]TopicMetrics, error) {
-	const op apperr.Op = "Repo.GetTopicMetricsByUserID"
+func (r *Repo) GetTopicMetricsByRoadmapID(ctx context.Context, roadmapID, userID string) (map[string]TopicMetrics, error) {
+	const op apperr.Op = "Repo.GetTopicMetricsByRoadmapID"
 	rows, err := r.pool.Query(ctx,
 		`SELECT
 			t.id,
@@ -384,8 +461,8 @@ func (r *Repo) GetTopicMetricsByUserID(ctx context.Context, userID string) (map[
 			WHERE user_id = $1 AND topic_id IS NOT NULL
 			GROUP BY topic_id
 		 ) pc ON pc.topic_id = t.id
-		 WHERE t.user_id = $1`,
-		userID,
+		 WHERE t.user_id = $1 AND t.roadmap_id = $2`,
+		userID, roadmapID,
 	)
 	if err != nil {
 		return nil, apperr.E(op, err)

@@ -38,30 +38,29 @@ export function dashboardUnavailableResponse(): NextResponse {
 }
 
 export async function loadRoadmapOrEmpty(client: ReturnType<typeof createBackendClient>) {
-  const roadmapResult = await client.call("/api/v1/roadmap", { method: "GET" });
-  if (!roadmapResult.response.ok) {
-    if (
-      roadmapResult.response.status === 404 &&
-      isBackendErrorCode(roadmapResult.payload, "roadmap_not_found")
-    ) {
-      return {
-        roadmap: null as BackendRoadmapResponse | null,
-        errorResponse: null as NextResponse | null
-      };
-    }
-
+  const listResult = await client.call("/api/v1/roadmaps", { method: "GET" });
+  if (!listResult.response.ok) {
     return {
       roadmap: null as BackendRoadmapResponse | null,
       errorResponse: createBackendErrorResponse(
-        roadmapResult.response,
-        roadmapResult.payload,
+        listResult.response,
+        listResult.payload,
         "Failed to load roadmap."
       )
     };
   }
 
+  const roadmapList = listResult.payload as Array<{ id: string }>;
+  let roadmap: BackendRoadmapResponse | null = null;
+  if (roadmapList.length > 0) {
+    const rmResult = await client.call(`/api/v1/roadmaps/${encodeURIComponent(roadmapList[0].id)}`, { method: "GET" });
+    if (rmResult.response.ok) {
+      roadmap = rmResult.payload as BackendRoadmapResponse;
+    }
+  }
+
   return {
-    roadmap: roadmapResult.payload as BackendRoadmapResponse,
+    roadmap,
     errorResponse: null as NextResponse | null
   };
 }

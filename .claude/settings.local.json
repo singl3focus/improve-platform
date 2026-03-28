@@ -8,7 +8,18 @@
       "Bash(ls:*)",
       "mcp__plugin_playwright_playwright__browser_take_screenshot",
       "mcp__plugin_playwright_playwright__browser_snapshot",
-      "Bash(curl -s http://localhost:8080/readyz)"
+      "Bash(curl -s http://localhost:8080/readyz)",
+      "Bash(docker compose:*)",
+      "Bash(npx playwright:*)",
+      "Bash(go build:*)",
+      "Bash(go test:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm test:*)",
+      "Bash(npm run:*)",
+      "Bash(curl:*)",
+      "Bash(npm install:*)",
+      "Bash(npm ls:*)",
+      "Bash(golangci-lint run:*)"
     ]
   }
 }

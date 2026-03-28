@@ -13,18 +13,22 @@ import (
 type mockRepo struct {
 	createRoadmapFn          func(ctx context.Context, userID, title string) (roadmap.Roadmap, error)
 	getRoadmapByUserIDFn     func(ctx context.Context, userID string) (roadmap.Roadmap, error)
-	updateRoadmapTitleFn     func(ctx context.Context, userID, title string) error
-	createTopicFn            func(ctx context.Context, userID, title, description string, position int) (roadmap.Topic, error)
-	createTopicDirectionalFn func(ctx context.Context, userID, currentTopicID, title, description string, direction roadmap.TopicCreateDirection) (roadmap.Topic, error)
+	getRoadmapByIDFn         func(ctx context.Context, id, userID string) (roadmap.Roadmap, error)
+	listRoadmapsFn           func(ctx context.Context, userID string) ([]roadmap.Roadmap, error)
+	updateRoadmapTitleFn     func(ctx context.Context, id, userID, title string) error
+	deleteRoadmapFn          func(ctx context.Context, id, userID string) error
+	createTopicFn            func(ctx context.Context, userID, roadmapID, title, description string, position int) (roadmap.Topic, error)
+	createTopicDirectionalFn func(ctx context.Context, userID, roadmapID, currentTopicID, title, description string, direction roadmap.TopicCreateDirection) (roadmap.Topic, error)
 	getTopicByIDFn           func(ctx context.Context, id, userID string) (roadmap.Topic, error)
-	getTopicsByUserIDFn      func(ctx context.Context, userID string) ([]roadmap.Topic, error)
-	updateTopicFn            func(ctx context.Context, id, userID, title, description string, startDate, targetDate *time.Time, position int) error
+	getTopicsByRoadmapIDFn   func(ctx context.Context, roadmapID, userID string) ([]roadmap.Topic, error)
+	updateTopicFn            func(ctx context.Context, id, userID, title, description, goal string, startDate, targetDate *time.Time, position int) error
+	setTopicConfidenceFn     func(ctx context.Context, id, userID string, confidence int) error
 	updateTopicStatusFn      func(ctx context.Context, id, userID, status string, startDate, completedDate *time.Time) error
 	deleteTopicFn            func(ctx context.Context, id, userID string) error
 	addDependencyFn          func(ctx context.Context, topicID, dependsOnTopicID, userID string) error
 	removeDependencyFn       func(ctx context.Context, topicID, dependsOnTopicID, userID string) error
-	getDependenciesFn        func(ctx context.Context, userID string) ([]roadmap.TopicDep, error)
-	getTopicMetricsFn        func(ctx context.Context, userID string) (map[string]roadmap.TopicMetrics, error)
+	getDependenciesFn        func(ctx context.Context, roadmapID, userID string) ([]roadmap.TopicDep, error)
+	getTopicMetricsFn        func(ctx context.Context, roadmapID, userID string) (map[string]roadmap.TopicMetrics, error)
 }
 
 func (m *mockRepo) CreateRoadmap(ctx context.Context, userID, title string) (roadmap.Roadmap, error) {
@@ -33,23 +37,50 @@ func (m *mockRepo) CreateRoadmap(ctx context.Context, userID, title string) (roa
 func (m *mockRepo) GetRoadmapByUserID(ctx context.Context, userID string) (roadmap.Roadmap, error) {
 	return m.getRoadmapByUserIDFn(ctx, userID)
 }
-func (m *mockRepo) UpdateRoadmapTitle(ctx context.Context, userID, title string) error {
-	return m.updateRoadmapTitleFn(ctx, userID, title)
+func (m *mockRepo) GetRoadmapByID(ctx context.Context, id, userID string) (roadmap.Roadmap, error) {
+	if m.getRoadmapByIDFn != nil {
+		return m.getRoadmapByIDFn(ctx, id, userID)
+	}
+	return roadmap.Roadmap{ID: id}, nil
 }
-func (m *mockRepo) CreateTopic(ctx context.Context, userID, title, description string, position int) (roadmap.Topic, error) {
-	return m.createTopicFn(ctx, userID, title, description, position)
+func (m *mockRepo) ListRoadmaps(ctx context.Context, userID string) ([]roadmap.Roadmap, error) {
+	if m.listRoadmapsFn != nil {
+		return m.listRoadmapsFn(ctx, userID)
+	}
+	return nil, nil
 }
-func (m *mockRepo) CreateTopicDirectional(ctx context.Context, userID, currentTopicID, title, description string, direction roadmap.TopicCreateDirection) (roadmap.Topic, error) {
-	return m.createTopicDirectionalFn(ctx, userID, currentTopicID, title, description, direction)
+func (m *mockRepo) UpdateRoadmapTitle(ctx context.Context, id, userID, title string) error {
+	if m.updateRoadmapTitleFn != nil {
+		return m.updateRoadmapTitleFn(ctx, id, userID, title)
+	}
+	return nil
+}
+func (m *mockRepo) DeleteRoadmap(ctx context.Context, id, userID string) error {
+	if m.deleteRoadmapFn != nil {
+		return m.deleteRoadmapFn(ctx, id, userID)
+	}
+	return nil
+}
+func (m *mockRepo) CreateTopic(ctx context.Context, userID, roadmapID, title, description string, position int) (roadmap.Topic, error) {
+	return m.createTopicFn(ctx, userID, roadmapID, title, description, position)
+}
+func (m *mockRepo) CreateTopicDirectional(ctx context.Context, userID, roadmapID, currentTopicID, title, description string, direction roadmap.TopicCreateDirection) (roadmap.Topic, error) {
+	return m.createTopicDirectionalFn(ctx, userID, roadmapID, currentTopicID, title, description, direction)
 }
 func (m *mockRepo) GetTopicByID(ctx context.Context, id, userID string) (roadmap.Topic, error) {
 	return m.getTopicByIDFn(ctx, id, userID)
 }
-func (m *mockRepo) GetTopicsByUserID(ctx context.Context, userID string) ([]roadmap.Topic, error) {
-	return m.getTopicsByUserIDFn(ctx, userID)
+func (m *mockRepo) GetTopicsByRoadmapID(ctx context.Context, roadmapID, userID string) ([]roadmap.Topic, error) {
+	return m.getTopicsByRoadmapIDFn(ctx, roadmapID, userID)
 }
-func (m *mockRepo) UpdateTopic(ctx context.Context, id, userID, title, description string, startDate, targetDate *time.Time, position int) error {
-	return m.updateTopicFn(ctx, id, userID, title, description, startDate, targetDate, position)
+func (m *mockRepo) UpdateTopic(ctx context.Context, id, userID, title, description, goal string, startDate, targetDate *time.Time, position int) error {
+	return m.updateTopicFn(ctx, id, userID, title, description, goal, startDate, targetDate, position)
+}
+func (m *mockRepo) SetTopicConfidence(ctx context.Context, id, userID string, confidence int) error {
+	if m.setTopicConfidenceFn != nil {
+		return m.setTopicConfidenceFn(ctx, id, userID, confidence)
+	}
+	return nil
 }
 func (m *mockRepo) UpdateTopicStatus(ctx context.Context, id, userID, status string, startDate, completedDate *time.Time) error {
 	return m.updateTopicStatusFn(ctx, id, userID, status, startDate, completedDate)
@@ -63,18 +94,18 @@ func (m *mockRepo) AddDependency(ctx context.Context, topicID, dependsOnTopicID,
 func (m *mockRepo) RemoveDependency(ctx context.Context, topicID, dependsOnTopicID, userID string) error {
 	return m.removeDependencyFn(ctx, topicID, dependsOnTopicID, userID)
 }
-func (m *mockRepo) GetDependenciesByUserID(ctx context.Context, userID string) ([]roadmap.TopicDep, error) {
-	return m.getDependenciesFn(ctx, userID)
+func (m *mockRepo) GetDependenciesByRoadmapID(ctx context.Context, roadmapID, userID string) ([]roadmap.TopicDep, error) {
+	return m.getDependenciesFn(ctx, roadmapID, userID)
 }
-func (m *mockRepo) GetTopicMetricsByUserID(ctx context.Context, userID string) (map[string]roadmap.TopicMetrics, error) {
-	return m.getTopicMetricsFn(ctx, userID)
+func (m *mockRepo) GetTopicMetricsByRoadmapID(ctx context.Context, roadmapID, userID string) (map[string]roadmap.TopicMetrics, error) {
+	return m.getTopicMetricsFn(ctx, roadmapID, userID)
 }
 
 func TestCreateTopic_DirectionalSuccess(t *testing.T) {
 	called := false
 	var depTopicID, depDependsOnID string
 	repo := &mockRepo{
-		createTopicDirectionalFn: func(_ context.Context, userID, currentTopicID, title, description string, direction roadmap.TopicCreateDirection) (roadmap.Topic, error) {
+		createTopicDirectionalFn: func(_ context.Context, userID, _, currentTopicID, title, description string, direction roadmap.TopicCreateDirection) (roadmap.Topic, error) {
 			called = true
 			if userID != "u-1" || currentTopicID != "11111111-1111-1111-1111-111111111111" {
 				t.Fatalf("unexpected ids: user=%s current=%s", userID, currentTopicID)
@@ -95,7 +126,7 @@ func TestCreateTopic_DirectionalSuccess(t *testing.T) {
 	}
 
 	uc := roadmap.NewUseCase(repo)
-	resp, err := uc.CreateTopic(context.Background(), "u-1", roadmap.CreateTopicRequest{
+	resp, err := uc.CreateTopic(context.Background(), "u-1", "rm-1", roadmap.CreateTopicRequest{
 		Title:             "Child",
 		Description:       "desc",
 		Direction:         roadmap.TopicCreateDirectionBelow,
@@ -122,7 +153,7 @@ func TestCreateTopic_DirectionalInvalidPayload(t *testing.T) {
 	repo := &mockRepo{}
 	uc := roadmap.NewUseCase(repo)
 
-	_, err := uc.CreateTopic(context.Background(), "u-1", roadmap.CreateTopicRequest{
+	_, err := uc.CreateTopic(context.Background(), "u-1", "rm-1", roadmap.CreateTopicRequest{
 		Title:             "Child",
 		Description:       "desc",
 		Direction:         "diagonal",
@@ -150,9 +181,9 @@ func TestAddDependency_SelfReference(t *testing.T) {
 func TestAddDependency_DirectCycle(t *testing.T) {
 	repo := &mockRepo{
 		getTopicByIDFn: func(_ context.Context, id, _ string) (roadmap.Topic, error) {
-			return roadmap.Topic{ID: id, Status: "not_started"}, nil
+			return roadmap.Topic{ID: id, RoadmapID: "rm-1", Status: "not_started"}, nil
 		},
-		getDependenciesFn: func(_ context.Context, _ string) ([]roadmap.TopicDep, error) {
+		getDependenciesFn: func(_ context.Context, _, _ string) ([]roadmap.TopicDep, error) {
 			return []roadmap.TopicDep{
 				{TopicID: "A", DependsOnTopicID: "B", UserID: "user-1"},
 			}, nil
@@ -171,9 +202,9 @@ func TestAddDependency_DirectCycle(t *testing.T) {
 func TestAddDependency_TransitiveCycle(t *testing.T) {
 	repo := &mockRepo{
 		getTopicByIDFn: func(_ context.Context, id, _ string) (roadmap.Topic, error) {
-			return roadmap.Topic{ID: id, Status: "not_started"}, nil
+			return roadmap.Topic{ID: id, RoadmapID: "rm-1", Status: "not_started"}, nil
 		},
-		getDependenciesFn: func(_ context.Context, _ string) ([]roadmap.TopicDep, error) {
+		getDependenciesFn: func(_ context.Context, _, _ string) ([]roadmap.TopicDep, error) {
 			return []roadmap.TopicDep{
 				{TopicID: "A", DependsOnTopicID: "B", UserID: "u"},
 				{TopicID: "B", DependsOnTopicID: "C", UserID: "u"},
@@ -194,9 +225,9 @@ func TestAddDependency_NoCycle(t *testing.T) {
 	var addedTopic, addedDep string
 	repo := &mockRepo{
 		getTopicByIDFn: func(_ context.Context, id, _ string) (roadmap.Topic, error) {
-			return roadmap.Topic{ID: id, Status: "not_started"}, nil
+			return roadmap.Topic{ID: id, RoadmapID: "rm-1", Status: "not_started"}, nil
 		},
-		getDependenciesFn: func(_ context.Context, _ string) ([]roadmap.TopicDep, error) {
+		getDependenciesFn: func(_ context.Context, _, _ string) ([]roadmap.TopicDep, error) {
 			return []roadmap.TopicDep{
 				{TopicID: "A", DependsOnTopicID: "B", UserID: "u"},
 			}, nil
@@ -223,9 +254,9 @@ func TestAddDependency_NoCycle(t *testing.T) {
 func TestAddDependency_Duplicate(t *testing.T) {
 	repo := &mockRepo{
 		getTopicByIDFn: func(_ context.Context, id, _ string) (roadmap.Topic, error) {
-			return roadmap.Topic{ID: id, Status: "not_started"}, nil
+			return roadmap.Topic{ID: id, RoadmapID: "rm-1", Status: "not_started"}, nil
 		},
-		getDependenciesFn: func(_ context.Context, _ string) ([]roadmap.TopicDep, error) {
+		getDependenciesFn: func(_ context.Context, _, _ string) ([]roadmap.TopicDep, error) {
 			return nil, nil
 		},
 		addDependencyFn: func(_ context.Context, _, _, _ string) error {
@@ -357,21 +388,21 @@ func TestUpdateTopicStatus_ToInProgress_SetsStartDate(t *testing.T) {
 
 func TestGetFullRoadmap_WithBlockageInfo(t *testing.T) {
 	repo := &mockRepo{
-		getRoadmapByUserIDFn: func(_ context.Context, _ string) (roadmap.Roadmap, error) {
-			return roadmap.Roadmap{ID: "rm-1", Title: "My Roadmap"}, nil
+		getRoadmapByIDFn: func(_ context.Context, id, _ string) (roadmap.Roadmap, error) {
+			return roadmap.Roadmap{ID: id, Title: "My Roadmap"}, nil
 		},
-		getTopicsByUserIDFn: func(_ context.Context, _ string) ([]roadmap.Topic, error) {
+		getTopicsByRoadmapIDFn: func(_ context.Context, _, _ string) ([]roadmap.Topic, error) {
 			return []roadmap.Topic{
 				{ID: "t1", Title: "Topic A", Status: "not_started"},
 				{ID: "t2", Title: "Topic B", Status: "not_started"},
 			}, nil
 		},
-		getDependenciesFn: func(_ context.Context, _ string) ([]roadmap.TopicDep, error) {
+		getDependenciesFn: func(_ context.Context, _, _ string) ([]roadmap.TopicDep, error) {
 			return []roadmap.TopicDep{
 				{TopicID: "t2", DependsOnTopicID: "t1", UserID: "u"},
 			}, nil
 		},
-		getTopicMetricsFn: func(_ context.Context, _ string) (map[string]roadmap.TopicMetrics, error) {
+		getTopicMetricsFn: func(_ context.Context, _, _ string) (map[string]roadmap.TopicMetrics, error) {
 			return map[string]roadmap.TopicMetrics{
 				"t1": {TopicID: "t1", TasksCount: 0, MaterialsCount: 1, ProgressPercent: 0},
 				"t2": {TopicID: "t2", TasksCount: 3, MaterialsCount: 2, ProgressPercent: 66},
@@ -380,7 +411,7 @@ func TestGetFullRoadmap_WithBlockageInfo(t *testing.T) {
 	}
 	uc := roadmap.NewUseCase(repo)
 
-	resp, err := uc.GetFullRoadmap(context.Background(), "u")
+	resp, err := uc.GetFullRoadmap(context.Background(), "u", "rm-1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -405,22 +436,22 @@ func TestGetFullRoadmap_WithBlockageInfo(t *testing.T) {
 
 func TestGetFullRoadmap_MetricsZeroValuesWhenMissing(t *testing.T) {
 	repo := &mockRepo{
-		getRoadmapByUserIDFn: func(_ context.Context, _ string) (roadmap.Roadmap, error) {
-			return roadmap.Roadmap{ID: "rm-1", Title: "My Roadmap"}, nil
+		getRoadmapByIDFn: func(_ context.Context, id, _ string) (roadmap.Roadmap, error) {
+			return roadmap.Roadmap{ID: id, Title: "My Roadmap"}, nil
 		},
-		getTopicsByUserIDFn: func(_ context.Context, _ string) ([]roadmap.Topic, error) {
+		getTopicsByRoadmapIDFn: func(_ context.Context, _, _ string) ([]roadmap.Topic, error) {
 			return []roadmap.Topic{{ID: "t1", Title: "Topic A", Status: "not_started"}}, nil
 		},
-		getDependenciesFn: func(_ context.Context, _ string) ([]roadmap.TopicDep, error) {
+		getDependenciesFn: func(_ context.Context, _, _ string) ([]roadmap.TopicDep, error) {
 			return nil, nil
 		},
-		getTopicMetricsFn: func(_ context.Context, _ string) (map[string]roadmap.TopicMetrics, error) {
+		getTopicMetricsFn: func(_ context.Context, _, _ string) (map[string]roadmap.TopicMetrics, error) {
 			return map[string]roadmap.TopicMetrics{}, nil
 		},
 	}
 	uc := roadmap.NewUseCase(repo)
 
-	resp, err := uc.GetFullRoadmap(context.Background(), "u")
+	resp, err := uc.GetFullRoadmap(context.Background(), "u", "rm-1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

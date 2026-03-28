@@ -2,11 +2,11 @@ package roadmap
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"time"
 
 	"improve-platform/internal/history"
+	"improve-platform/pkg/dateutil"
 	apperr "improve-platform/pkg/errors"
 )
 
@@ -42,6 +42,31 @@ func (uc *UseCase) record(ctx context.Context, ev history.Event) {
 
 // --- Roadmap ---
 
+func (uc *UseCase) ListRoadmaps(ctx context.Context, userID string) ([]RoadmapListItem, error) {
+	const op apperr.Op = "UseCase.ListRoadmaps"
+	roadmaps, err := uc.repo.ListRoadmaps(ctx, userID)
+	if err != nil {
+		return nil, apperr.E(op, err)
+	}
+	items := make([]RoadmapListItem, 0, len(roadmaps))
+	for _, rm := range roadmaps {
+		pct := 0
+		if rm.TotalTopics > 0 {
+			pct = rm.CompletedTopics * 100 / rm.TotalTopics
+		}
+		items = append(items, RoadmapListItem{
+			ID:              rm.ID,
+			Title:           rm.Title,
+			TotalTopics:     rm.TotalTopics,
+			CompletedTopics: rm.CompletedTopics,
+			ProgressPercent: pct,
+			CreatedAt:       rm.CreatedAt,
+			UpdatedAt:       rm.UpdatedAt,
+		})
+	}
+	return items, nil
+}
+
 func (uc *UseCase) CreateRoadmap(ctx context.Context, userID string, req CreateRoadmapRequest) (RoadmapResponse, error) {
 	const op apperr.Op = "UseCase.CreateRoadmap"
 	rm, err := uc.repo.CreateRoadmap(ctx, userID, req.Title)
@@ -65,24 +90,24 @@ func (uc *UseCase) CreateRoadmap(ctx context.Context, userID string, req CreateR
 	}, nil
 }
 
-func (uc *UseCase) GetFullRoadmap(ctx context.Context, userID string) (RoadmapResponse, error) {
+func (uc *UseCase) GetFullRoadmap(ctx context.Context, userID, roadmapID string) (RoadmapResponse, error) {
 	const op apperr.Op = "UseCase.GetFullRoadmap"
-	rm, err := uc.repo.GetRoadmapByUserID(ctx, userID)
+	rm, err := uc.repo.GetRoadmapByID(ctx, roadmapID, userID)
 	if err != nil {
 		return RoadmapResponse{}, apperr.E(op, err)
 	}
 
-	topics, err := uc.repo.GetTopicsByUserID(ctx, userID)
+	topics, err := uc.repo.GetTopicsByRoadmapID(ctx, roadmapID, userID)
 	if err != nil {
 		return RoadmapResponse{}, apperr.E(op, err)
 	}
 
-	deps, err := uc.repo.GetDependenciesByUserID(ctx, userID)
+	deps, err := uc.repo.GetDependenciesByRoadmapID(ctx, roadmapID, userID)
 	if err != nil {
 		return RoadmapResponse{}, apperr.E(op, err)
 	}
 
-	metricsByTopicID, err := uc.repo.GetTopicMetricsByUserID(ctx, userID)
+	metricsByTopicID, err := uc.repo.GetTopicMetricsByRoadmapID(ctx, roadmapID, userID)
 	if err != nil {
 		return RoadmapResponse{}, apperr.E(op, err)
 	}
@@ -90,19 +115,14 @@ func (uc *UseCase) GetFullRoadmap(ctx context.Context, userID string) (RoadmapRe
 	return uc.assembleRoadmap(rm, topics, deps, metricsByTopicID), nil
 }
 
-func (uc *UseCase) UpdateRoadmap(ctx context.Context, userID string, req UpdateRoadmapRequest) error {
+func (uc *UseCase) UpdateRoadmap(ctx context.Context, userID, roadmapID string, req UpdateRoadmapRequest) error {
 	const op apperr.Op = "UseCase.UpdateRoadmap"
-	rm, err := uc.repo.GetRoadmapByUserID(ctx, userID)
-	if err != nil {
-		return apperr.E(op, err)
-	}
-
-	if err := uc.repo.UpdateRoadmapTitle(ctx, userID, req.Title); err != nil {
+	if err := uc.repo.UpdateRoadmapTitle(ctx, roadmapID, userID, req.Title); err != nil {
 		return apperr.E(op, err)
 	}
 
 	uc.record(ctx, history.Event{
-		UserID: userID, EntityType: "roadmap", EntityID: rm.ID,
+		UserID: userID, EntityType: "roadmap", EntityID: roadmapID,
 		EventType: "technical", EventName: "entity.updated",
 		Payload: map[string]any{"title": req.Title},
 	})
@@ -110,9 +130,24 @@ func (uc *UseCase) UpdateRoadmap(ctx context.Context, userID string, req UpdateR
 	return nil
 }
 
+func (uc *UseCase) DeleteRoadmap(ctx context.Context, userID, roadmapID string) error {
+	const op apperr.Op = "UseCase.DeleteRoadmap"
+	if err := uc.repo.DeleteRoadmap(ctx, roadmapID, userID); err != nil {
+		return apperr.E(op, err)
+	}
+
+	uc.record(ctx, history.Event{
+		UserID: userID, EntityType: "roadmap", EntityID: roadmapID,
+		EventType: "technical", EventName: "entity.deleted",
+		Payload: map[string]any{},
+	})
+
+	return nil
+}
+
 // --- Topics ---
 
-func (uc *UseCase) CreateTopic(ctx context.Context, userID string, req CreateTopicRequest) (TopicResponse, error) {
+func (uc *UseCase) CreateTopic(ctx context.Context, userID, roadmapID string, req CreateTopicRequest) (TopicResponse, error) {
 	const op apperr.Op = "UseCase.CreateTopic"
 	var (
 		t   Topic
@@ -127,13 +162,14 @@ func (uc *UseCase) CreateTopic(ctx context.Context, userID string, req CreateTop
 		t, err = uc.repo.CreateTopicDirectional(
 			ctx,
 			userID,
+			roadmapID,
 			req.RelativeToTopicID,
 			req.Title,
 			req.Description,
 			req.Direction,
 		)
 	} else {
-		t, err = uc.repo.CreateTopic(ctx, userID, req.Title, req.Description, req.Position)
+		t, err = uc.repo.CreateTopic(ctx, userID, roadmapID, req.Title, req.Description, req.Position)
 	}
 	if err != nil {
 		return TopicResponse{}, apperr.E(op, err)
@@ -165,7 +201,7 @@ func (uc *UseCase) GetTopic(ctx context.Context, userID, topicID string) (TopicR
 		return TopicResponse{}, apperr.E(op, err)
 	}
 
-	deps, err := uc.repo.GetDependenciesByUserID(ctx, userID)
+	deps, err := uc.repo.GetDependenciesByRoadmapID(ctx, t.RoadmapID, userID)
 	if err != nil {
 		return TopicResponse{}, apperr.E(op, err)
 	}
@@ -182,16 +218,16 @@ func (uc *UseCase) UpdateTopic(ctx context.Context, userID, topicID string, req 
 		return apperr.E(op, err)
 	}
 
-	startDate, err := parseDate(req.StartDate)
+	startDate, err := dateutil.Parse(req.StartDate)
 	if err != nil {
 		return apperr.E(op, apperr.Fmt("start_date: %w", err))
 	}
-	targetDate, err := parseDate(req.TargetDate)
+	targetDate, err := dateutil.Parse(req.TargetDate)
 	if err != nil {
 		return apperr.E(op, apperr.Fmt("target_date: %w", err))
 	}
 
-	if err := uc.repo.UpdateTopic(ctx, topicID, userID, req.Title, req.Description, startDate, targetDate, req.Position); err != nil {
+	if err := uc.repo.UpdateTopic(ctx, topicID, userID, req.Title, req.Description, req.Goal, startDate, targetDate, req.Position); err != nil {
 		return apperr.E(op, err)
 	}
 
@@ -256,6 +292,22 @@ func (uc *UseCase) DeleteTopic(ctx context.Context, userID, topicID string) erro
 	return nil
 }
 
+func (uc *UseCase) SetTopicConfidence(ctx context.Context, userID, topicID string, req SetConfidenceRequest) error {
+	const op apperr.Op = "UseCase.SetTopicConfidence"
+	if req.Confidence < 1 || req.Confidence > 5 {
+		return apperr.E(op, ErrInvalidConfidence)
+	}
+	if err := uc.repo.SetTopicConfidence(ctx, topicID, userID, req.Confidence); err != nil {
+		return apperr.E(op, err)
+	}
+	uc.record(ctx, history.Event{
+		UserID: userID, EntityType: "topic", EntityID: topicID,
+		EventType: "business", EventName: "topic.confidence_set",
+		Payload: map[string]any{"confidence": req.Confidence},
+	})
+	return nil
+}
+
 // --- Dependencies ---
 
 func (uc *UseCase) AddDependency(ctx context.Context, userID, topicID string, req AddDependencyRequest) error {
@@ -264,14 +316,15 @@ func (uc *UseCase) AddDependency(ctx context.Context, userID, topicID string, re
 		return apperr.E(op, ErrSelfDependency)
 	}
 
-	if _, err := uc.repo.GetTopicByID(ctx, topicID, userID); err != nil {
+	topic, err := uc.repo.GetTopicByID(ctx, topicID, userID)
+	if err != nil {
 		return apperr.E(op, err)
 	}
 	if _, err := uc.repo.GetTopicByID(ctx, req.DependsOnTopicID, userID); err != nil {
 		return apperr.E(op, err)
 	}
 
-	deps, err := uc.repo.GetDependenciesByUserID(ctx, userID)
+	deps, err := uc.repo.GetDependenciesByRoadmapID(ctx, topic.RoadmapID, userID)
 	if err != nil {
 		return apperr.E(op, err)
 	}
@@ -295,14 +348,6 @@ func buildDepMap(deps []TopicDep) map[string][]string {
 	m := make(map[string][]string)
 	for _, d := range deps {
 		m[d.TopicID] = append(m[d.TopicID], d.DependsOnTopicID)
-	}
-	return m
-}
-
-func buildTopicMap(topics []Topic) map[string]Topic {
-	m := make(map[string]Topic, len(topics))
-	for _, t := range topics {
-		m[t.ID] = t
 	}
 	return m
 }
@@ -368,12 +413,15 @@ func buildTopicResponse(t Topic, depIDs []string, metrics TopicMetrics) TopicRes
 	}
 	return TopicResponse{
 		ID:              t.ID,
+		RoadmapID:       t.RoadmapID,
 		Title:           t.Title,
 		Description:     t.Description,
+		Goal:            t.Goal,
 		Status:          t.Status,
-		StartDate:       formatDate(t.StartDate),
-		TargetDate:      formatDate(t.TargetDate),
-		CompletedDate:   formatDate(t.CompletedDate),
+		Confidence:      t.Confidence,
+		StartDate:       dateutil.Format(t.StartDate),
+		TargetDate:      dateutil.Format(t.TargetDate),
+		CompletedDate:   dateutil.Format(t.CompletedDate),
 		Position:        t.Position,
 		TasksCount:      metrics.TasksCount,
 		MaterialsCount:  metrics.MaterialsCount,
@@ -396,26 +444,4 @@ func buildDependencyResponses(deps []TopicDep) []TopicDependencyResponse {
 		})
 	}
 	return resp
-}
-
-func formatDate(t *time.Time) *string {
-	if t == nil {
-		return nil
-	}
-	s := t.Format("2006-01-02")
-	return &s
-}
-
-func parseDate(s *string) (*time.Time, error) {
-	if s == nil {
-		return nil, nil
-	}
-	if *s == "" {
-		return nil, nil
-	}
-	t, err := time.Parse("2006-01-02", *s)
-	if err != nil {
-		return nil, fmt.Errorf("invalid date format, expected YYYY-MM-DD: %w", err)
-	}
-	return &t, nil
 }

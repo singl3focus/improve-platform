@@ -118,6 +118,39 @@ export interface DashboardCopy {
   chartStatusCompleted: string;
   chartDeadlinesDayLabel: (date: string) => string;
   chartCountLabel: (count: number) => string;
+  // Feature 3: Goal + Confidence
+  topicGoal: string;
+  topicGoalPlaceholder: string;
+  topicGoalNudge: string;
+  confidencePromptTitle: string;
+  confidenceSkip: string;
+  confidenceLabels: string[];
+  // Feature 1: Daily Focus
+  focusToday: string;
+  focusPriorityOverdue: string;
+  focusPriorityToday: string;
+  focusPriorityActive: string;
+  focusAlsoToday: string;
+  focusContinue: string;
+  focusMarkDone: string;
+  focusEmptyState: string;
+  focusNoDue: string;
+  // Feature 5: Weekly Review
+  weeklyReviewTitle: string;
+  weeklyReviewStep1: string;
+  weeklyReviewStep2: string;
+  weeklyReviewStep3: string;
+  weeklyReviewReflection: string;
+  weeklyReviewNextGoal: string;
+  weeklyReviewComplete: string;
+  weeklyReviewNothingStuck: string;
+  weeklyReviewCTA: string;
+  weeklyReviewLastDone: (n: number) => string;
+  // Feature 4: Multiple Roadmaps
+  roadmapSwitcherLabel: string;
+  newRoadmapPlaceholder: string;
+  deleteRoadmapConfirm: string;
+  roadmapProgressMultiple: string;
 }
 
 export interface AppCopy {
@@ -242,7 +275,36 @@ const RU_COPY: AppCopy = {
     chartStatusPaused: "На паузе",
     chartStatusCompleted: "Завершено",
     chartDeadlinesDayLabel: (date) => date,
-    chartCountLabel: (count) => `${count}`
+    chartCountLabel: (count) => `${count}`,
+    topicGoal: "Цель темы",
+    topicGoalPlaceholder: "Что вы сможете делать после изучения этой темы?",
+    topicGoalNudge: "Добавьте цель — это поможет оставаться в фокусе",
+    confidencePromptTitle: "Насколько уверенно вы освоили тему?",
+    confidenceSkip: "Пропустить",
+    confidenceLabels: ["Поверхностно", "Знаю основы", "Понимаю", "Уверенно", "Могу объяснить"],
+    focusToday: "Фокус на сегодня",
+    focusPriorityOverdue: "ПРОСРОЧЕНО",
+    focusPriorityToday: "СЕГОДНЯ",
+    focusPriorityActive: "В РАБОТЕ",
+    focusAlsoToday: "Ещё на сегодня:",
+    focusContinue: "Продолжить с места остановки",
+    focusMarkDone: "Готово",
+    focusEmptyState: "На сегодня ничего не запланировано. Добавьте задачу с дедлайном.",
+    focusNoDue: "Без дедлайна",
+    weeklyReviewTitle: "Обзор недели",
+    weeklyReviewStep1: "Что произошло",
+    weeklyReviewStep2: "Что застряло",
+    weeklyReviewStep3: "План на следующую неделю",
+    weeklyReviewReflection: "Ваши мысли (необязательно)",
+    weeklyReviewNextGoal: "Главная цель на следующую неделю:",
+    weeklyReviewComplete: "Завершить обзор",
+    weeklyReviewNothingStuck: "Ничего не застряло — отличная неделя!",
+    weeklyReviewCTA: "Обзор недели →",
+    weeklyReviewLastDone: (n) => `Последний обзор: ${n} дн. назад`,
+    roadmapSwitcherLabel: "Дорожная карта",
+    newRoadmapPlaceholder: "Название новой дорожной карты",
+    deleteRoadmapConfirm: "Удалить дорожную карту и все её темы?",
+    roadmapProgressMultiple: "Прогресс по дорожным картам"
   }
 };
 
@@ -360,7 +422,36 @@ const EN_COPY: AppCopy = {
     chartStatusPaused: "Paused",
     chartStatusCompleted: "Completed",
     chartDeadlinesDayLabel: (date) => date,
-    chartCountLabel: (count) => `${count}`
+    chartCountLabel: (count) => `${count}`,
+    topicGoal: "Topic goal",
+    topicGoalPlaceholder: "What will you be able to do after learning this topic?",
+    topicGoalNudge: "Add a goal to stay focused",
+    confidencePromptTitle: "How confident are you about this topic?",
+    confidenceSkip: "Skip",
+    confidenceLabels: ["Scratched surface", "Know basics", "Understand", "Confident", "Can teach"],
+    focusToday: "Focus today",
+    focusPriorityOverdue: "OVERDUE",
+    focusPriorityToday: "TODAY",
+    focusPriorityActive: "IN PROGRESS",
+    focusAlsoToday: "Also today:",
+    focusContinue: "Continue where you stopped",
+    focusMarkDone: "Mark done",
+    focusEmptyState: "Nothing scheduled for today. Add a task with a deadline.",
+    focusNoDue: "No deadline",
+    weeklyReviewTitle: "Week in Review",
+    weeklyReviewStep1: "What happened",
+    weeklyReviewStep2: "What got stuck",
+    weeklyReviewStep3: "Next week plan",
+    weeklyReviewReflection: "Your reflection (optional)",
+    weeklyReviewNextGoal: "Main goal for next week:",
+    weeklyReviewComplete: "Complete Review",
+    weeklyReviewNothingStuck: "Nothing stuck — great week!",
+    weeklyReviewCTA: "Weekly Review →",
+    weeklyReviewLastDone: (n) => `Last review: ${n} day(s) ago`,
+    roadmapSwitcherLabel: "Roadmap",
+    newRoadmapPlaceholder: "New roadmap title",
+    deleteRoadmapConfirm: "Delete roadmap and all its topics?",
+    roadmapProgressMultiple: "Roadmap progress"
   }
 };
 

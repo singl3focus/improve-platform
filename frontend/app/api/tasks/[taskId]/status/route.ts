@@ -11,8 +11,7 @@ import type { TaskBoardStatus } from "@features/tasks/types";
 import {
   createBackendClient,
   createBackendErrorResponse,
-  createBackendUnavailableResponse,
-  isBackendErrorCode
+  createBackendUnavailableResponse
 } from "@shared/api/backend-client";
 import { buildRoadmapTopicTitleMap } from "@features/roadmap/lib/roadmap-topic-helpers";
 
@@ -79,26 +78,25 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       return errorResponse;
     }
 
-    const roadmapResult = await client.call("/api/v1/roadmap", { method: "GET" });
-    if (
-      !roadmapResult.response.ok &&
-      !(
-        roadmapResult.response.status === 404 &&
-        isBackendErrorCode(roadmapResult.payload, "roadmap_not_found")
-      )
-    ) {
+    const listResult = await client.call("/api/v1/roadmaps", { method: "GET" });
+    let roadmap: BackendRoadmapResponse | null = null;
+    if (listResult.response.ok) {
+      const roadmapList = listResult.payload as Array<{ id: string }>;
+      if (roadmapList.length > 0) {
+        const rmResult = await client.call(`/api/v1/roadmaps/${encodeURIComponent(roadmapList[0].id)}`, { method: "GET" });
+        if (rmResult.response.ok) {
+          roadmap = rmResult.payload as BackendRoadmapResponse;
+        }
+      }
+    } else {
       const errorResponse = createBackendErrorResponse(
-        roadmapResult.response,
-        roadmapResult.payload,
+        listResult.response,
+        listResult.payload,
         "Failed to load task topic data."
       );
       client.applyUpdatedSession(errorResponse);
       return errorResponse;
     }
-
-    const roadmap = roadmapResult.response.ok
-      ? (roadmapResult.payload as BackendRoadmapResponse)
-      : null;
     const topicTitleMap = buildRoadmapTopicTitleMap(roadmap);
     const task = taskResult.payload as BackendTaskResponse;
 

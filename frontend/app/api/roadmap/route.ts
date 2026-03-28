@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { RoadmapResponse, RoadmapTopic } from "@features/roadmap/types";
 import type {
-  BackendRoadmapResponse,
-  BackendRoadmapTopic,
-  BackendTopicTasksResponse
+  BackendRoadmapTopic
 } from "@shared/api/backend-contracts";
+import { isBackendRoadmapListArray, isBackendRoadmapResponse, isBackendTopicTasksResponse } from "@shared/api/backend-contracts";
 import {
   createBackendClient,
   createBackendErrorResponse,
@@ -22,8 +21,10 @@ interface BackendFlatRoadmapTopic {
   id: string;
   title: string;
   description: string;
+  goal?: string;
   position: number;
   status: BackendRoadmapTopic["status"];
+  confidence?: number | null;
   dependencies: string[];
   stage_id?: string;
 }
@@ -87,8 +88,8 @@ async function loadTopicMetrics(
     }
   }
 
-  const tasksPayload = tasksResult.response.ok
-    ? (tasksResult.payload as BackendTopicTasksResponse)
+  const tasksPayload = tasksResult.response.ok && isBackendTopicTasksResponse(tasksResult.payload)
+    ? tasksResult.payload
     : null;
   const materialsPayload = materialsResult.response.ok
     ? (materialsResult.payload as Array<unknown>)
@@ -108,7 +109,28 @@ export async function GET(request: NextRequest) {
   const client = createBackendClient(request);
 
   try {
-    const roadmapResult = await client.call("/api/v1/roadmap", { method: "GET" });
+    // List roadmaps and use the first one (legacy compatibility)
+    const listResult = await client.call("/api/v1/roadmaps", { method: "GET" });
+    if (!listResult.response.ok) {
+      const errorResponse = createBackendErrorResponse(
+        listResult.response,
+        listResult.payload,
+        "Roadmap list request failed."
+      );
+      client.applyUpdatedSession(errorResponse);
+      return errorResponse;
+    }
+    const roadmapList = isBackendRoadmapListArray(listResult.payload) ? listResult.payload : [];
+    if (roadmapList.length === 0) {
+      const response = NextResponse.json({ stages: [] } satisfies RoadmapResponse, {
+        status: 200
+      });
+      client.applyUpdatedSession(response);
+      return response;
+    }
+    const firstRoadmapId = roadmapList[0].id;
+
+    const roadmapResult = await client.call(`/api/v1/roadmaps/${encodeURIComponent(firstRoadmapId)}`, { method: "GET" });
 
     if (!roadmapResult.response.ok) {
       if (
@@ -131,12 +153,11 @@ export async function GET(request: NextRequest) {
       return errorResponse;
     }
 
-    const roadmapPayload = roadmapResult.payload as BackendRoadmapResponse | BackendFlatRoadmapResponse;
+    const roadmapPayload = roadmapResult.payload;
     const mappedStages: RoadmapResponse["stages"] = [];
 
-    const hasStageGroups = Array.isArray((roadmapPayload as BackendRoadmapResponse).stages);
-    const normalizedStages = hasStageGroups
-      ? (roadmapPayload as BackendRoadmapResponse).stages
+    const normalizedStages = isBackendRoadmapResponse(roadmapPayload)
+      ? roadmapPayload.stages
       : [
           {
             id: (roadmapPayload as BackendFlatRoadmapResponse).id,
@@ -165,11 +186,13 @@ export async function GET(request: NextRequest) {
           stageId: topic.stage_id ?? stage.id,
           title: topic.title,
           description: topic.description,
+          goal: (topic as BackendFlatRoadmapTopic).goal ?? "",
           position:
             typeof topic.position === "number" && Number.isFinite(topic.position)
               ? topic.position
               : topicIndex + 1,
           status: topic.status,
+          confidence: (topic as BackendFlatRoadmapTopic).confidence ?? null,
           progressPercent: metricsResult.metrics?.progressPercent ?? 0,
           tasksCount: metricsResult.metrics?.tasksCount ?? 0,
           materialsCount: metricsResult.metrics?.materialsCount ?? 0,

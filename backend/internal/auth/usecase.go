@@ -192,8 +192,10 @@ func (uc *UseCase) generateToken(userID, tokenType string, ttl time.Duration) (s
 }
 
 func (uc *UseCase) parseRefreshToken(refreshToken string) (string, error) {
+	const op apperr.Op = "UseCase.parseRefreshToken"
+
 	if refreshToken == "" {
-		return "", fmt.Errorf("empty refresh token")
+		return "", apperr.E(op, apperr.Fmt("empty refresh token"))
 	}
 
 	token, err := jwt.Parse(refreshToken, func(t *jwt.Token) (interface{}, error) {
@@ -203,22 +205,22 @@ func (uc *UseCase) parseRefreshToken(refreshToken string) (string, error) {
 		return uc.jwtSecret, nil
 	})
 	if err != nil || !token.Valid {
-		return "", fmt.Errorf("invalid token")
+		return "", apperr.E(op, apperr.Fmt("invalid token"))
 	}
 
 	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok {
-		return "", fmt.Errorf("invalid token claims")
+		return "", apperr.E(op, apperr.Fmt("invalid token claims"))
 	}
 
 	tokenType, ok := claims["typ"].(string)
 	if !ok || tokenType != refreshTokenType {
-		return "", fmt.Errorf("token is not refresh")
+		return "", apperr.E(op, apperr.Fmt("token is not refresh"))
 	}
 
 	userID, ok := claims["sub"].(string)
 	if !ok || userID == "" {
-		return "", fmt.Errorf("missing subject in token")
+		return "", apperr.E(op, apperr.Fmt("missing subject in token"))
 	}
 
 	return userID, nil

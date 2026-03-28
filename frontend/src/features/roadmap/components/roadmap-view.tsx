@@ -304,8 +304,8 @@ function initialRoadmapState(): RoadmapState {
   };
 }
 
-async function fetchRoadmap(signal: AbortSignal): Promise<RoadmapResponse> {
-  const response = await authFetch("/api/roadmap", {
+async function fetchRoadmap(roadmapId: string, signal: AbortSignal): Promise<RoadmapResponse> {
+  const response = await authFetch(`/api/roadmaps/${encodeURIComponent(roadmapId)}`, {
     method: "GET",
     signal
   });
@@ -387,31 +387,49 @@ function getTopicStatusErrorMessage(
 
 async function quickCreateFirstTopic(payload: {
   roadmapTitle: string;
-  stageTitle: string;
   topicTitle: string;
   topicDescription: string;
-}): Promise<void> {
-  const response = await authFetch("/api/roadmap/quick-create", {
+}): Promise<string> {
+  const roadmapResponse = await authFetch("/api/roadmaps", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(payload)
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title: payload.roadmapTitle })
   });
 
-  if (!response.ok) {
-    throw new Error(await parseErrorMessage(response, "Roadmap quick-create failed."));
+  if (!roadmapResponse.ok) {
+    throw new Error(await parseErrorMessage(roadmapResponse, "Roadmap creation failed."));
   }
+
+  const roadmapData = await roadmapResponse.json();
+  const newRoadmapId: string = roadmapData.id ?? roadmapData.data?.id;
+  if (!newRoadmapId) {
+    throw new Error("Roadmap created but id is missing in response.");
+  }
+
+  const topicResponse = await authFetch(`/api/roadmaps/${encodeURIComponent(newRoadmapId)}/topics`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      title: payload.topicTitle,
+      description: payload.topicDescription
+    })
+  });
+
+  if (!topicResponse.ok) {
+    throw new Error(await parseErrorMessage(topicResponse, "Topic creation failed."));
+  }
+
+  return newRoadmapId;
 }
 
-async function createRoadmapTopic(payload: {
+async function createRoadmapTopic(roadmapId: string, payload: {
   title: string;
   description: string;
   direction?: TopicCreateDirection;
   relative_to_topic_id?: string;
   position?: number;
 }): Promise<TopicCreateResult> {
-  const response = await authFetch("/api/roadmap/topics", {
+  const response = await authFetch(`/api/roadmaps/${encodeURIComponent(roadmapId)}/topics`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
@@ -442,6 +460,7 @@ async function createRoadmapTopic(payload: {
 }
 
 async function updateRoadmapTopic(
+  roadmapId: string,
   topicId: string,
   payload: {
     title: string;
@@ -449,7 +468,7 @@ async function updateRoadmapTopic(
     status: RoadmapTopicStatus;
   }
 ): Promise<void> {
-  const response = await authFetch(`/api/roadmap/topics/${encodeURIComponent(topicId)}`, {
+  const response = await authFetch(`/api/roadmaps/${encodeURIComponent(roadmapId)}/topics/${encodeURIComponent(topicId)}`, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json"
@@ -462,8 +481,8 @@ async function updateRoadmapTopic(
   }
 }
 
-async function deleteRoadmapTopic(topicId: string): Promise<void> {
-  const response = await authFetch(`/api/roadmap/topics/${encodeURIComponent(topicId)}`, {
+async function deleteRoadmapTopic(roadmapId: string, topicId: string): Promise<void> {
+  const response = await authFetch(`/api/roadmaps/${encodeURIComponent(roadmapId)}/topics/${encodeURIComponent(topicId)}`, {
     method: "DELETE"
   });
 
@@ -472,9 +491,9 @@ async function deleteRoadmapTopic(topicId: string): Promise<void> {
   }
 }
 
-async function deleteRoadmapDependency(topicId: string, dependencyTopicId: string): Promise<void> {
+async function deleteRoadmapDependency(roadmapId: string, topicId: string, dependencyTopicId: string): Promise<void> {
   const response = await authFetch(
-    `/api/roadmap/topics/${encodeURIComponent(topicId)}/dependencies/${encodeURIComponent(
+    `/api/roadmaps/${encodeURIComponent(roadmapId)}/topics/${encodeURIComponent(topicId)}/dependencies/${encodeURIComponent(
       dependencyTopicId
     )}`,
     { method: "DELETE" }
@@ -526,18 +545,27 @@ function getStatusClassName(status: RoadmapTopicStatus): string {
   return "roadmap-status-not-started";
 }
 
-function useRoadmapData(errorFallback: string) {
+function useRoadmapData(roadmapId: string | null, errorFallback: string) {
   const [state, setState] = useState<RoadmapState>(initialRoadmapState());
   const [reloadKey, setReloadKey] = useState(0);
   const reload = useCallback(() => setReloadKey((value) => value + 1), []);
 
   useEffect(() => {
+    if (!roadmapId) {
+      setState({
+        status: "success",
+        data: { stages: [] },
+        errorMessage: null
+      });
+      return;
+    }
+
     const controller = new AbortController();
 
     async function load() {
       setState(initialRoadmapState());
       try {
-        const payload = await fetchRoadmap(controller.signal);
+        const payload = await fetchRoadmap(roadmapId!, controller.signal);
         setState({
           status: "success",
           data: payload,
@@ -558,7 +586,7 @@ function useRoadmapData(errorFallback: string) {
 
     void load();
     return () => controller.abort();
-  }, [reloadKey, errorFallback]);
+  }, [reloadKey, roadmapId, errorFallback]);
 
   return {
     state,
@@ -674,9 +702,9 @@ function QuickCreatePanel(props: {
 
 export function RoadmapView() {
   const router = useRouter();
-  const { language } = useUserPreferences();
+  const { language, activeRoadmapId, setActiveRoadmapId } = useUserPreferences();
   const copy = ROADMAP_COPY.ru;
-  const roadmap = useRoadmapData(copy.errorFallback);
+  const roadmap = useRoadmapData(activeRoadmapId, copy.errorFallback);
   const roadmapReload = roadmap.reload;
   const graphRef = useRef<HTMLDivElement | null>(null);
   const topicRefs = useRef<Map<string, HTMLElement>>(new Map());
@@ -1172,12 +1200,12 @@ export function RoadmapView() {
     setQuickCreateError(null);
     setIsQuickCreating(true);
     try {
-      await quickCreateFirstTopic({
+      const newRoadmapId = await quickCreateFirstTopic({
         roadmapTitle: copy.defaultRoadmapTitle,
-        stageTitle: copy.defaultStageTitle,
         topicTitle,
         topicDescription: quickCreateDraft.topicDescription.trim()
       });
+      setActiveRoadmapId(newRoadmapId);
       pendingFirstTopicCenterRef.current = true;
       setQuickCreateDraft(initialQuickCreateDraft());
       roadmap.reload();
@@ -1201,6 +1229,7 @@ export function RoadmapView() {
     setIsTopicCreating(true);
     try {
       await createRoadmapTopic(
+        activeRoadmapId!,
         buildTopicCreatePayload({
           title,
           description: topicCreateDraft.description.trim(),
@@ -1294,7 +1323,7 @@ export function RoadmapView() {
     setTopicMutationError(null);
     setUpdatingTopicId(editingTopicId);
     try {
-      await updateRoadmapTopic(editingTopicId, submission.payload);
+      await updateRoadmapTopic(activeRoadmapId!, editingTopicId, submission.payload);
       cancelTopicEditing();
       roadmap.reload();
     } catch (error) {
@@ -1312,7 +1341,7 @@ export function RoadmapView() {
     setTopicMutationError(null);
     setDeletingTopicId(topic.id);
     try {
-      await deleteRoadmapTopic(topic.id);
+      await deleteRoadmapTopic(activeRoadmapId!, topic.id);
       if (editingTopicId === topic.id) {
         cancelTopicEditing();
       }
@@ -1330,7 +1359,7 @@ export function RoadmapView() {
     setRemovingDependencyKey(key);
 
     try {
-      await deleteRoadmapDependency(topicId, dependencyTopicId);
+      await deleteRoadmapDependency(activeRoadmapId!, topicId, dependencyTopicId);
       roadmap.reload();
     } catch (error) {
       setDependencyMutationError(
@@ -1868,6 +1897,21 @@ export function RoadmapView() {
                               >
                                 {getStatusLabel(topic.status, language)}
                               </span>
+                              {topic.status === "completed" && topic.confidence !== null && topic.confidence !== undefined && (
+                                <span
+                                  style={{
+                                    display: "inline-block",
+                                    width: "8px",
+                                    height: "8px",
+                                    borderRadius: "50%",
+                                    marginLeft: "0.25rem",
+                                    backgroundColor:
+                                      topic.confidence <= 2 ? "#eab308" :
+                                      topic.confidence === 3 ? "#3b82f6" : "#22c55e"
+                                  }}
+                                  title={`Confidence: ${topic.confidence}/5`}
+                                />
+                              )}
                               <div className="roadmap-topic-meta">
                                 <button
                                   type="button"
@@ -1950,7 +1994,7 @@ export function RoadmapView() {
 
                             <div className="roadmap-topic-core">
                               <div className="roadmap-topic-center">
-                                <h4 className="roadmap-topic-title">{topic.title}</h4>
+                                <h4 className="roadmap-topic-title" title={topic.goal || undefined}>{topic.title}</h4>
 
                                 <div className="roadmap-topic-progress">
                                   <div className="roadmap-progress-row">

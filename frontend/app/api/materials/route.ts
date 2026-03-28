@@ -28,33 +28,44 @@ async function loadRoadmapTopics(
   topics: TopicTitleOption[] | null;
   errorResponse: NextResponse | null;
 }> {
-  const roadmapResult = await client.call("/api/v1/roadmap", { method: "GET" });
-  if (!roadmapResult.response.ok) {
-    if (
-      roadmapResult.response.status === 404 &&
-      isBackendErrorCode(roadmapResult.payload, "roadmap_not_found")
-    ) {
-      return {
-        topics: [],
-        errorResponse: null
-      };
-    }
-
+  const listResult = await client.call("/api/v1/roadmaps", { method: "GET" });
+  if (!listResult.response.ok) {
     return {
       topics: null,
       errorResponse: createBackendErrorResponse(
-        roadmapResult.response,
-        roadmapResult.payload,
-        "Failed to load roadmap topics."
+        listResult.response,
+        listResult.payload,
+        "Failed to load roadmaps."
       )
     };
   }
 
-  const roadmap = roadmapResult.payload as BackendRoadmapResponse;
-  return {
-    topics: extractTopicTitleOptions(roadmap),
-    errorResponse: null
-  };
+  const roadmapList = listResult.payload as Array<{ id: string }>;
+  const allTopics: TopicTitleOption[] = [];
+
+  for (const entry of roadmapList) {
+    const rmResult = await client.call(`/api/v1/roadmaps/${encodeURIComponent(entry.id)}`, { method: "GET" });
+    if (!rmResult.response.ok) {
+      if (
+        rmResult.response.status === 404 &&
+        isBackendErrorCode(rmResult.payload, "roadmap_not_found")
+      ) {
+        continue;
+      }
+      return {
+        topics: null,
+        errorResponse: createBackendErrorResponse(
+          rmResult.response,
+          rmResult.payload,
+          "Failed to load roadmap topics."
+        )
+      };
+    }
+    const roadmap = rmResult.payload as BackendRoadmapResponse;
+    allTopics.push(...extractTopicTitleOptions(roadmap));
+  }
+
+  return { topics: allTopics, errorResponse: null };
 }
 
 export async function GET(request: NextRequest) {

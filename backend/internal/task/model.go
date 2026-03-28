@@ -9,6 +9,7 @@ import (
 
 var (
 	ErrTaskNotFound  = errors.New("task not found")
+	ErrTopicNotFound = errors.New("topic not found")
 	ErrInvalidStatus = errors.New("invalid task status transition")
 )
 

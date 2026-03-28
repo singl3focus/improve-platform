@@ -4,23 +4,39 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
-	"regexp"
 
 	"github.com/go-chi/chi/v5"
 
 	"improve-platform/internal/auth"
 	apperr "improve-platform/pkg/errors"
 	"improve-platform/pkg/httpresp"
+	"improve-platform/pkg/httputil"
 )
 
 type Handler struct {
 	svc Service
 }
 
-var uuidPathParamPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
-
 func NewHandler(svc Service) *Handler {
 	return &Handler{svc: svc}
+}
+
+func (h *Handler) ListRoadmaps() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := auth.UserIDFromContext(r.Context())
+		if !ok {
+			httpresp.Error(w, http.StatusUnauthorized, "unauthorized", "user not authenticated")
+			return
+		}
+
+		items, err := h.svc.ListRoadmaps(r.Context(), userID)
+		if err != nil {
+			handleError(w, err)
+			return
+		}
+
+		httpresp.JSON(w, http.StatusOK, items)
+	}
 }
 
 func (h *Handler) GetRoadmap() http.HandlerFunc {
@@ -31,7 +47,12 @@ func (h *Handler) GetRoadmap() http.HandlerFunc {
 			return
 		}
 
-		resp, err := h.svc.GetFullRoadmap(r.Context(), userID)
+		roadmapID := chi.URLParam(r, "roadmapID")
+		if !httputil.ValidateUUID(w, roadmapID, "roadmap_id") {
+			return
+		}
+
+		resp, err := h.svc.GetFullRoadmap(r.Context(), userID, roadmapID)
 		if err != nil {
 			handleError(w, err)
 			return
@@ -77,6 +98,11 @@ func (h *Handler) UpdateRoadmap() http.HandlerFunc {
 			return
 		}
 
+		roadmapID := chi.URLParam(r, "roadmapID")
+		if !httputil.ValidateUUID(w, roadmapID, "roadmap_id") {
+			return
+		}
+
 		var req UpdateRoadmapRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			httpresp.Error(w, http.StatusBadRequest, "bad_request", "invalid request body")
@@ -87,7 +113,29 @@ func (h *Handler) UpdateRoadmap() http.HandlerFunc {
 			return
 		}
 
-		if err := h.svc.UpdateRoadmap(r.Context(), userID, req); err != nil {
+		if err := h.svc.UpdateRoadmap(r.Context(), userID, roadmapID, req); err != nil {
+			handleError(w, err)
+			return
+		}
+
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+func (h *Handler) DeleteRoadmap() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := auth.UserIDFromContext(r.Context())
+		if !ok {
+			httpresp.Error(w, http.StatusUnauthorized, "unauthorized", "user not authenticated")
+			return
+		}
+
+		roadmapID := chi.URLParam(r, "roadmapID")
+		if !httputil.ValidateUUID(w, roadmapID, "roadmap_id") {
+			return
+		}
+
+		if err := h.svc.DeleteRoadmap(r.Context(), userID, roadmapID); err != nil {
 			handleError(w, err)
 			return
 		}
@@ -101,6 +149,11 @@ func (h *Handler) CreateTopic() http.HandlerFunc {
 		userID, ok := auth.UserIDFromContext(r.Context())
 		if !ok {
 			httpresp.Error(w, http.StatusUnauthorized, "unauthorized", "user not authenticated")
+			return
+		}
+
+		roadmapID := chi.URLParam(r, "roadmapID")
+		if !httputil.ValidateUUID(w, roadmapID, "roadmap_id") {
 			return
 		}
 
@@ -118,8 +171,7 @@ func (h *Handler) CreateTopic() http.HandlerFunc {
 				httpresp.Error(w, http.StatusBadRequest, "validation_error", "relative_to_topic_id is required for directional create")
 				return
 			}
-			if !uuidPathParamPattern.MatchString(req.RelativeToTopicID) {
-				httpresp.Error(w, http.StatusBadRequest, "validation_error", "relative_to_topic_id must be a valid UUID")
+			if !httputil.ValidateUUID(w, req.RelativeToTopicID, "relative_to_topic_id") {
 				return
 			}
 			if !req.Direction.IsValid() {
@@ -128,7 +180,7 @@ func (h *Handler) CreateTopic() http.HandlerFunc {
 			}
 		}
 
-		resp, err := h.svc.CreateTopic(r.Context(), userID, req)
+		resp, err := h.svc.CreateTopic(r.Context(), userID, roadmapID, req)
 		if err != nil {
 			handleError(w, err)
 			return
@@ -147,7 +199,7 @@ func (h *Handler) GetTopic() http.HandlerFunc {
 		}
 
 		topicID := chi.URLParam(r, "topicID")
-		if !validateUUIDPathParam(w, topicID, "topic_id") {
+		if !httputil.ValidateUUID(w, topicID, "topic_id") {
 			return
 		}
 		resp, err := h.svc.GetTopic(r.Context(), userID, topicID)
@@ -169,7 +221,7 @@ func (h *Handler) UpdateTopic() http.HandlerFunc {
 		}
 
 		topicID := chi.URLParam(r, "topicID")
-		if !validateUUIDPathParam(w, topicID, "topic_id") {
+		if !httputil.ValidateUUID(w, topicID, "topic_id") {
 			return
 		}
 		var req UpdateTopicRequest
@@ -200,7 +252,7 @@ func (h *Handler) DeleteTopic() http.HandlerFunc {
 		}
 
 		topicID := chi.URLParam(r, "topicID")
-		if !validateUUIDPathParam(w, topicID, "topic_id") {
+		if !httputil.ValidateUUID(w, topicID, "topic_id") {
 			return
 		}
 		if err := h.svc.DeleteTopic(r.Context(), userID, topicID); err != nil {
@@ -221,7 +273,7 @@ func (h *Handler) UpdateTopicStatus() http.HandlerFunc {
 		}
 
 		topicID := chi.URLParam(r, "topicID")
-		if !validateUUIDPathParam(w, topicID, "topic_id") {
+		if !httputil.ValidateUUID(w, topicID, "topic_id") {
 			return
 		}
 		var req UpdateStatusRequest
@@ -243,6 +295,33 @@ func (h *Handler) UpdateTopicStatus() http.HandlerFunc {
 	}
 }
 
+func (h *Handler) SetTopicConfidence() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := auth.UserIDFromContext(r.Context())
+		if !ok {
+			httpresp.Error(w, http.StatusUnauthorized, "unauthorized", "user not authenticated")
+			return
+		}
+
+		topicID := chi.URLParam(r, "topicID")
+		if !httputil.ValidateUUID(w, topicID, "topic_id") {
+			return
+		}
+		var req SetConfidenceRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			httpresp.Error(w, http.StatusBadRequest, "bad_request", "invalid request body")
+			return
+		}
+
+		if err := h.svc.SetTopicConfidence(r.Context(), userID, topicID, req); err != nil {
+			handleError(w, err)
+			return
+		}
+
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
 func (h *Handler) AddDependency() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID, ok := auth.UserIDFromContext(r.Context())
@@ -252,7 +331,7 @@ func (h *Handler) AddDependency() http.HandlerFunc {
 		}
 
 		topicID := chi.URLParam(r, "topicID")
-		if !validateUUIDPathParam(w, topicID, "topic_id") {
+		if !httputil.ValidateUUID(w, topicID, "topic_id") {
 			return
 		}
 		var req AddDependencyRequest
@@ -284,10 +363,10 @@ func (h *Handler) RemoveDependency() http.HandlerFunc {
 
 		topicID := chi.URLParam(r, "topicID")
 		depTopicID := chi.URLParam(r, "depTopicID")
-		if !validateUUIDPathParam(w, topicID, "topic_id") {
+		if !httputil.ValidateUUID(w, topicID, "topic_id") {
 			return
 		}
-		if !validateUUIDPathParam(w, depTopicID, "dep_topic_id") {
+		if !httputil.ValidateUUID(w, depTopicID, "dep_topic_id") {
 			return
 		}
 
@@ -320,16 +399,10 @@ func handleError(w http.ResponseWriter, err error) {
 		httpresp.Error(w, http.StatusNotFound, "dependency_not_found", "dependency not found")
 	case apperr.Is(err, ErrSelfDependency):
 		httpresp.Error(w, http.StatusBadRequest, "self_dependency", "topic cannot depend on itself")
+	case apperr.Is(err, ErrInvalidConfidence):
+		httpresp.Error(w, http.StatusBadRequest, "invalid_confidence", "confidence must be between 1 and 5")
 	default:
 		slog.Error("unhandled error", "ops", apperr.OpsTrace(err), "error", err)
 		httpresp.Error(w, http.StatusInternalServerError, "internal_error", "internal server error")
 	}
-}
-
-func validateUUIDPathParam(w http.ResponseWriter, value, field string) bool {
-	if !uuidPathParamPattern.MatchString(value) {
-		httpresp.Error(w, http.StatusBadRequest, "validation_error", field+" must be a valid UUID")
-		return false
-	}
-	return true
 }

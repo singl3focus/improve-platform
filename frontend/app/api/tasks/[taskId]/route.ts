@@ -7,10 +7,10 @@ import { mapBackendTaskStatusToBoard } from "@features/tasks/lib/backend-learnin
 import {
   createBackendClient,
   createBackendErrorResponse,
-  createBackendUnavailableResponse,
-  isBackendErrorCode
+  createBackendUnavailableResponse
 } from "@shared/api/backend-client";
 import { buildRoadmapTopicTitleMap } from "@features/roadmap/lib/roadmap-topic-helpers";
+import { normalizeText } from "@shared/api/payload-parsers";
 
 interface RouteContext {
   params: {
@@ -72,30 +72,14 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     return NextResponse.json({ message: "Invalid JSON body." }, { status: 400 });
   }
 
-  if (typeof payload.title !== "string" || payload.title.trim().length === 0) {
+  const title = normalizeText(payload.title);
+  if (!title) {
     return NextResponse.json({ message: "Title must be a non-empty string." }, { status: 422 });
   }
 
-  if (payload.description !== undefined && typeof payload.description !== "string") {
-    return NextResponse.json({ message: "Description must be a string." }, { status: 422 });
-  }
-
-  if (payload.topicId !== undefined && payload.topicId !== null && typeof payload.topicId !== "string") {
-    return NextResponse.json({ message: "Topic id must be a string." }, { status: 422 });
-  }
-
-  if (payload.deadline !== undefined && payload.deadline !== null && typeof payload.deadline !== "string") {
-    return NextResponse.json({ message: "Deadline must be a string in YYYY-MM-DD format." }, { status: 422 });
-  }
-
-  const title = payload.title.trim();
-  const description = typeof payload.description === "string" ? payload.description.trim() : "";
-  const topicId =
-    typeof payload.topicId === "string" && payload.topicId.trim().length > 0
-      ? payload.topicId.trim()
-      : null;
-  const deadlineRaw = typeof payload.deadline === "string" ? payload.deadline.trim() : "";
-  const deadline = deadlineRaw.length > 0 ? deadlineRaw : null;
+  const description = normalizeText(payload.description) ?? "";
+  const topicId = normalizeText(payload.topicId) ?? null;
+  const deadline = normalizeText(payload.deadline) ?? null;
 
   if (deadline && !isValidDateString(deadline)) {
     return NextResponse.json({ message: "Deadline must be in YYYY-MM-DD format." }, { status: 422 });
@@ -157,26 +141,25 @@ export async function PUT(request: NextRequest, context: RouteContext) {
       return errorResponse;
     }
 
-    const roadmapResult = await client.call("/api/v1/roadmap", { method: "GET" });
-    if (
-      !roadmapResult.response.ok &&
-      !(
-        roadmapResult.response.status === 404 &&
-        isBackendErrorCode(roadmapResult.payload, "roadmap_not_found")
-      )
-    ) {
+    const listResult = await client.call("/api/v1/roadmaps", { method: "GET" });
+    let roadmap: BackendRoadmapResponse | null = null;
+    if (listResult.response.ok) {
+      const roadmapList = listResult.payload as Array<{ id: string }>;
+      if (roadmapList.length > 0) {
+        const rmResult = await client.call(`/api/v1/roadmaps/${encodeURIComponent(roadmapList[0].id)}`, { method: "GET" });
+        if (rmResult.response.ok) {
+          roadmap = rmResult.payload as BackendRoadmapResponse;
+        }
+      }
+    } else {
       const errorResponse = createBackendErrorResponse(
-        roadmapResult.response,
-        roadmapResult.payload,
+        listResult.response,
+        listResult.payload,
         "Failed to load task topic data."
       );
       client.applyUpdatedSession(errorResponse);
       return errorResponse;
     }
-
-    const roadmap = roadmapResult.response.ok
-      ? (roadmapResult.payload as BackendRoadmapResponse)
-      : null;
     const topicTitleMap = buildRoadmapTopicTitleMap(roadmap);
     const task = taskResult.payload as BackendTaskResponse;
 

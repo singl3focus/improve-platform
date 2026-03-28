@@ -1,12 +1,25 @@
 export type RoadmapTopicStatus = "not_started" | "in_progress" | "paused" | "completed";
 
+export interface RoadmapListItem {
+  id: string;
+  title: string;
+  totalTopics: number;
+  completedTopics: number;
+  progressPercent: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface RoadmapTopic {
   id: string;
+  roadmapId?: string;
   stageId?: string;
   title: string;
   description: string;
+  goal: string;
   position: number;
   status: RoadmapTopicStatus;
+  confidence: number | null;
   progressPercent: number;
   tasksCount: number;
   materialsCount: number;

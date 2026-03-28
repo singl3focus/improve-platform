@@ -59,3 +59,26 @@ export interface DashboardChartsPayload {
   topicsByStatus: DashboardTopicsByStatusChart;
   upcomingDeadlines: DashboardDeadlinesByDayChartItem[];
 }
+
+export interface DashboardFocusTask {
+  id: string;
+  title: string;
+  topicId: string | null;
+  topicTitle: string | null;
+  status: string;
+  deadline: string | null;
+  priorityLevel: "overdue" | "due_today" | "in_progress" | "active_topic";
+}
+
+export interface DashboardFocusTopic {
+  id: string;
+  title: string;
+  lastTaskTitle: string;
+  progressPercent: number;
+}
+
+export interface DashboardFocus {
+  primaryTask: DashboardFocusTask | null;
+  secondaryTasks: DashboardFocusTask[];
+  continueTopic: DashboardFocusTopic | null;
+}

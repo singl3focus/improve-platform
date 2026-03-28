@@ -26,8 +26,6 @@ formatters:
         - localmodule
 
 issues:
-  max-issues-per-linter: 50
-  max-same-issues: 3
   new: false
   fix: true
 

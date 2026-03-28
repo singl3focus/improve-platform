@@ -25,7 +25,9 @@ function createEmptyTopicWorkspace(topicId: string): TopicWorkspace {
     id: topicId,
     title: "Topic workspace",
     description: "Create this topic in your roadmap to start working with tasks and materials.",
+    goal: "",
     status: "not_started",
+    confidence: null,
     progressPercent: 0,
     startDate: "",
     targetDate: "",
@@ -90,26 +92,28 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
     const topic = topicResult.payload as BackendRoadmapTopic;
 
-    const roadmapResult = await client.call("/api/v1/roadmap", { method: "GET" });
-    if (
-      !roadmapResult.response.ok &&
-      !(
-        roadmapResult.response.status === 404 &&
-        isBackendErrorCode(roadmapResult.payload, "roadmap_not_found")
-      )
-    ) {
-      const errorResponse = createBackendErrorResponse(
-        roadmapResult.response,
-        roadmapResult.payload,
-        "Failed to load roadmap dependencies."
-      );
-      client.applyUpdatedSession(errorResponse);
-      return errorResponse;
+    let roadmap: BackendRoadmapResponse | null = null;
+    if (topic.roadmap_id) {
+      const roadmapResult = await client.call(`/api/v1/roadmaps/${encodeURIComponent(topic.roadmap_id)}`, { method: "GET" });
+      if (
+        !roadmapResult.response.ok &&
+        !(
+          roadmapResult.response.status === 404 &&
+          isBackendErrorCode(roadmapResult.payload, "roadmap_not_found")
+        )
+      ) {
+        const errorResponse = createBackendErrorResponse(
+          roadmapResult.response,
+          roadmapResult.payload,
+          "Failed to load roadmap dependencies."
+        );
+        client.applyUpdatedSession(errorResponse);
+        return errorResponse;
+      }
+      roadmap = roadmapResult.response.ok
+        ? (roadmapResult.payload as BackendRoadmapResponse)
+        : null;
     }
-
-    const roadmap = roadmapResult.response.ok
-      ? (roadmapResult.payload as BackendRoadmapResponse)
-      : null;
     const topicMap = buildTopicMap(roadmap);
 
     const tasksResult = await client.call(`/api/v1/roadmap/topics/${encodeURIComponent(topicId)}/tasks`, {
@@ -146,7 +150,9 @@ export async function GET(request: NextRequest, context: RouteContext) {
       id: topic.id,
       title: topic.title,
       description: topic.description,
+      goal: (topic as unknown as { goal?: string }).goal ?? "",
       status: topic.status,
+      confidence: (topic as unknown as { confidence?: number | null }).confidence ?? null,
       progressPercent: buildProgressPercent(topicTasks),
       startDate: topic.start_date ?? "",
       targetDate: topic.target_date ?? "",

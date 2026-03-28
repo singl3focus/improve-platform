@@ -16,6 +16,7 @@ import (
 
 	"improve-platform/internal/auth"
 	"improve-platform/internal/config"
+	"improve-platform/internal/dashboard"
 	"improve-platform/internal/history"
 	"improve-platform/internal/material"
 	"improve-platform/internal/roadmap"
@@ -81,26 +82,36 @@ func (s *Server) routes() {
 	matUC.WithRecorder(histUC)
 	matH := material.NewHandler(matUC)
 
+	dashRepo := dashboard.NewRepo(s.pool)
+	dashUC := dashboard.NewUseCase(dashRepo)
+	dashUC.WithRecorder(histUC)
+	dashH := dashboard.NewHandler(dashUC)
+
 	s.router.Group(func(r chi.Router) {
 		r.Use(auth.Middleware([]byte(s.cfg.JWTSecret)))
 		r.Get("/api/v1/me", authH.Me())
 		r.Patch("/api/v1/auth/profile", authH.UpdateProfile())
 
-		r.Get("/api/v1/roadmap", rmH.GetRoadmap())
-		r.Post("/api/v1/roadmap", rmH.CreateRoadmap())
-		r.Put("/api/v1/roadmap", rmH.UpdateRoadmap())
+		// Multiple roadmaps
+		r.Get("/api/v1/roadmaps", rmH.ListRoadmaps())
+		r.Post("/api/v1/roadmaps", rmH.CreateRoadmap())
+		r.Get("/api/v1/roadmaps/{roadmapID}", rmH.GetRoadmap())
+		r.Put("/api/v1/roadmaps/{roadmapID}", rmH.UpdateRoadmap())
+		r.Delete("/api/v1/roadmaps/{roadmapID}", rmH.DeleteRoadmap())
 
-		r.Post("/api/v1/roadmap/topics", rmH.CreateTopic())
-		r.Get("/api/v1/roadmap/topics/{topicID}", rmH.GetTopic())
-		r.Put("/api/v1/roadmap/topics/{topicID}", rmH.UpdateTopic())
-		r.Delete("/api/v1/roadmap/topics/{topicID}", rmH.DeleteTopic())
-		r.Patch("/api/v1/roadmap/topics/{topicID}/status", rmH.UpdateTopicStatus())
+		// Topics scoped to roadmap
+		r.Post("/api/v1/roadmaps/{roadmapID}/topics", rmH.CreateTopic())
+		r.Get("/api/v1/roadmaps/{roadmapID}/topics/{topicID}", rmH.GetTopic())
+		r.Put("/api/v1/roadmaps/{roadmapID}/topics/{topicID}", rmH.UpdateTopic())
+		r.Delete("/api/v1/roadmaps/{roadmapID}/topics/{topicID}", rmH.DeleteTopic())
+		r.Patch("/api/v1/roadmaps/{roadmapID}/topics/{topicID}/status", rmH.UpdateTopicStatus())
+		r.Patch("/api/v1/roadmaps/{roadmapID}/topics/{topicID}/confidence", rmH.SetTopicConfidence())
 
-		r.Post("/api/v1/roadmap/topics/{topicID}/dependencies", rmH.AddDependency())
-		r.Delete("/api/v1/roadmap/topics/{topicID}/dependencies/{depTopicID}", rmH.RemoveDependency())
+		r.Post("/api/v1/roadmaps/{roadmapID}/topics/{topicID}/dependencies", rmH.AddDependency())
+		r.Delete("/api/v1/roadmaps/{roadmapID}/topics/{topicID}/dependencies/{depTopicID}", rmH.RemoveDependency())
 
-		r.Get("/api/v1/roadmap/topics/{topicID}/tasks", taskH.GetTopicTasks())
-		r.Get("/api/v1/roadmap/topics/{topicID}/materials", matH.ListTopicMaterials())
+		r.Get("/api/v1/roadmaps/{roadmapID}/topics/{topicID}/tasks", taskH.GetTopicTasks())
+		r.Get("/api/v1/roadmaps/{roadmapID}/topics/{topicID}/materials", matH.ListTopicMaterials())
 
 		r.Post("/api/v1/tasks", taskH.CreateTask())
 		r.Get("/api/v1/tasks", taskH.ListTasks())
@@ -115,6 +126,21 @@ func (s *Server) routes() {
 		r.Delete("/api/v1/materials/{materialID}", matH.DeleteMaterial())
 
 		r.Get("/api/v1/history", histH.GetHistory())
+
+		r.Get("/api/v1/dashboard/focus", dashH.GetFocus())
+		r.Get("/api/v1/dashboard/weekly-review", dashH.GetWeeklyReview())
+		r.Post("/api/v1/dashboard/weekly-review", dashH.SaveWeeklyReview())
+
+		// Legacy topic routes (no roadmapID prefix) — used by topic workspace, weekly review
+		r.Get("/api/v1/roadmap/topics/{topicID}", rmH.GetTopic())
+		r.Put("/api/v1/roadmap/topics/{topicID}", rmH.UpdateTopic())
+		r.Delete("/api/v1/roadmap/topics/{topicID}", rmH.DeleteTopic())
+		r.Patch("/api/v1/roadmap/topics/{topicID}/status", rmH.UpdateTopicStatus())
+		r.Patch("/api/v1/roadmap/topics/{topicID}/confidence", rmH.SetTopicConfidence())
+		r.Post("/api/v1/roadmap/topics/{topicID}/dependencies", rmH.AddDependency())
+		r.Delete("/api/v1/roadmap/topics/{topicID}/dependencies/{depTopicID}", rmH.RemoveDependency())
+		r.Get("/api/v1/roadmap/topics/{topicID}/tasks", taskH.GetTopicTasks())
+		r.Get("/api/v1/roadmap/topics/{topicID}/materials", matH.ListTopicMaterials())
 	})
 }
 

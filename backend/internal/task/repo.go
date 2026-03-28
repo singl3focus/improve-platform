@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	apperr "improve-platform/pkg/errors"
@@ -18,6 +19,8 @@ func NewRepo(pool *pgxpool.Pool) *Repo {
 	return &Repo{pool: pool}
 }
 
+const foreignKeyViolation = "23503"
+
 func (r *Repo) Create(ctx context.Context, t Task) (Task, error) {
 	const op apperr.Op = "Repo.Create"
 	var created Task
@@ -29,7 +32,14 @@ func (r *Repo) Create(ctx context.Context, t Task) (Task, error) {
 		t.UserID, t.TopicID, t.Title, t.Description, t.Deadline, t.Position,
 	).Scan(&created.ID, &created.UserID, &created.TopicID, &created.Title, &created.Description,
 		&created.Status, &created.Deadline, &created.Position, &created.CreatedAt, &created.UpdatedAt)
-	return created, apperr.E(op, err)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if apperr.As(err, &pgErr) && pgErr.Code == foreignKeyViolation {
+			return Task{}, apperr.E(op, ErrTopicNotFound)
+		}
+		return Task{}, apperr.E(op, err)
+	}
+	return created, nil
 }
 
 func (r *Repo) GetByID(ctx context.Context, id, userID string) (Task, error) {

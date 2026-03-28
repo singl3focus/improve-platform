@@ -2,11 +2,11 @@ package task
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"time"
 
 	"improve-platform/internal/history"
+	"improve-platform/pkg/dateutil"
 	apperr "improve-platform/pkg/errors"
 )
 
@@ -45,7 +45,7 @@ func (uc *UseCase) record(ctx context.Context, ev history.Event) {
 
 func (uc *UseCase) CreateTask(ctx context.Context, userID string, req CreateRequest) (TaskResponse, error) {
 	const op apperr.Op = "UseCase.CreateTask"
-	deadline, err := parseDate(req.Deadline)
+	deadline, err := dateutil.Parse(req.Deadline)
 	if err != nil {
 		return TaskResponse{}, apperr.E(op, apperr.Fmt("deadline: %w", err))
 	}
@@ -103,7 +103,7 @@ func (uc *UseCase) UpdateTask(ctx context.Context, userID, taskID string, req Up
 		return apperr.E(op, err)
 	}
 
-	deadline, err := parseDate(req.Deadline)
+	deadline, err := dateutil.Parse(req.Deadline)
 	if err != nil {
 		return apperr.E(op, apperr.Fmt("deadline: %w", err))
 	}
@@ -128,13 +128,13 @@ func (uc *UseCase) UpdateTask(ctx context.Context, userID, taskID string, req Up
 		Payload: map[string]any{"title": req.Title},
 	})
 
-	if !sameDate(old.Deadline, deadline) {
+	if !dateutil.Equal(old.Deadline, deadline) {
 		uc.record(ctx, history.Event{
 			UserID: userID, EntityType: "task", EntityID: taskID,
 			EventType: "business", EventName: "task.deadline_changed",
 			Payload: map[string]any{
-				"old_deadline": dateToAny(old.Deadline),
-				"new_deadline": dateToAny(deadline),
+				"old_deadline": dateutil.ToAny(old.Deadline),
+				"new_deadline": dateutil.ToAny(deadline),
 			},
 		})
 	}
@@ -333,7 +333,7 @@ func buildTaskResponse(t Task) TaskResponse {
 		Title:       t.Title,
 		Description: t.Description,
 		Status:      t.Status,
-		Deadline:    formatDate(t.Deadline),
+		Deadline:    dateutil.Format(t.Deadline),
 		Position:    t.Position,
 		IsOverdue:   computeOverdue(t.Status, t.Deadline),
 		CreatedAt:   t.CreatedAt,
@@ -346,43 +346,4 @@ func computeOverdue(status string, deadline *time.Time) bool {
 		return false
 	}
 	return time.Now().Truncate(24 * time.Hour).After(*deadline)
-}
-
-func formatDate(t *time.Time) *string {
-	if t == nil {
-		return nil
-	}
-	s := t.Format("2006-01-02")
-	return &s
-}
-
-func parseDate(s *string) (*time.Time, error) {
-	if s == nil {
-		return nil, nil
-	}
-	if *s == "" {
-		return nil, nil
-	}
-	t, err := time.Parse("2006-01-02", *s)
-	if err != nil {
-		return nil, fmt.Errorf("invalid date format, expected YYYY-MM-DD: %w", err)
-	}
-	return &t, nil
-}
-
-func sameDate(a, b *time.Time) bool {
-	if a == nil && b == nil {
-		return true
-	}
-	if a == nil || b == nil {
-		return false
-	}
-	return a.Equal(*b)
-}
-
-func dateToAny(t *time.Time) any {
-	if t == nil {
-		return nil
-	}
-	return t.Format("2006-01-02")
 }

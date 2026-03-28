@@ -17,29 +17,44 @@ import (
 )
 
 type mockService struct {
-	getFullRoadmapFn    func(ctx context.Context, userID string) (roadmap.RoadmapResponse, error)
-	createRoadmapFn     func(ctx context.Context, userID string, req roadmap.CreateRoadmapRequest) (roadmap.RoadmapResponse, error)
-	updateRoadmapFn     func(ctx context.Context, userID string, req roadmap.UpdateRoadmapRequest) error
-	createTopicFn       func(ctx context.Context, userID string, req roadmap.CreateTopicRequest) (roadmap.TopicResponse, error)
-	getTopicFn          func(ctx context.Context, userID, topicID string) (roadmap.TopicResponse, error)
-	updateTopicFn       func(ctx context.Context, userID, topicID string, req roadmap.UpdateTopicRequest) error
-	updateTopicStatusFn func(ctx context.Context, userID, topicID string, req roadmap.UpdateStatusRequest) error
-	deleteTopicFn       func(ctx context.Context, userID, topicID string) error
-	addDependencyFn     func(ctx context.Context, userID, topicID string, req roadmap.AddDependencyRequest) error
-	removeDependencyFn  func(ctx context.Context, userID, topicID, depTopicID string) error
+	listRoadmapsFn       func(ctx context.Context, userID string) ([]roadmap.RoadmapListItem, error)
+	getFullRoadmapFn     func(ctx context.Context, userID, roadmapID string) (roadmap.RoadmapResponse, error)
+	createRoadmapFn      func(ctx context.Context, userID string, req roadmap.CreateRoadmapRequest) (roadmap.RoadmapResponse, error)
+	updateRoadmapFn      func(ctx context.Context, userID, roadmapID string, req roadmap.UpdateRoadmapRequest) error
+	deleteRoadmapFn      func(ctx context.Context, userID, roadmapID string) error
+	createTopicFn        func(ctx context.Context, userID, roadmapID string, req roadmap.CreateTopicRequest) (roadmap.TopicResponse, error)
+	getTopicFn           func(ctx context.Context, userID, topicID string) (roadmap.TopicResponse, error)
+	updateTopicFn        func(ctx context.Context, userID, topicID string, req roadmap.UpdateTopicRequest) error
+	updateTopicStatusFn  func(ctx context.Context, userID, topicID string, req roadmap.UpdateStatusRequest) error
+	deleteTopicFn        func(ctx context.Context, userID, topicID string) error
+	addDependencyFn      func(ctx context.Context, userID, topicID string, req roadmap.AddDependencyRequest) error
+	setTopicConfidenceFn func(ctx context.Context, userID, topicID string, req roadmap.SetConfidenceRequest) error
+	removeDependencyFn   func(ctx context.Context, userID, topicID, depTopicID string) error
 }
 
-func (m *mockService) GetFullRoadmap(ctx context.Context, userID string) (roadmap.RoadmapResponse, error) {
-	return m.getFullRoadmapFn(ctx, userID)
+func (m *mockService) ListRoadmaps(ctx context.Context, userID string) ([]roadmap.RoadmapListItem, error) {
+	if m.listRoadmapsFn != nil {
+		return m.listRoadmapsFn(ctx, userID)
+	}
+	return nil, nil
+}
+func (m *mockService) GetFullRoadmap(ctx context.Context, userID, roadmapID string) (roadmap.RoadmapResponse, error) {
+	return m.getFullRoadmapFn(ctx, userID, roadmapID)
 }
 func (m *mockService) CreateRoadmap(ctx context.Context, userID string, req roadmap.CreateRoadmapRequest) (roadmap.RoadmapResponse, error) {
 	return m.createRoadmapFn(ctx, userID, req)
 }
-func (m *mockService) UpdateRoadmap(ctx context.Context, userID string, req roadmap.UpdateRoadmapRequest) error {
-	return m.updateRoadmapFn(ctx, userID, req)
+func (m *mockService) UpdateRoadmap(ctx context.Context, userID, roadmapID string, req roadmap.UpdateRoadmapRequest) error {
+	return m.updateRoadmapFn(ctx, userID, roadmapID, req)
 }
-func (m *mockService) CreateTopic(ctx context.Context, userID string, req roadmap.CreateTopicRequest) (roadmap.TopicResponse, error) {
-	return m.createTopicFn(ctx, userID, req)
+func (m *mockService) DeleteRoadmap(ctx context.Context, userID, roadmapID string) error {
+	if m.deleteRoadmapFn != nil {
+		return m.deleteRoadmapFn(ctx, userID, roadmapID)
+	}
+	return nil
+}
+func (m *mockService) CreateTopic(ctx context.Context, userID, roadmapID string, req roadmap.CreateTopicRequest) (roadmap.TopicResponse, error) {
+	return m.createTopicFn(ctx, userID, roadmapID, req)
 }
 func (m *mockService) GetTopic(ctx context.Context, userID, topicID string) (roadmap.TopicResponse, error) {
 	return m.getTopicFn(ctx, userID, topicID)
@@ -52,6 +67,12 @@ func (m *mockService) UpdateTopicStatus(ctx context.Context, userID, topicID str
 }
 func (m *mockService) DeleteTopic(ctx context.Context, userID, topicID string) error {
 	return m.deleteTopicFn(ctx, userID, topicID)
+}
+func (m *mockService) SetTopicConfidence(ctx context.Context, userID, topicID string, req roadmap.SetConfidenceRequest) error {
+	if m.setTopicConfidenceFn != nil {
+		return m.setTopicConfidenceFn(ctx, userID, topicID, req)
+	}
+	return nil
 }
 func (m *mockService) AddDependency(ctx context.Context, userID, topicID string, req roadmap.AddDependencyRequest) error {
 	return m.addDependencyFn(ctx, userID, topicID, req)
@@ -142,7 +163,7 @@ func TestHandler_CreateRoadmap_AlreadyExists(t *testing.T) {
 
 func TestHandler_GetRoadmap_Success(t *testing.T) {
 	svc := &mockService{
-		getFullRoadmapFn: func(_ context.Context, _ string) (roadmap.RoadmapResponse, error) {
+		getFullRoadmapFn: func(_ context.Context, _, _ string) (roadmap.RoadmapResponse, error) {
 			return roadmap.RoadmapResponse{
 				ID:    "rm-1",
 				Title: "My RM",
@@ -155,7 +176,10 @@ func TestHandler_GetRoadmap_Success(t *testing.T) {
 	}
 	h := roadmap.NewHandler(svc)
 
-	req := authedRequest(http.MethodGet, "/api/v1/roadmap", nil)
+	req := withURLParams(
+		authedRequest(http.MethodGet, "/api/v1/roadmaps/11111111-1111-1111-1111-111111111111", nil),
+		"roadmapID", "11111111-1111-1111-1111-111111111111",
+	)
 	rec := httptest.NewRecorder()
 
 	h.GetRoadmap().ServeHTTP(rec, req)
@@ -179,7 +203,7 @@ func TestHandler_GetRoadmap_Success(t *testing.T) {
 
 func TestHandler_GetRoadmap_ResponseDoesNotContainStageFields(t *testing.T) {
 	svc := &mockService{
-		getFullRoadmapFn: func(_ context.Context, _ string) (roadmap.RoadmapResponse, error) {
+		getFullRoadmapFn: func(_ context.Context, _, _ string) (roadmap.RoadmapResponse, error) {
 			return roadmap.RoadmapResponse{
 				ID:    "rm-1",
 				Title: "My RM",
@@ -192,7 +216,10 @@ func TestHandler_GetRoadmap_ResponseDoesNotContainStageFields(t *testing.T) {
 	}
 	h := roadmap.NewHandler(svc)
 
-	req := authedRequest(http.MethodGet, "/api/v1/roadmap", nil)
+	req := withURLParams(
+		authedRequest(http.MethodGet, "/api/v1/roadmaps/11111111-1111-1111-1111-111111111111", nil),
+		"roadmapID", "11111111-1111-1111-1111-111111111111",
+	)
 	rec := httptest.NewRecorder()
 
 	h.GetRoadmap().ServeHTTP(rec, req)
@@ -212,7 +239,7 @@ func TestHandler_GetRoadmap_ResponseDoesNotContainStageFields(t *testing.T) {
 
 func TestHandler_CreateTopic_SuccessWithoutStageFields(t *testing.T) {
 	svc := &mockService{
-		createTopicFn: func(_ context.Context, _ string, req roadmap.CreateTopicRequest) (roadmap.TopicResponse, error) {
+		createTopicFn: func(_ context.Context, _, _ string, req roadmap.CreateTopicRequest) (roadmap.TopicResponse, error) {
 			if req.Title != "Topic 1" || req.Description != "desc" || req.Position != 3 {
 				t.Fatalf("unexpected request: %+v", req)
 			}
@@ -226,7 +253,10 @@ func TestHandler_CreateTopic_SuccessWithoutStageFields(t *testing.T) {
 		"description": "desc",
 		"position":    3,
 	})
-	req := authedRequest(http.MethodPost, "/api/v1/roadmap/topics", body)
+	req := withURLParams(
+		authedRequest(http.MethodPost, "/api/v1/roadmaps/rm-1/topics", body),
+		"roadmapID", "11111111-1111-1111-1111-111111111111",
+	)
 	rec := httptest.NewRecorder()
 
 	h.CreateTopic().ServeHTTP(rec, req)
@@ -246,7 +276,7 @@ func TestHandler_CreateTopic_SuccessWithoutStageFields(t *testing.T) {
 
 func TestHandler_CreateTopic_DirectionalSuccess(t *testing.T) {
 	svc := &mockService{
-		createTopicFn: func(_ context.Context, _ string, req roadmap.CreateTopicRequest) (roadmap.TopicResponse, error) {
+		createTopicFn: func(_ context.Context, _, _ string, req roadmap.CreateTopicRequest) (roadmap.TopicResponse, error) {
 			if req.Direction != roadmap.TopicCreateDirectionRight {
 				t.Fatalf("unexpected direction: %s", req.Direction)
 			}
@@ -264,7 +294,10 @@ func TestHandler_CreateTopic_DirectionalSuccess(t *testing.T) {
 		"direction":            "right",
 		"relative_to_topic_id": "11111111-1111-1111-1111-111111111111",
 	})
-	req := authedRequest(http.MethodPost, "/api/v1/roadmap/topics", body)
+	req := withURLParams(
+		authedRequest(http.MethodPost, "/api/v1/roadmaps/rm-1/topics", body),
+		"roadmapID", "22222222-2222-2222-2222-222222222222",
+	)
 	rec := httptest.NewRecorder()
 
 	h.CreateTopic().ServeHTTP(rec, req)
@@ -282,7 +315,10 @@ func TestHandler_CreateTopic_DirectionalMissingRelativeTopicID(t *testing.T) {
 		"description": "desc",
 		"direction":   "below",
 	})
-	req := authedRequest(http.MethodPost, "/api/v1/roadmap/topics", body)
+	req := withURLParams(
+		authedRequest(http.MethodPost, "/api/v1/roadmaps/rm-1/topics", body),
+		"roadmapID", "11111111-1111-1111-1111-111111111111",
+	)
 	rec := httptest.NewRecorder()
 
 	h.CreateTopic().ServeHTTP(rec, req)
@@ -301,7 +337,10 @@ func TestHandler_CreateTopic_DirectionalInvalidDirection(t *testing.T) {
 		"direction":            "diagonal",
 		"relative_to_topic_id": "11111111-1111-1111-1111-111111111111",
 	})
-	req := authedRequest(http.MethodPost, "/api/v1/roadmap/topics", body)
+	req := withURLParams(
+		authedRequest(http.MethodPost, "/api/v1/roadmaps/rm-1/topics", body),
+		"roadmapID", "22222222-2222-2222-2222-222222222222",
+	)
 	rec := httptest.NewRecorder()
 
 	h.CreateTopic().ServeHTTP(rec, req)

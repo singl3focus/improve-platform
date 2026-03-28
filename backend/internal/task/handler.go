@@ -4,20 +4,18 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
-	"regexp"
 
 	"github.com/go-chi/chi/v5"
 
 	"improve-platform/internal/auth"
 	apperr "improve-platform/pkg/errors"
 	"improve-platform/pkg/httpresp"
+	"improve-platform/pkg/httputil"
 )
 
 type Handler struct {
 	svc Service
 }
-
-var uuidPathParamPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 
 func NewHandler(svc Service) *Handler {
 	return &Handler{svc: svc}
@@ -60,7 +58,7 @@ func (h *Handler) GetTask() http.HandlerFunc {
 		}
 
 		taskID := chi.URLParam(r, "taskID")
-		if !validateUUIDPathParam(w, taskID, "task_id") {
+		if !httputil.ValidateUUID(w, taskID, "task_id") {
 			return
 		}
 		resp, err := h.svc.GetTask(r.Context(), userID, taskID)
@@ -105,7 +103,7 @@ func (h *Handler) UpdateTask() http.HandlerFunc {
 		}
 
 		taskID := chi.URLParam(r, "taskID")
-		if !validateUUIDPathParam(w, taskID, "task_id") {
+		if !httputil.ValidateUUID(w, taskID, "task_id") {
 			return
 		}
 		var req UpdateRequest
@@ -136,7 +134,7 @@ func (h *Handler) UpdateTaskStatus() http.HandlerFunc {
 		}
 
 		taskID := chi.URLParam(r, "taskID")
-		if !validateUUIDPathParam(w, taskID, "task_id") {
+		if !httputil.ValidateUUID(w, taskID, "task_id") {
 			return
 		}
 		var req UpdateStatusRequest
@@ -167,7 +165,7 @@ func (h *Handler) DeleteTask() http.HandlerFunc {
 		}
 
 		taskID := chi.URLParam(r, "taskID")
-		if !validateUUIDPathParam(w, taskID, "task_id") {
+		if !httputil.ValidateUUID(w, taskID, "task_id") {
 			return
 		}
 		if err := h.svc.DeleteTask(r.Context(), userID, taskID); err != nil {
@@ -188,7 +186,7 @@ func (h *Handler) GetTopicTasks() http.HandlerFunc {
 		}
 
 		topicID := chi.URLParam(r, "topicID")
-		if !validateUUIDPathParam(w, topicID, "topic_id") {
+		if !httputil.ValidateUUID(w, topicID, "topic_id") {
 			return
 		}
 		resp, err := h.svc.GetTopicTasks(r.Context(), userID, topicID)
@@ -205,18 +203,12 @@ func handleError(w http.ResponseWriter, err error) {
 	switch {
 	case apperr.Is(err, ErrTaskNotFound):
 		httpresp.Error(w, http.StatusNotFound, "task_not_found", "task not found")
+	case apperr.Is(err, ErrTopicNotFound):
+		httpresp.Error(w, http.StatusBadRequest, "topic_not_found", "referenced topic does not exist")
 	case apperr.Is(err, ErrInvalidStatus):
 		httpresp.Error(w, http.StatusBadRequest, "invalid_status", "invalid task status transition")
 	default:
 		slog.Error("unhandled error", "ops", apperr.OpsTrace(err), "error", err)
 		httpresp.Error(w, http.StatusInternalServerError, "internal_error", "internal server error")
 	}
-}
-
-func validateUUIDPathParam(w http.ResponseWriter, value, field string) bool {
-	if !uuidPathParamPattern.MatchString(value) {
-		httpresp.Error(w, http.StatusBadRequest, "validation_error", field+" must be a valid UUID")
-		return false
-	}
-	return true
 }

@@ -11,31 +11,10 @@
     "incremental": false
   },
   "include": [
-    "src/features/roadmap/lib/roadmap-graph.ts",
-    "src/features/roadmap/lib/roadmap-graph.test.ts",
-    "src/features/roadmap/lib/roadmap-layout.ts",
-    "src/features/roadmap/lib/roadmap-layout.test.ts",
-    "src/features/roadmap/lib/roadmap-topic-position.ts",
-    "src/features/roadmap/lib/roadmap-topic-position.test.ts",
-    "src/features/roadmap/lib/roadmap-topic-create.ts",
-    "src/features/roadmap/lib/roadmap-topic-create.test.ts",
-    "src/features/roadmap/lib/roadmap-topic-edit.ts",
-    "src/features/roadmap/lib/roadmap-topic-edit.test.ts",
-    "src/features/roadmap/lib/roadmap-topic-status.ts",
-    "src/features/roadmap/lib/roadmap-topic-status.test.ts",
-    "src/features/roadmap/lib/roadmap-topic-update-flow.ts",
-    "src/features/roadmap/lib/roadmap-topic-update-flow.test.ts",
-    "src/features/roadmap/types.ts",
-    "src/shared/api/backend-shared.ts",
-    "src/shared/api/backend-shared.test.ts",
-    "src/features/materials/lib/materials-api-mapping.ts",
-    "src/features/materials/lib/materials-api-mapping.test.ts",
-    "src/features/materials/lib/materials-form.ts",
-    "src/features/materials/lib/materials-form.test.ts",
-    "src/features/materials/types.ts",
-    "src/features/tasks/types.ts",
-    "src/features/topics/types.ts",
-    "src/features/tasks/lib/backend-learning-mappers.ts",
-    "src/shared/api/backend-contracts.ts"
+    "src/**/*.test.ts",
+    "src/**/*.ts"
+  ],
+  "exclude": [
+    "src/**/*.tsx"
   ]
 }

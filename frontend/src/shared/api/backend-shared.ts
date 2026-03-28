@@ -40,6 +40,28 @@ export function getNumberValue(
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
+/**
+ * Extract an error message from a failed fetch Response.
+ * Tries to parse JSON body for a `message` field, falls back to the given string.
+ */
+export async function parseErrorMessage(response: Response, fallback: string): Promise<string> {
+  try {
+    const payload: unknown = await response.json();
+    const record = isRecord(payload) ? payload : null;
+    const nestedError = record && isRecord(record.error) ? record.error : null;
+
+    return (
+      getStringValue(record, "message") ??
+      getStringValue(nestedError, "message") ??
+      getStringValue(record, "error") ??
+      (response.statusText || fallback)
+    );
+  } catch {
+    // non-JSON response
+  }
+  return fallback;
+}
+
 export function getResponseCandidates(payload: unknown): Array<Record<string, unknown>> {
   const primary = isRecord(payload) ? payload : null;
   const candidates: Array<Record<string, unknown>> = [];

@@ -2,6 +2,7 @@
 
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { authFetch } from "@features/auth/lib/auth-fetch";
+import { parseErrorMessage } from "@shared/api/backend-shared";
 import type { AppLanguage } from "@shared/i18n/ui-copy";
 import type {
   TaskBoardDueFilter,
@@ -68,18 +69,6 @@ function initialBoardState(): TaskBoardState {
     data: null,
     errorMessage: null
   };
-}
-
-async function parseErrorMessage(response: Response, fallback: string): Promise<string> {
-  try {
-    const payload = (await response.json()) as { message?: string };
-    if (typeof payload?.message === "string") {
-      return payload.message;
-    }
-  } catch {
-    // Ignore non-JSON errors.
-  }
-  return fallback;
 }
 
 async function fetchTasksBoard(

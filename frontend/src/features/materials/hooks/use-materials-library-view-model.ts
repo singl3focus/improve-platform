@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type FormEvent, useEffect, useState } from "react";
 import { authFetch } from "@features/auth/lib/auth-fetch";
+import { parseErrorMessage } from "@shared/api/backend-shared";
 import type {
   LibraryMaterial,
   MaterialsLibraryPayload,
@@ -73,18 +74,6 @@ function initialMaterialDraft(): MaterialDraft {
     completedAmount: "0",
     position: "1",
   };
-}
-
-async function parseErrorMessage(response: Response, fallback: string): Promise<string> {
-  try {
-    const payload = (await response.json()) as { message?: string };
-    if (typeof payload?.message === "string") {
-      return payload.message;
-    }
-  } catch {
-    // Ignore non-JSON errors.
-  }
-  return fallback;
 }
 
 async function fetchMaterialsLibrary(

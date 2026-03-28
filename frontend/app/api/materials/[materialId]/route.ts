@@ -7,8 +7,7 @@ import type { UpdateLibraryMaterialInput } from "@features/materials/types";
 import {
   createBackendClient,
   createBackendErrorResponse,
-  createBackendUnavailableResponse,
-  isBackendErrorCode
+  createBackendUnavailableResponse
 } from "@shared/api/backend-client";
 import { normalizeText, parseInteger } from "@shared/api/payload-parsers";
 import { buildRoadmapTopicTitleMap } from "@features/roadmap/lib/roadmap-topic-helpers";
@@ -26,29 +25,27 @@ interface RouteContext {
 }
 
 async function loadTopicTitleMap(client: ReturnType<typeof createBackendClient>) {
-  const roadmapResult = await client.call("/api/v1/roadmap", { method: "GET" });
-  if (!roadmapResult.response.ok) {
-    if (
-      roadmapResult.response.status === 404 &&
-      isBackendErrorCode(roadmapResult.payload, "roadmap_not_found")
-    ) {
-      return {
-        topicTitleMap: new Map<string, string>(),
-        errorResponse: null as NextResponse | null
-      };
-    }
-
+  const listResult = await client.call("/api/v1/roadmaps", { method: "GET" });
+  if (!listResult.response.ok) {
     return {
       topicTitleMap: new Map<string, string>(),
       errorResponse: createBackendErrorResponse(
-        roadmapResult.response,
-        roadmapResult.payload,
+        listResult.response,
+        listResult.payload,
         "Failed to load roadmap topics."
       )
     };
   }
 
-  const roadmap = roadmapResult.payload as BackendRoadmapResponse;
+  const roadmapList = listResult.payload as Array<{ id: string }>;
+  let roadmap: BackendRoadmapResponse | null = null;
+  if (roadmapList.length > 0) {
+    const rmResult = await client.call(`/api/v1/roadmaps/${encodeURIComponent(roadmapList[0].id)}`, { method: "GET" });
+    if (rmResult.response.ok) {
+      roadmap = rmResult.payload as BackendRoadmapResponse;
+    }
+  }
+
   return {
     topicTitleMap: buildRoadmapTopicTitleMap(roadmap),
     errorResponse: null as NextResponse | null
