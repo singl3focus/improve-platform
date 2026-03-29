@@ -277,9 +277,12 @@ a {
 }
 
 .roadmap-switcher-roadmap {
+  position: relative;
+  z-index: 25;
   margin-top: 12px;
   margin-bottom: 0;
   max-width: 360px;
+  width: min(100%, 360px);
 }
 
 .roadmap-switcher-trigger {
@@ -338,7 +341,7 @@ a {
   top: calc(100% + 8px);
   left: 0;
   right: 0;
-  z-index: 30;
+  z-index: 60;
   display: grid;
   gap: 4px;
   padding: 8px;
@@ -1170,6 +1173,10 @@ a {
   display: flex;
   justify-content: space-between;
   gap: 12px;
+  position: relative;
+  z-index: 20;
+  overflow: visible;
+  isolation: isolate;
   border: none;
   border-radius: 18px;
   background:
@@ -1196,6 +1203,8 @@ a {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
+  position: relative;
+  z-index: 1;
 }
 
 .roadmap-header-actions .button {
@@ -1441,6 +1450,7 @@ a {
 
 .roadmap-graph {
   position: relative;
+  z-index: 1;
   overflow: hidden;
   overscroll-behavior: contain;
   border-radius: 20px;
@@ -1456,6 +1466,10 @@ a {
 
 .roadmap-graph[data-panning="true"] {
   cursor: grabbing;
+}
+
+body.roadmap-switcher-open .roadmap-graph {
+  pointer-events: none;
 }
 
 .roadmap-graph-canvas {

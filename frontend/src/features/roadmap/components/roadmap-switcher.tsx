@@ -63,6 +63,11 @@ export function RoadmapSwitcher({ className }: RoadmapSwitcherProps) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    document.body.classList.toggle("roadmap-switcher-open", open);
+    return () => document.body.classList.remove("roadmap-switcher-open");
+  }, [open]);
+
   const activeRoadmap = roadmaps.find((roadmap) => roadmap.id === activeRoadmapId);
 
   async function handleCreate() {

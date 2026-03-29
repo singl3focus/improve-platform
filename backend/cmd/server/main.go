@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"improve-platform/internal/config"
@@ -28,7 +29,17 @@ func main() {
 
 	ctx := context.Background()
 
-	pool, err := pgxpool.New(ctx, cfg.DatabaseURL)
+	poolConfig, err := pgxpool.ParseConfig(cfg.DatabaseURL)
+	if err != nil {
+		log.Error("failed to parse database config", "error", err)
+		os.Exit(1)
+	}
+
+	// Avoid stale prepared-plan failures ("cached plan must not change result type")
+	// after schema changes by disabling statement-cache execution mode.
+	poolConfig.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeExec
+
+	pool, err := pgxpool.NewWithConfig(ctx, poolConfig)
 	if err != nil {
 		log.Error("failed to connect to database", "error", err)
 		os.Exit(1)

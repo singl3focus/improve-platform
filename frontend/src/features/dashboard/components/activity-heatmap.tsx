@@ -97,17 +97,35 @@ function buildGrid(days: ActivityDay[]) {
 }
 
 function getMonthLabels(start: Date, totalWeeks: number, months: string[]) {
-  const labels: { label: string; weekIndex: number }[] = [];
+  const rawLabels: { label: string; weekIndex: number }[] = [];
   const current = new Date(start);
   let lastMonth = -1;
+  const MIN_WEEK_GAP = 2;
 
   for (let w = 0; w < totalWeeks; w++) {
     const month = current.getMonth();
     if (month !== lastMonth) {
-      labels.push({ label: months[month], weekIndex: w });
+      rawLabels.push({ label: months[month], weekIndex: w });
       lastMonth = month;
     }
     current.setDate(current.getDate() + 7);
+  }
+
+  const labels: { label: string; weekIndex: number }[] = [];
+  for (const next of rawLabels) {
+    const prev = labels[labels.length - 1];
+    if (!prev) {
+      labels.push(next);
+      continue;
+    }
+
+    if (next.weekIndex - prev.weekIndex < MIN_WEEK_GAP) {
+      // Keep the latest month label when two starts are too close.
+      labels[labels.length - 1] = next;
+      continue;
+    }
+
+    labels.push(next);
   }
 
   return labels;

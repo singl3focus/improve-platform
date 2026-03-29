@@ -273,6 +273,7 @@ export function DashboardView() {
       </section>
 
       <DashboardCalendarRibbon locale={locale} />
+      <ActivityHeatmap />
 
       {/* Focus Today block */}
       <section className="dashboard-focus panel" style={{ padding: "1rem", marginBottom: "1rem" }}>
@@ -665,8 +666,6 @@ export function DashboardView() {
           </DashboardPanel>
         </div>
       </div>
-
-      <ActivityHeatmap />
 
       {/* Weekly Review banner */}
       <section className="panel" style={{ padding: "1rem", marginTop: "1rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>

@@ -20,14 +20,14 @@ func NewRepo(pool *pgxpool.Pool) *Repo {
 
 func (r *Repo) Insert(ctx context.Context, event Event) error {
 	const op apperr.Op = "Repo.Insert"
-	payload, err := json.Marshal(event.Payload)
+	payloadJSON, err := json.Marshal(event.Payload)
 	if err != nil {
 		return apperr.E(op, err)
 	}
 	_, err = r.pool.Exec(ctx,
 		`INSERT INTO history_events (user_id, entity_type, entity_id, event_type, event_name, payload)
-		 VALUES ($1, $2, $3, $4, $5, $6)`,
-		event.UserID, event.EntityType, event.EntityID, event.EventType, event.EventName, payload,
+		 VALUES ($1, $2, $3, $4, $5, $6::jsonb)`,
+		event.UserID, event.EntityType, event.EntityID, event.EventType, event.EventName, string(payloadJSON),
 	)
 	return apperr.E(op, err)
 }
