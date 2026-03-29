@@ -466,7 +466,7 @@ export function useTasksBoardViewModel(copy: TasksBoardCopyForViewModel) {
         title,
         description,
         topicId: topicId || null,
-        ...(deadline ? { deadline } : {})
+        deadline
       });
 
       if (statusChanged && draft.status) {

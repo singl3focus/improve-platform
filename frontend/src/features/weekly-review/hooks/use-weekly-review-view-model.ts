@@ -54,11 +54,11 @@ export function useWeeklyReviewViewModel() {
     return () => controller.abort();
   }, []);
 
-  async function rescheduleTask(taskId: string, title: string, newDeadline: string) {
+  async function rescheduleTask(taskId: string, _title: string, newDeadline: string) {
     await authFetch(`/api/tasks/${encodeURIComponent(taskId)}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, description: "", deadline: newDeadline, position: 0 })
+      body: JSON.stringify({ deadline: newDeadline })
     });
   }
 
@@ -71,18 +71,18 @@ export function useWeeklyReviewViewModel() {
   }
 
   async function pauseTopic(topicId: string) {
-    await authFetch(`/api/roadmap/topics/${encodeURIComponent(topicId)}/status`, {
-      method: "PATCH",
+    await authFetch(`/api/roadmap/topics/${encodeURIComponent(topicId)}`, {
+      method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: "paused" })
     });
   }
 
-  async function rescheduleTopic(topicId: string, title: string, newTargetDate: string) {
+  async function rescheduleTopic(topicId: string, _title: string, newTargetDate: string) {
     await authFetch(`/api/roadmap/topics/${encodeURIComponent(topicId)}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, description: "", target_date: newTargetDate, position: 0 })
+      body: JSON.stringify({ target_date: newTargetDate })
     });
   }
 

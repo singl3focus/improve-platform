@@ -10,7 +10,7 @@ import {
   createBackendUnavailableResponse
 } from "@shared/api/backend-client";
 import { buildRoadmapTopicTitleMap } from "@features/roadmap/lib/roadmap-topic-helpers";
-import { normalizeText } from "@shared/api/payload-parsers";
+import { resolveTaskUpdateRequest } from "@features/tasks/lib/task-update-request";
 
 interface RouteContext {
   params: {
@@ -72,19 +72,6 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     return NextResponse.json({ message: "Invalid JSON body." }, { status: 400 });
   }
 
-  const title = normalizeText(payload.title);
-  if (!title) {
-    return NextResponse.json({ message: "Title must be a non-empty string." }, { status: 422 });
-  }
-
-  const description = normalizeText(payload.description) ?? "";
-  const topicId = normalizeText(payload.topicId) ?? null;
-  const deadline = normalizeText(payload.deadline) ?? null;
-
-  if (deadline && !isValidDateString(deadline)) {
-    return NextResponse.json({ message: "Deadline must be in YYYY-MM-DD format." }, { status: 422 });
-  }
-
   const client = createBackendClient(request);
 
   try {
@@ -106,6 +93,19 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     }
 
     const currentTask = currentTaskResult.payload as BackendTaskResponse;
+    const resolvedRequest = resolveTaskUpdateRequest(currentTask, payload);
+    if (!resolvedRequest.ok) {
+      return NextResponse.json({ message: resolvedRequest.message }, { status: 422 });
+    }
+
+    const { title, description, topicId, deadline } = resolvedRequest.value;
+
+    if (deadline && !isValidDateString(deadline)) {
+      return NextResponse.json(
+        { message: "Deadline must be in YYYY-MM-DD format." },
+        { status: 422 }
+      );
+    }
 
     const updateResult = await client.call(`/api/v1/tasks/${encodeURIComponent(context.params.taskId)}`, {
       method: "PUT",
@@ -113,7 +113,7 @@ export async function PUT(request: NextRequest, context: RouteContext) {
         title,
         description,
         topic_id: topicId,
-        ...(deadline ? { deadline } : {}),
+        deadline,
         position: currentTask.position
       }
     });

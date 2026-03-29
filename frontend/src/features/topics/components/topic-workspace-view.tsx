@@ -244,6 +244,16 @@ function TopicHeroPanel({
   handleUpdateDates: (dates: { startDate?: string | null; targetDate?: string | null }) => void;
 }) {
   const confidenceLabel = getConfidenceLabel(language, topic.confidence);
+  const [startDateValue, setStartDateValue] = useState(topic.startDate ?? "");
+  const [targetDateValue, setTargetDateValue] = useState(topic.targetDate ?? "");
+
+  useEffect(() => {
+    setStartDateValue(topic.startDate ?? "");
+  }, [topic.startDate]);
+
+  useEffect(() => {
+    setTargetDateValue(topic.targetDate ?? "");
+  }, [topic.targetDate]);
 
   return (
     <section className="topic-hero panel">
@@ -325,8 +335,12 @@ function TopicHeroPanel({
                 <input
                   type="date"
                   className="input"
-                  value={topic.startDate ?? ""}
-                  onChange={(event) => handleUpdateDates({ startDate: event.target.value || null })}
+                  value={startDateValue}
+                  onChange={(event) => {
+                    const nextValue = event.target.value;
+                    setStartDateValue(nextValue);
+                    handleUpdateDates({ startDate: nextValue || null });
+                  }}
                 />
               </label>
               <label>
@@ -334,8 +348,12 @@ function TopicHeroPanel({
                 <input
                   type="date"
                   className="input"
-                  value={topic.targetDate ?? ""}
-                  onChange={(event) => handleUpdateDates({ targetDate: event.target.value || null })}
+                  value={targetDateValue}
+                  onChange={(event) => {
+                    const nextValue = event.target.value;
+                    setTargetDateValue(nextValue);
+                    handleUpdateDates({ targetDate: nextValue || null });
+                  }}
                 />
               </label>
               <div className="topic-date-summary">

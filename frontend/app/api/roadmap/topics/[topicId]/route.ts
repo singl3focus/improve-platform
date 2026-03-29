@@ -5,11 +5,11 @@ import {
   createBackendUnavailableResponse
 } from "@shared/api/backend-client";
 import { getStringValue, isRecord } from "@shared/api/backend-shared";
-import { normalizeText } from "@shared/api/payload-parsers";
 import {
   isRoadmapTopicStatus
 } from "@features/roadmap/lib/roadmap-topic-status";
 import { buildRoadmapTopicUpdatePlan } from "@features/roadmap/lib/roadmap-topic-update-flow";
+import { resolveRoadmapTopicUpdateRequest } from "@features/roadmap/lib/roadmap-topic-update-request";
 
 interface RouteContext {
   params: {
@@ -33,25 +33,6 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     return NextResponse.json({ message: "Invalid JSON body." }, { status: 400 });
   }
 
-  const title = normalizeText(payload.title);
-  if (!title) {
-    return NextResponse.json({ message: "Title is required." }, { status: 422 });
-  }
-
-  if (payload.description !== undefined && typeof payload.description !== "string") {
-    return NextResponse.json({ message: "Description must be a string." }, { status: 422 });
-  }
-  if (payload.status !== undefined && (typeof payload.status !== "string" || !isRoadmapTopicStatus(payload.status))) {
-    return NextResponse.json(
-      {
-        message: "Invalid topic status. Allowed: not_started, in_progress, paused, completed."
-      },
-      { status: 422 }
-    );
-  }
-
-  const description = typeof payload.description === "string" ? payload.description.trim() : "";
-  const nextStatus = typeof payload.status === "string" ? payload.status : null;
   const client = createBackendClient(request);
   const topicId = context.params.topicId;
 
@@ -71,11 +52,13 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     }
 
     const currentTopic = isRecord(currentTopicResult.payload) ? currentTopicResult.payload : null;
+    const currentTitle = getStringValue(currentTopic, "title");
     const currentStatusValue = getStringValue(currentTopic, "status");
-    if (!currentStatusValue || !isRoadmapTopicStatus(currentStatusValue)) {
+    const currentDescription = getStringValue(currentTopic, "description") ?? "";
+    if (!currentTitle || !currentStatusValue || !isRoadmapTopicStatus(currentStatusValue)) {
       return NextResponse.json(
         {
-          message: "Roadmap topic status is missing in backend response.",
+          message: "Roadmap topic data is missing in backend response.",
           code: "invalid_status"
         },
         { status: 502 }
@@ -88,8 +71,20 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     const position = Number.isFinite(currentPositionValue) && currentPositionValue > 0
       ? Math.floor(currentPositionValue)
       : 1;
-    const requestStartDate = typeof payload.start_date === "string" ? payload.start_date : undefined;
-    const requestTargetDate = typeof payload.target_date === "string" ? payload.target_date : undefined;
+    const resolvedRequest = resolveRoadmapTopicUpdateRequest(
+      {
+        title: currentTitle,
+        description: currentDescription,
+        status: currentStatusValue
+      },
+      payload
+    );
+    if (!resolvedRequest.ok) {
+      return NextResponse.json({ message: resolvedRequest.message }, { status: 422 });
+    }
+
+    const { title, description, status: nextStatus, startDate: requestStartDate, targetDate: requestTargetDate } =
+      resolvedRequest.value;
 
     const updatePlan = buildRoadmapTopicUpdatePlan({
       currentTopic: {
@@ -102,8 +97,8 @@ export async function PUT(request: NextRequest, context: RouteContext) {
         title,
         description,
         status: nextStatus,
-        startDate: requestStartDate !== undefined ? (requestStartDate || null) : undefined,
-        targetDate: requestTargetDate !== undefined ? (requestTargetDate || null) : undefined
+        startDate: requestStartDate,
+        targetDate: requestTargetDate
       }
     });
     if (!updatePlan.ok) {

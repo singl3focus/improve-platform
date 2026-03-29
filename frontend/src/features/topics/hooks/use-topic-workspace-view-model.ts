@@ -126,8 +126,8 @@ async function updateTopicDates(
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      start_date: dates.startDate ?? null,
-      target_date: dates.targetDate ?? null
+      ...(dates.startDate !== undefined ? { start_date: dates.startDate ?? "" } : {}),
+      ...(dates.targetDate !== undefined ? { target_date: dates.targetDate ?? "" } : {})
     })
   });
 
@@ -142,7 +142,7 @@ async function addTopicDependency(topicId: string, dependsOnTopicId: string): Pr
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ depends_on_topic_id: dependsOnTopicId })
+      body: JSON.stringify({ prerequisiteTopicId: dependsOnTopicId })
     }
   );
 
