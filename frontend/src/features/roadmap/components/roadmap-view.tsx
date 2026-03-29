@@ -14,6 +14,7 @@ import { useRouter } from "next/navigation";
 import { authFetch } from "@features/auth/lib/auth-fetch";
 import { MoreHorizontal, Pencil } from "lucide-react";
 import { useRoadmapGraphLayout } from "@features/roadmap/hooks/use-roadmap-graph-layout";
+import { RoadmapSwitcher } from "@features/roadmap/components/roadmap-switcher";
 import { useUserPreferences } from "@shared/providers/user-preferences-provider";
 import {
   buildConnectionPath,
@@ -705,7 +706,6 @@ export function RoadmapView() {
   const { language, activeRoadmapId, setActiveRoadmapId } = useUserPreferences();
   const copy = ROADMAP_COPY.ru;
   const roadmap = useRoadmapData(activeRoadmapId, copy.errorFallback);
-  const roadmapReload = roadmap.reload;
   const graphRef = useRef<HTMLDivElement | null>(null);
   const topicRefs = useRef<Map<string, HTMLElement>>(new Map());
   const topicCreateModalTitleInputRef = useRef<HTMLInputElement | null>(null);
@@ -1522,6 +1522,7 @@ export function RoadmapView() {
         <div>
           <h2>{copy.title}</h2>
           <p>{copy.subtitle}</p>
+          <RoadmapSwitcher className="roadmap-switcher roadmap-switcher-roadmap" />
           {roadmap.state.status === "success" && stages.length > 0 ? (
             <div className="roadmap-header-actions">
               <div className="roadmap-canvas-controls" role="group" aria-label="Roadmap canvas controls">

@@ -276,6 +276,12 @@ a {
   margin-bottom: 12px;
 }
 
+.roadmap-switcher-roadmap {
+  margin-top: 12px;
+  margin-bottom: 0;
+  max-width: 360px;
+}
+
 .roadmap-switcher-trigger {
   width: 100%;
   display: inline-flex;
@@ -3184,6 +3190,11 @@ a {
 
   .roadmap-switcher {
     margin-bottom: 10px;
+  }
+
+  .roadmap-switcher-roadmap {
+    margin-top: 10px;
+    max-width: none;
   }
 
   .roadmap-switcher-dropdown {
