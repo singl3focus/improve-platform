@@ -9,7 +9,7 @@ export default function HomePage() {
     Boolean(cookieStore.get(REFRESH_TOKEN_COOKIE)?.value);
 
   if (hasSession) {
-    redirect("/dashboard");
+    redirect("/today");
   }
 
   redirect("/login");

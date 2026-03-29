@@ -52,6 +52,17 @@ type ReviewTopic struct {
 	TargetDate      *string `json:"target_date"`
 }
 
+type ActivityDay struct {
+	Date  string `json:"date"`
+	Count int    `json:"count"`
+}
+
+type ActivityHeatmap struct {
+	Days            []ActivityDay `json:"days"`
+	Streak          int           `json:"streak"`
+	TotalActiveDays int           `json:"total_active_days"`
+}
+
 type SaveWeeklyReviewRequest struct {
 	PeriodStart     string `json:"period_start"`
 	PeriodEnd       string `json:"period_end"`

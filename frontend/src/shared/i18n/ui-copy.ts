@@ -21,6 +21,7 @@ export interface NavigationCopy {
   brand: string;
   ariaPrimary: string;
   appLabel: string;
+  todayLabel: string;
   dashboardLabel: string;
   roadmapLabel: string;
   tasksLabel: string;
@@ -181,6 +182,7 @@ const RU_COPY: AppCopy = {
     brand: "Improve Platform",
     ariaPrimary: "Основная навигация",
     appLabel: "Приложение",
+    todayLabel: "Сегодня",
     dashboardLabel: "Дашборд",
     roadmapLabel: "Дорожная карта",
     tasksLabel: "Задачи",
@@ -328,6 +330,7 @@ const EN_COPY: AppCopy = {
     brand: "Improve Platform",
     ariaPrimary: "Primary navigation",
     appLabel: "App",
+    todayLabel: "Today",
     dashboardLabel: "Dashboard",
     roadmapLabel: "Roadmap",
     tasksLabel: "Tasks",

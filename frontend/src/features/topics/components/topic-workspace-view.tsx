@@ -4,6 +4,7 @@ import type { Dispatch, FormEvent, SetStateAction } from "react";
 import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Plus } from "lucide-react";
+import { TopicNotes } from "@features/topics/components/topic-notes";
 import { useUserPreferences } from "@shared/providers/user-preferences-provider";
 import {
   type TopicMaterialDraft,
@@ -947,6 +948,7 @@ export function TopicWorkspaceView() {
               clearTaskMutationError={clearTaskMutationError}
               onCreateTask={handleCreateTask}
             />
+            <TopicNotes topicId={topicId} />
             <TopicMaterialsPanel
               topic={state.data}
               copy={copy}

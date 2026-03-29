@@ -7,6 +7,7 @@ import {
   ChevronDown,
   Check,
   Plus,
+  Sun,
   LayoutDashboard,
   Map,
   ListTodo,
@@ -43,6 +44,7 @@ function getAvatarColor(name: string): string {
 }
 
 type NavItemKey =
+  | "todayLabel"
   | "dashboardLabel"
   | "roadmapLabel"
   | "tasksLabel"
@@ -55,6 +57,7 @@ type NavItem = {
 };
 
 const MAIN_NAV_ITEMS: ReadonlyArray<NavItem> = [
+  { href: "/today", key: "todayLabel", icon: Sun },
   { href: "/dashboard", key: "dashboardLabel", icon: LayoutDashboard },
   { href: "/roadmap", key: "roadmapLabel", icon: Map },
   { href: "/tasks", key: "tasksLabel", icon: ListTodo },
@@ -142,6 +145,8 @@ function RoadmapSwitcher() {
       <button
         type="button"
         className="roadmap-switcher-trigger"
+        aria-haspopup="listbox"
+        aria-expanded={open}
         onClick={() => setOpen(!open)}
       >
         <Map size={14} />

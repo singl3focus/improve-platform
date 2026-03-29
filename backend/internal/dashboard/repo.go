@@ -105,6 +105,55 @@ func (r *Repo) GetContinueTopic(ctx context.Context, userID string) (*FocusTopic
 	return &ft, nil
 }
 
+func (r *Repo) GetActivityHeatmap(ctx context.Context, userID string, from, to time.Time) ([]ActivityDay, error) {
+	const op apperr.Op = "dashboard.Repo.GetActivityHeatmap"
+
+	rows, err := r.pool.Query(ctx,
+		`SELECT date_trunc('day', created_at)::date AS date, COUNT(*) AS count
+		 FROM history_events
+		 WHERE user_id = $1 AND created_at >= $2 AND created_at < $3
+		 GROUP BY date
+		 ORDER BY date`,
+		userID, from, to)
+	if err != nil {
+		return nil, apperr.E(op, err)
+	}
+	defer rows.Close()
+
+	var days []ActivityDay
+	for rows.Next() {
+		var d ActivityDay
+		var dt time.Time
+		if err := rows.Scan(&dt, &d.Count); err != nil {
+			return nil, apperr.E(op, err)
+		}
+		d.Date = dt.Format("2006-01-02")
+		days = append(days, d)
+	}
+	return days, apperr.E(op, rows.Err())
+}
+
+func (r *Repo) GetCurrentStreak(ctx context.Context, userID string) (int, error) {
+	const op apperr.Op = "dashboard.Repo.GetCurrentStreak"
+
+	var streak int
+	err := r.pool.QueryRow(ctx,
+		`WITH daily AS (
+			SELECT DISTINCT date_trunc('day', created_at)::date AS d
+			FROM history_events WHERE user_id = $1
+		), numbered AS (
+			SELECT d, d - (ROW_NUMBER() OVER (ORDER BY d DESC))::int AS grp
+			FROM daily WHERE d <= CURRENT_DATE
+		)
+		SELECT COUNT(*)::int FROM numbered
+		WHERE grp = (SELECT grp FROM numbered WHERE d = CURRENT_DATE LIMIT 1)`,
+		userID).Scan(&streak)
+	if err != nil {
+		return 0, nil // no streak is fine
+	}
+	return streak, nil
+}
+
 func (r *Repo) GetWeeklyReviewData(ctx context.Context, userID string) (WeeklyReviewData, error) {
 	const op apperr.Op = "dashboard.Repo.GetWeeklyReviewData"
 	now := time.Now()

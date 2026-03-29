@@ -12,6 +12,7 @@ import {
 import type { DashboardChartsPayload, DashboardFocus, DashboardFocusTask, DashboardHistoryEvent } from "@features/dashboard/types";
 import type { DashboardCopy } from "@shared/i18n/ui-copy";
 import { DashboardCalendarRibbon } from "@features/dashboard/components/dashboard-calendar-ribbon";
+import { ActivityHeatmap } from "@features/dashboard/components/activity-heatmap";
 import {
   formatHistoryEventTitle,
   formatHistoryEventSubtitle,
@@ -664,6 +665,8 @@ export function DashboardView() {
           </DashboardPanel>
         </div>
       </div>
+
+      <ActivityHeatmap />
 
       {/* Weekly Review banner */}
       <section className="panel" style={{ padding: "1rem", marginTop: "1rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>

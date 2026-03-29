@@ -3,6 +3,7 @@ export const REFRESH_TOKEN_COOKIE = "improve_refresh_token";
 
 export const AUTH_ROUTES = ["/login", "/register"] as const;
 export const PROTECTED_ROUTES = [
+  "/today",
   "/dashboard",
   "/roadmap",
   "/topics",

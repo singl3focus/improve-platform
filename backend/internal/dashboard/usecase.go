@@ -2,6 +2,7 @@ package dashboard
 
 import (
 	"context"
+	"time"
 
 	"improve-platform/internal/history"
 )
@@ -45,6 +46,28 @@ func (uc *UseCase) GetFocus(ctx context.Context, userID string) (FocusResponse, 
 	resp.ContinueTopic = continueTopic
 
 	return resp, nil
+}
+
+func (uc *UseCase) GetActivityHeatmap(ctx context.Context, userID string) (ActivityHeatmap, error) {
+	now := time.Now()
+	to := time.Date(now.Year(), now.Month(), now.Day()+1, 0, 0, 0, 0, now.Location())
+	from := to.AddDate(0, 0, -365)
+
+	days, err := uc.repo.GetActivityHeatmap(ctx, userID, from, to)
+	if err != nil {
+		return ActivityHeatmap{}, err
+	}
+	if days == nil {
+		days = []ActivityDay{}
+	}
+
+	streak, _ := uc.repo.GetCurrentStreak(ctx, userID)
+
+	return ActivityHeatmap{
+		Days:            days,
+		Streak:          streak,
+		TotalActiveDays: len(days),
+	}, nil
 }
 
 func (uc *UseCase) GetWeeklyReviewData(ctx context.Context, userID string) (WeeklyReviewData, error) {

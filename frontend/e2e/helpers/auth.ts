@@ -9,5 +9,5 @@ export async function registerUser(
   await page.locator("#email").fill(params.email);
   await page.locator("#password").fill(params.password);
   await page.getByRole("button", { name: "Создать аккаунт" }).click();
-  await page.waitForURL(/\/dashboard/, { timeout: 30_000 });
+  await page.waitForURL(/\/(today|dashboard)/, { timeout: 30_000 });
 }

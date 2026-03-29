@@ -60,6 +60,17 @@ export interface DashboardChartsPayload {
   upcomingDeadlines: DashboardDeadlinesByDayChartItem[];
 }
 
+export interface ActivityDay {
+  date: string;
+  count: number;
+}
+
+export interface ActivityHeatmap {
+  days: ActivityDay[];
+  streak: number;
+  totalActiveDays: number;
+}
+
 export interface DashboardFocusTask {
   id: string;
   title: string;
