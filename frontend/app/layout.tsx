@@ -1,13 +1,22 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { Montserrat } from "next/font/google";
+import { Cormorant_Garamond, Manrope } from "next/font/google";
 import { GlobalUiControls } from "@shared/ui/global-ui-controls";
 import { AppQueryProvider } from "@shared/providers/app-query-provider";
 import { UserPreferencesProvider } from "@shared/providers/user-preferences-provider";
 import "./globals.css";
+import "./editorial-overrides.css";
 
-const montserrat = Montserrat({
+const manrope = Manrope({
   subsets: ["latin", "cyrillic"],
+  variable: "--font-body",
+  display: "swap"
+});
+
+const cormorant = Cormorant_Garamond({
+  subsets: ["latin", "cyrillic"],
+  variable: "--font-display",
+  weight: ["600", "700"],
   display: "swap"
 });
 
@@ -23,7 +32,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={montserrat.className}>
+      <body className={`${manrope.variable} ${cormorant.variable}`}>
         <UserPreferencesProvider>
           <AppQueryProvider>
             <GlobalUiControls />

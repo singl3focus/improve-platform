@@ -2,94 +2,226 @@
 
 import Link from "next/link";
 import type { Dispatch, FormEvent, SetStateAction } from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useUserPreferences } from "@shared/providers/user-preferences-provider";
 import {
   type MaterialDraft,
   useMaterialsLibraryViewModel
 } from "@features/materials/hooks/use-materials-library-view-model";
 import type { LibraryMaterial, MaterialType, MaterialUnit } from "@features/materials/types";
 
-const MATERIALS_COPY = {
-  title: "Личная библиотека материалов",
-  subtitle: "Просматривайте, обновляйте и упорядочивайте материалы по темам.",
-  search: "Поиск",
-  topic: "Тема",
-  allTopics: "Все темы",
-  searchPlaceholder: "Название, описание, тема",
-  fieldTitle: "Название",
-  fieldDescription: "Описание",
-  fieldType: "Тип",
-  fieldUnit: "Единица",
-  fieldTotalAmount: "Полная мера",
-  fieldCompletedAmount: "Выполнено",
-  fieldPosition: "Позиция",
-  fieldUrl: "Ссылка",
-  fieldTopic: "Тема",
-  typeBook: "Книга",
-  typeArticle: "Статья",
-  typeCourse: "Курс",
-  typeVideo: "Видео",
-  unitPages: "страницы",
-  unitLessons: "уроки",
-  unitHours: "часы",
-  createPlaceholderTitle: "Название материала",
-  createPlaceholderDescription: "Описание материала",
-  createPlaceholderUrl: "https://...",
-  noTopicsAvailable: "Нет доступных тем",
-  createButton: "Создать материал",
-  createModalTitle: "Создать материал",
-  closeModalAria: "Закрыть окно создания материала",
-  creatingButton: "Создание...",
-  topicRequired: "Для создания материала нужна тема.",
-  titleDescriptionRequired: "Название обязательно.",
-  amountInvalid: "Выполненная мера должна быть меньше или равна полной мере.",
-  createFailed: "Не удалось создать материал.",
-  updateFailed: "Не удалось обновить материал.",
-  deleteFailed: "Не удалось удалить материал.",
-  loading: "Загрузка библиотеки материалов...",
-  loadFailed: "Не удалось загрузить библиотеку материалов.",
-  retry: "Повторить",
-  progress: "Прогресс",
-  updateProgress: "Обновить прогресс",
-  edit: "Редактировать",
-  delete: "Удалить",
-  save: "Сохранить",
-  cancel: "Отмена",
-  empty: "Материалы по текущим фильтрам не найдены. Измените фильтр или добавьте новый элемент."
-} as const;
+type MaterialsCopy = {
+  title: string;
+  subtitle: string;
+  search: string;
+  topic: string;
+  allTopics: string;
+  searchPlaceholder: string;
+  fieldTitle: string;
+  fieldDescription: string;
+  fieldType: string;
+  fieldUnit: string;
+  fieldTotalAmount: string;
+  fieldCompletedAmount: string;
+  fieldPosition: string;
+  fieldUrl: string;
+  fieldTopic: string;
+  typeBook: string;
+  typeArticle: string;
+  typeCourse: string;
+  typeVideo: string;
+  unitPages: string;
+  unitLessons: string;
+  unitHours: string;
+  createPlaceholderTitle: string;
+  createPlaceholderDescription: string;
+  createPlaceholderUrl: string;
+  noTopicsAvailable: string;
+  createButton: string;
+  createModalTitle: string;
+  closeModalAria: string;
+  creatingButton: string;
+  topicRequired: string;
+  titleDescriptionRequired: string;
+  amountInvalid: string;
+  createFailed: string;
+  updateFailed: string;
+  deleteFailed: string;
+  loading: string;
+  loadFailed: string;
+  retry: string;
+  progress: string;
+  edit: string;
+  delete: string;
+  save: string;
+  cancel: string;
+  empty: string;
+  summaryTitle: string;
+  summaryTotal: string;
+  summaryTracked: string;
+  summaryAverage: string;
+  resultsLabel: (count: number) => string;
+};
 
-type MaterialsCopy = typeof MATERIALS_COPY;
+const COPY: Record<"ru" | "en", MaterialsCopy> = {
+  ru: {
+    title: "Библиотека материалов",
+    subtitle: "Поиск, фильтрация и аккуратное ведение учебных ресурсов по темам.",
+    search: "Поиск",
+    topic: "Тема",
+    allTopics: "Все темы",
+    searchPlaceholder: "Название, описание или тема",
+    fieldTitle: "Название",
+    fieldDescription: "Описание",
+    fieldType: "Тип",
+    fieldUnit: "Единица",
+    fieldTotalAmount: "Полный объём",
+    fieldCompletedAmount: "Пройдено",
+    fieldPosition: "Позиция",
+    fieldUrl: "Ссылка",
+    fieldTopic: "Тема",
+    typeBook: "Книга",
+    typeArticle: "Статья",
+    typeCourse: "Курс",
+    typeVideo: "Видео",
+    unitPages: "страницы",
+    unitLessons: "уроки",
+    unitHours: "часы",
+    createPlaceholderTitle: "Название материала",
+    createPlaceholderDescription: "Короткое описание материала",
+    createPlaceholderUrl: "https://...",
+    noTopicsAvailable: "Нет доступных тем",
+    createButton: "Добавить материал",
+    createModalTitle: "Новый материал",
+    closeModalAria: "Закрыть окно создания материала",
+    creatingButton: "Создание...",
+    topicRequired: "Для материала нужна тема.",
+    titleDescriptionRequired: "Название обязательно.",
+    amountInvalid: "Пройденный объём не может быть больше полного.",
+    createFailed: "Не удалось создать материал.",
+    updateFailed: "Не удалось обновить материал.",
+    deleteFailed: "Не удалось удалить материал.",
+    loading: "Загрузка библиотеки...",
+    loadFailed: "Не удалось загрузить библиотеку материалов.",
+    retry: "Повторить",
+    progress: "Прогресс",
+    edit: "Редактировать",
+    delete: "Удалить",
+    save: "Сохранить",
+    cancel: "Отмена",
+    empty: "По текущим фильтрам материалы не найдены. Измените фильтр или добавьте новый ресурс.",
+    summaryTitle: "Сводка библиотеки",
+    summaryTotal: "Всего материалов",
+    summaryTracked: "С прогрессом",
+    summaryAverage: "Средний прогресс",
+    resultsLabel: (count) => `${count} материалов`
+  },
+  en: {
+    title: "Materials library",
+    subtitle: "Search, filter, and maintain your learning resources with a calmer operational flow.",
+    search: "Search",
+    topic: "Topic",
+    allTopics: "All topics",
+    searchPlaceholder: "Title, description, or topic",
+    fieldTitle: "Title",
+    fieldDescription: "Description",
+    fieldType: "Type",
+    fieldUnit: "Unit",
+    fieldTotalAmount: "Total amount",
+    fieldCompletedAmount: "Completed",
+    fieldPosition: "Position",
+    fieldUrl: "URL",
+    fieldTopic: "Topic",
+    typeBook: "Book",
+    typeArticle: "Article",
+    typeCourse: "Course",
+    typeVideo: "Video",
+    unitPages: "pages",
+    unitLessons: "lessons",
+    unitHours: "hours",
+    createPlaceholderTitle: "Material title",
+    createPlaceholderDescription: "Short material description",
+    createPlaceholderUrl: "https://...",
+    noTopicsAvailable: "No topics available",
+    createButton: "Add material",
+    createModalTitle: "New material",
+    closeModalAria: "Close material creation dialog",
+    creatingButton: "Creating...",
+    topicRequired: "A topic is required for a material.",
+    titleDescriptionRequired: "Title is required.",
+    amountInvalid: "Completed amount cannot exceed total amount.",
+    createFailed: "Failed to create material.",
+    updateFailed: "Failed to update material.",
+    deleteFailed: "Failed to delete material.",
+    loading: "Loading library...",
+    loadFailed: "Failed to load materials library.",
+    retry: "Retry",
+    progress: "Progress",
+    edit: "Edit",
+    delete: "Delete",
+    save: "Save",
+    cancel: "Cancel",
+    empty: "No materials match the current filters. Adjust the filters or add a new resource.",
+    summaryTitle: "Library pulse",
+    summaryTotal: "Total materials",
+    summaryTracked: "With progress",
+    summaryAverage: "Average progress",
+    resultsLabel: (count) => `${count} materials`
+  }
+};
 
 const MATERIAL_TYPE_OPTIONS: MaterialType[] = ["book", "article", "course", "video"];
-
-function getMaterialTypeLabel(copy: MaterialsCopy, type: MaterialType): string {
-  if (type === "book") {
-    return copy.typeBook;
-  }
-  if (type === "article") {
-    return copy.typeArticle;
-  }
-  if (type === "course") {
-    return copy.typeCourse;
-  }
-
-  return copy.typeVideo;
-}
-
-function getMaterialUnitLabel(copy: MaterialsCopy, unit: MaterialUnit): string {
-  if (unit === "hours") {
-    return copy.unitHours;
-  }
-  if (unit === "lessons") {
-    return copy.unitLessons;
-  }
-
-  return copy.unitPages;
-}
 
 interface TopicOption {
   id: string;
   title: string;
+}
+
+function getMaterialTypeLabel(copy: MaterialsCopy, type: MaterialType): string {
+  if (type === "book") return copy.typeBook;
+  if (type === "article") return copy.typeArticle;
+  if (type === "course") return copy.typeCourse;
+  return copy.typeVideo;
+}
+
+function getMaterialUnitLabel(copy: MaterialsCopy, unit: MaterialUnit): string {
+  if (unit === "hours") return copy.unitHours;
+  if (unit === "lessons") return copy.unitLessons;
+  return copy.unitPages;
+}
+
+function MaterialsSummary({
+  copy,
+  materials
+}: {
+  copy: MaterialsCopy;
+  materials: LibraryMaterial[];
+}) {
+  const total = materials.length;
+  const tracked = materials.filter((material) => material.completedAmount > 0).length;
+  const average = total
+    ? Math.round(
+        materials.reduce((sum, material) => sum + material.progressPercent, 0) / total
+      )
+    : 0;
+
+  return (
+    <aside className="materials-summary-card">
+      <p className="materials-summary-kicker">{copy.summaryTitle}</p>
+      <div className="materials-summary-metric">
+        <span>{copy.summaryTotal}</span>
+        <strong>{total}</strong>
+      </div>
+      <div className="materials-summary-metric">
+        <span>{copy.summaryTracked}</span>
+        <strong>{tracked}</strong>
+      </div>
+      <div className="materials-summary-metric">
+        <span>{copy.summaryAverage}</span>
+        <strong>{average}%</strong>
+      </div>
+    </aside>
+  );
 }
 
 function MaterialsLibraryHeader({
@@ -97,23 +229,31 @@ function MaterialsLibraryHeader({
   query,
   topicId,
   topics,
+  resultsCount,
   onQueryChange,
   onTopicChange,
-  onCreateClick
+  onCreateClick,
+  materials
 }: {
   copy: MaterialsCopy;
   query: string;
   topicId: string;
   topics: TopicOption[];
+  resultsCount: number;
   onQueryChange: (query: string) => void;
   onTopicChange: (topicId: string) => void;
   onCreateClick: (triggerElement: HTMLElement) => void;
+  materials: LibraryMaterial[];
 }) {
   return (
     <header className="materials-library-header">
       <div className="materials-library-intro">
-        <h2>{copy.title}</h2>
-        <p>{copy.subtitle}</p>
+        <div>
+          <p className="materials-summary-kicker">{copy.summaryTitle}</p>
+          <h2>{copy.title}</h2>
+          <p>{copy.subtitle}</p>
+        </div>
+        <MaterialsSummary copy={copy} materials={materials} />
       </div>
 
       <div className="panel materials-library-controls-panel">
@@ -145,13 +285,16 @@ function MaterialsLibraryHeader({
             </select>
           </label>
 
-          <button
-            type="button"
-            className="button button-primary materials-create-trigger"
-            onClick={(event) => onCreateClick(event.currentTarget)}
-          >
-            {copy.createButton}
-          </button>
+          <div className="materials-controls-meta">
+            <span className="materials-results-count">{copy.resultsLabel(resultsCount)}</span>
+            <button
+              type="button"
+              className="button button-primary materials-create-trigger"
+              onClick={(event) => onCreateClick(event.currentTarget)}
+            >
+              {copy.createButton}
+            </button>
+          </div>
         </div>
       </div>
     </header>
@@ -379,55 +522,68 @@ function MaterialsCard({
   return (
     <li className="materials-card">
       <div className="materials-card-head">
-        <span className="topic-material-position">#{material.position}</span>
-        <Link
-          className="materials-card-topic-link"
-          href={`/topics?topicId=${encodeURIComponent(material.topicId)}`}
-        >
-          {material.topicTitle}
-        </Link>
+        <div className="materials-card-topic-row">
+          <span className="topic-material-position">#{material.position}</span>
+          <Link
+            className="materials-card-topic-link"
+            href={`/topics?topicId=${encodeURIComponent(material.topicId)}`}
+          >
+            {material.topicTitle}
+          </Link>
+        </div>
+        <div className="materials-card-meta-head">
+          <span className="materials-type-badge">{getMaterialTypeLabel(copy, material.type)}</span>
+          <span className="materials-measure-badge">
+            {material.completedAmount}/{material.totalAmount}{" "}
+            {getMaterialUnitLabel(copy, material.unit)}
+          </span>
+        </div>
       </div>
 
-      <div className="materials-card-meta-head">
-        <span className="materials-type-badge">{getMaterialTypeLabel(copy, material.type)}</span>
-        <span className="materials-measure-badge">
-          {material.completedAmount}/{material.totalAmount} {getMaterialUnitLabel(copy, material.unit)}
-        </span>
-      </div>
+      <div className="materials-card-body">
+        <div>
+          <h3>{material.title}</h3>
+          <p>{material.description}</p>
+          {material.url ? (
+            <a
+              href={material.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="materials-url-link"
+            >
+              {material.url}
+            </a>
+          ) : null}
+        </div>
 
-      <h3>{material.title}</h3>
-      <p>{material.description}</p>
-      {material.url ? (
-        <a href={material.url} target="_blank" rel="noopener noreferrer" className="materials-url-link">
-          {material.url}
-        </a>
-      ) : null}
+        <div className="materials-card-side">
+          <div className="materials-card-progress-head">
+            <span>{copy.progress}</span>
+            <strong>{computedProgress}%</strong>
+          </div>
+          <div className="roadmap-progress-track">
+            <span className="roadmap-progress-fill" style={{ width: `${computedProgress}%` }} />
+          </div>
 
-      <div className="materials-card-progress-head">
-        <span>{copy.progress}</span>
-        <strong>{computedProgress}%</strong>
-      </div>
-      <div className="roadmap-progress-track">
-        <span className="roadmap-progress-fill" style={{ width: `${computedProgress}%` }} />
-      </div>
-
-      <div className="materials-card-actions">
-        <button
-          type="button"
-          className="button button-outline"
-          onClick={() => onEditStart(material)}
-          disabled={updatingMaterialId === material.id}
-        >
-          {copy.edit}
-        </button>
-        <button
-          type="button"
-          className="button button-outline materials-delete-button"
-          onClick={() => onDelete(material.id)}
-          disabled={updatingMaterialId === material.id}
-        >
-          {copy.delete}
-        </button>
+          <div className="materials-card-actions">
+            <button
+              type="button"
+              className="button button-outline"
+              onClick={() => onEditStart(material)}
+              disabled={updatingMaterialId === material.id}
+            >
+              {copy.edit}
+            </button>
+            <button
+              type="button"
+              className="button button-outline materials-delete-button"
+              onClick={() => onDelete(material.id)}
+              disabled={updatingMaterialId === material.id}
+            >
+              {copy.delete}
+            </button>
+          </div>
+        </div>
       </div>
 
       {editingId === material.id && editDraft ? (
@@ -637,10 +793,12 @@ function MaterialsCard({
 }
 
 export function MaterialsLibraryView() {
-  const copy = MATERIALS_COPY;
+  const { language } = useUserPreferences();
+  const copy = COPY[language];
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const createModalTriggerRef = useRef<HTMLElement | null>(null);
   const createModalTitleId = "materials-create-modal-title";
+
   const {
     filters,
     setFilters,
@@ -662,6 +820,9 @@ export function MaterialsLibraryView() {
     handleDelete,
     computeProgressPercent
   } = useMaterialsLibraryViewModel(copy);
+
+  const materials = materialsQuery.data?.materials ?? [];
+  const resultsCount = materials.length;
 
   useEffect(() => {
     if (!isCreateModalOpen) {
@@ -717,6 +878,7 @@ export function MaterialsLibraryView() {
         query={filters.query}
         topicId={filters.topicId}
         topics={availableTopics}
+        resultsCount={resultsCount}
         onQueryChange={(query) =>
           setFilters((current) => ({
             ...current,
@@ -730,6 +892,7 @@ export function MaterialsLibraryView() {
           }))
         }
         onCreateClick={openCreateModal}
+        materials={materials}
       />
 
       {isCreateModalOpen ? (
@@ -763,7 +926,6 @@ export function MaterialsLibraryView() {
               includePanelStyles={false}
               error={mutationError}
             />
-
           </section>
         </div>
       ) : null}
@@ -803,9 +965,9 @@ export function MaterialsLibraryView() {
       ) : null}
 
       {materialsQuery.status === "success" && materialsQuery.data ? (
-        materialsQuery.data.materials.length > 0 ? (
+        resultsCount > 0 ? (
           <ul className="materials-grid">
-            {materialsQuery.data.materials.map((material) => (
+            {materials.map((material) => (
               <MaterialsCard
                 key={material.id}
                 copy={copy}
@@ -824,7 +986,7 @@ export function MaterialsLibraryView() {
             ))}
           </ul>
         ) : (
-          <section className="panel">
+          <section className="panel materials-empty-panel">
             <p className="dashboard-empty">{copy.empty}</p>
           </section>
         )

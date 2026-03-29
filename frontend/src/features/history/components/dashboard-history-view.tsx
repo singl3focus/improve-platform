@@ -21,39 +21,22 @@ interface HistoryState {
 }
 
 function initialState(): HistoryState {
-  return {
-    status: "loading",
-    data: [],
-    errorMessage: null
-  };
+  return { status: "loading", data: [], errorMessage: null };
 }
 
 async function fetchHistory(signal: AbortSignal): Promise<DashboardHistoryEvent[]> {
-  const response = await authFetch("/api/dashboard/history?limit=50", {
-    method: "GET",
-    signal
-  });
-
+  const response = await authFetch("/api/dashboard/history?limit=50", { method: "GET", signal });
   if (!response.ok) {
     let message = `Request failed (${response.status})`;
     try {
       const payload = (await response.json()) as { message?: string };
-      if (typeof payload?.message === "string") {
-        message = payload.message;
-      }
+      if (typeof payload?.message === "string") message = payload.message;
     } catch {
       // Ignore non-JSON body.
     }
-
     throw new Error(message);
   }
-
   return (await response.json()) as DashboardHistoryEvent[];
-}
-
-function formatHistorySubtitle(entry: DashboardHistoryEvent, locale: string, noDateLabel: string): string {
-  const createdAt = formatDashboardDate(entry.createdAt, locale, noDateLabel);
-  return `${entry.entityType} · ${entry.eventType} · ${createdAt}`;
 }
 
 export function DashboardHistoryView() {
@@ -63,6 +46,19 @@ export function DashboardHistoryView() {
   const [state, setState] = useState<HistoryState>(initialState);
   const [reloadKey, setReloadKey] = useState(0);
 
+  const historyCopy =
+    language === "ru"
+      ? {
+          eyebrow: "Лента активности",
+          lead: "Последовательность последних действий по темам, задачам и материалам.",
+          returnLabel: "Вернуться к dashboard"
+        }
+      : {
+          eyebrow: "Activity feed",
+          lead: "A readable sequence of recent actions across topics, tasks, and materials.",
+          returnLabel: "Back to dashboard"
+        };
+
   useEffect(() => {
     const controller = new AbortController();
 
@@ -70,16 +66,9 @@ export function DashboardHistoryView() {
       setState(initialState());
       try {
         const payload = await fetchHistory(controller.signal);
-        setState({
-          status: "success",
-          data: payload,
-          errorMessage: null
-        });
+        setState({ status: "success", data: payload, errorMessage: null });
       } catch (error) {
-        if (controller.signal.aborted) {
-          return;
-        }
-
+        if (controller.signal.aborted) return;
         setState({
           status: "error",
           data: [],
@@ -101,59 +90,78 @@ export function DashboardHistoryView() {
   );
 
   return (
-    <section className="panel" style={{ display: "grid", gap: "14px" }}>
-      <header>
-        <h2 style={{ margin: 0 }}>{header.title}</h2>
-        <p style={{ marginTop: "6px" }}>{header.description}</p>
-      </header>
-
-      {state.status === "loading" ? (
-        <div className="dashboard-loading" aria-hidden="true">
-          <span />
-          <span />
-          <span />
-          <span />
+    <section className="history-view">
+      <section className="panel history-hero">
+        <div>
+          <p className="dashboard-eyebrow">{historyCopy.eyebrow}</p>
+          <h2>{header.title}</h2>
+          <p>{historyCopy.lead}</p>
         </div>
-      ) : null}
+        <Link href="/dashboard" className="button button-outline history-return-link">
+          {historyCopy.returnLabel}
+        </Link>
+      </section>
 
-      {state.status === "error" ? (
-        <div className="dashboard-error">
-          <p>{state.errorMessage ?? dashboardCopy.historyLoadFailed}</p>
-          <button
-            type="button"
-            className="button button-outline dashboard-retry"
-            onClick={() => setReloadKey((value) => value + 1)}
-          >
-            {dashboardCopy.retry}
-          </button>
-        </div>
-      ) : null}
+      <section className="panel history-feed-panel">
+        <header className="history-feed-header">
+          <div>
+            <p className="topic-card-kicker">{header.title}</p>
+            <h3>{header.title}</h3>
+            <p>{header.description}</p>
+          </div>
+        </header>
 
-      {state.status === "success" ? (
-        state.data.length === 0 ? (
+        {state.status === "loading" ? (
+          <div className="dashboard-loading" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+            <span />
+          </div>
+        ) : null}
+
+        {state.status === "error" ? (
+          <div className="dashboard-error">
+            <p>{state.errorMessage ?? dashboardCopy.historyLoadFailed}</p>
+            <button
+              type="button"
+              className="button button-outline dashboard-retry"
+              onClick={() => setReloadKey((value) => value + 1)}
+            >
+              {dashboardCopy.retry}
+            </button>
+          </div>
+        ) : null}
+
+        {state.status === "success" && state.data.length === 0 ? (
           <p className="dashboard-empty">{dashboardCopy.historyEmpty}</p>
-        ) : (
-          <ul className="dashboard-list">
+        ) : null}
+
+        {state.status === "success" && state.data.length > 0 ? (
+          <ol className="history-feed-list">
             {state.data.map((entry) => (
-              <li key={entry.id} className="dashboard-list-item">
-                <div>
-                  <p className="dashboard-list-title">{formatHistoryEventTitle(entry, language)}</p>
-                  <p className="dashboard-list-subtitle">
-                    {formatHistoryEventSubtitle(entry, language, formatDashboardDate(entry.createdAt, locale, dashboardCopy.noDate))}
-                  </p>
+              <li key={entry.id} className="history-feed-item">
+                <div className="history-feed-marker" aria-hidden="true" />
+                <div className="history-feed-card">
+                  <div className="history-feed-main">
+                    <div>
+                      <p className="history-feed-title">{formatHistoryEventTitle(entry, language)}</p>
+                      <p className="history-feed-subtitle">
+                        {formatHistoryEventSubtitle(
+                          entry,
+                          language,
+                          formatDashboardDate(entry.createdAt, locale, dashboardCopy.noDate)
+                        )}
+                      </p>
+                    </div>
+                    <span className="dashboard-badge">{formatHistoryEventBadge(entry, language)}</span>
+                  </div>
                 </div>
-                <span className="dashboard-badge">{formatHistoryEventBadge(entry, language)}</span>
               </li>
             ))}
-          </ul>
-        )
-      ) : null}
-
-      <div>
-        <Link href="/dashboard" className="button button-outline" style={{ display: "inline-flex", alignItems: "center" }}>
-          {copy.navigation.dashboardLabel}
-        </Link>
-      </div>
+          </ol>
+        ) : null}
+      </section>
     </section>
   );
 }

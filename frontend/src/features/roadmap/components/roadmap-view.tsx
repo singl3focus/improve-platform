@@ -12,8 +12,9 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { authFetch } from "@features/auth/lib/auth-fetch";
-import { MoreHorizontal, Pencil } from "lucide-react";
+import { ExternalLink, MoreHorizontal, Pencil } from "lucide-react";
 import { useRoadmapGraphLayout } from "@features/roadmap/hooks/use-roadmap-graph-layout";
+import { RoadmapCreateForm } from "@features/roadmap/components/roadmap-create-form";
 import { RoadmapSwitcher } from "@features/roadmap/components/roadmap-switcher";
 import { useUserPreferences } from "@shared/providers/user-preferences-provider";
 import {
@@ -23,6 +24,10 @@ import {
   getGraphOffsetForScale
 } from "@features/roadmap/lib/roadmap-graph";
 import { buildTopicGridPlacementById, compareTopicsByPosition } from "@features/roadmap/lib/roadmap-layout";
+import {
+  prepareRoadmapCreateSubmission,
+  type RoadmapCreateDraft
+} from "@features/roadmap/lib/roadmap-create";
 import { prepareRoadmapTopicEditSubmission } from "@features/roadmap/lib/roadmap-topic-edit";
 import { buildTopicCreatePayload } from "@features/roadmap/lib/roadmap-topic-create";
 import {
@@ -32,6 +37,7 @@ import {
 import type { AppLanguage } from "@shared/i18n/ui-copy";
 import type {
   RoadmapResponse,
+  RoadmapType,
   RoadmapTopic,
   RoadmapTopicStatus
 } from "@features/roadmap/types";
@@ -42,11 +48,7 @@ interface RoadmapState {
   status: RoadmapLoadStatus;
   data: RoadmapResponse | null;
   errorMessage: string | null;
-}
-
-interface QuickCreateDraft {
-  topicTitle: string;
-  topicDescription: string;
+  missingRoadmapId: string | null;
 }
 
 interface TopicCreateDraft {
@@ -297,11 +299,209 @@ const ROADMAP_COPY = {
 
 type RoadmapCopy = (typeof ROADMAP_COPY)[keyof typeof ROADMAP_COPY];
 
+const ROADMAP_TYPE_META = {
+  graph: {
+    ru: {
+      label: "Graph",
+      badge: "Графовый roadmap",
+      description: "Связанный граф тем и зависимостей.",
+      emptyTitle: "Графовый roadmap пуст",
+      emptyDescription: "Добавьте первую тему, чтобы построить граф зависимостей и начать заполнять карту.",
+      firstItemAction: "Добавить первую тему"
+    },
+    en: {
+      label: "Graph",
+      badge: "Graph roadmap",
+      description: "A connected graph of topics and dependencies.",
+      emptyTitle: "Graph roadmap is empty",
+      emptyDescription: "Add the first topic to start building the dependency graph.",
+      firstItemAction: "Add first topic"
+    }
+  },
+  levels: {
+    ru: {
+      label: "Levels",
+      badge: "Levels roadmap",
+      description: "Последовательные уровни развития с фокусом на следующий шаг.",
+      emptyTitle: "Levels roadmap пуст",
+      emptyDescription: "Добавьте первый уровень и затем выстраивайте последовательность освоения как ступени роста.",
+      firstItemAction: "Добавить первый уровень"
+    },
+    en: {
+      label: "Levels",
+      badge: "Levels roadmap",
+      description: "Sequential development levels with a clear next step.",
+      emptyTitle: "Levels roadmap is empty",
+      emptyDescription: "Add the first level and build the roadmap as a progression ladder.",
+      firstItemAction: "Add first level"
+    }
+  },
+  cycles: {
+    ru: {
+      label: "Cycles",
+      badge: "Cycles roadmap",
+      description: "Повторяющиеся циклы улучшения с обзором текущего витка.",
+      emptyTitle: "Cycles roadmap пуст",
+      emptyDescription: "Добавьте первый цикл и используйте roadmap как систему повторяемого улучшения.",
+      firstItemAction: "Добавить первый цикл"
+    },
+    en: {
+      label: "Cycles",
+      badge: "Cycles roadmap",
+      description: "Recurring improvement cycles with a focused current loop.",
+      emptyTitle: "Cycles roadmap is empty",
+      emptyDescription: "Add the first cycle and use the roadmap as a repeatable improvement system.",
+      firstItemAction: "Add first cycle"
+    }
+  }
+} as const;
+
+function getRoadmapTypeBadge(type: RoadmapType, language: AppLanguage): string {
+  return ROADMAP_TYPE_META[type][language].badge;
+}
+
+function getRoadmapTypeDescription(type: RoadmapType, language: AppLanguage): string {
+  return ROADMAP_TYPE_META[type][language].description;
+}
+
+function getRoadmapEmptyTitle(type: RoadmapType, language: AppLanguage): string {
+  return ROADMAP_TYPE_META[type][language].emptyTitle;
+}
+
+function getRoadmapEmptyDescription(type: RoadmapType, language: AppLanguage): string {
+  return ROADMAP_TYPE_META[type][language].emptyDescription;
+}
+
+function getFirstRoadmapItemActionLabel(type: RoadmapType, language: AppLanguage): string {
+  return ROADMAP_TYPE_META[type][language].firstItemAction;
+}
+
+function getNextRoadmapItemActionLabel(type: RoadmapType, language: AppLanguage): string {
+  if (language === "ru") {
+    if (type === "levels") {
+      return "Добавить следующий уровень";
+    }
+    if (type === "cycles") {
+      return "Добавить следующий цикл";
+    }
+    return "Добавить тему";
+  }
+
+  if (type === "levels") {
+    return "Add next level";
+  }
+  if (type === "cycles") {
+    return "Add next cycle";
+  }
+  return "Add topic";
+}
+
+function getRoadmapStructuredOpenLabel(type: RoadmapType, language: AppLanguage): string {
+  if (language === "ru") {
+    if (type === "levels") {
+      return "Открыть уровень";
+    }
+    if (type === "cycles") {
+      return "Открыть цикл";
+    }
+    return "Открыть тему";
+  }
+
+  if (type === "levels") {
+    return "Open level";
+  }
+  if (type === "cycles") {
+    return "Open cycle";
+  }
+  return "Open topic";
+}
+
+function getRoadmapItemCreateTitle(type: RoadmapType, language: AppLanguage): string {
+  if (language === "ru") {
+    if (type === "levels") {
+      return "Добавить уровень";
+    }
+    if (type === "cycles") {
+      return "Добавить цикл";
+    }
+    return "Добавить тему";
+  }
+
+  if (type === "levels") {
+    return "Add level";
+  }
+  if (type === "cycles") {
+    return "Add cycle";
+  }
+  return "Add topic";
+}
+
+function getRoadmapItemCreateSubtitle(type: RoadmapType, language: AppLanguage): string {
+  if (language === "ru") {
+    if (type === "levels") {
+      return "Создайте новый уровень в текущем roadmap и продолжите последовательность освоения.";
+    }
+    if (type === "cycles") {
+      return "Создайте новый цикл в текущем roadmap.";
+    }
+    return "Создайте новую тему в текущем roadmap.";
+  }
+
+  if (type === "levels") {
+    return "Create a new level in the current roadmap and continue the learning sequence.";
+  }
+  if (type === "cycles") {
+    return "Create a new cycle in the current roadmap.";
+  }
+  return "Create a new topic in your current roadmap.";
+}
+
+function getRoadmapItemSubmitLabel(type: RoadmapType, language: AppLanguage): string {
+  if (language === "ru") {
+    if (type === "levels") {
+      return "Добавить уровень";
+    }
+    if (type === "cycles") {
+      return "Добавить цикл";
+    }
+    return "Добавить тему";
+  }
+
+  if (type === "levels") {
+    return "Add level";
+  }
+  if (type === "cycles") {
+    return "Add cycle";
+  }
+  return "Add topic";
+}
+
+function getRoadmapItemSubmittingLabel(type: RoadmapType, language: AppLanguage): string {
+  if (language === "ru") {
+    if (type === "levels") {
+      return "Добавление уровня...";
+    }
+    if (type === "cycles") {
+      return "Добавление цикла...";
+    }
+    return "Добавление...";
+  }
+
+  if (type === "levels") {
+    return "Adding level...";
+  }
+  if (type === "cycles") {
+    return "Adding cycle...";
+  }
+  return "Adding...";
+}
+
 function initialRoadmapState(): RoadmapState {
   return {
     status: "loading",
     data: null,
-    errorMessage: null
+    errorMessage: null,
+    missingRoadmapId: null
   };
 }
 
@@ -312,25 +512,18 @@ async function fetchRoadmap(roadmapId: string, signal: AbortSignal): Promise<Roa
   });
 
   if (!response.ok) {
-    let message = `Roadmap request failed (${response.status})`;
-    try {
-      const payload = (await response.json()) as { message?: string };
-      if (typeof payload?.message === "string") {
-        message = payload.message;
-      }
-    } catch {
-      // Ignore parse errors for non-JSON responses.
-    }
-    throw new Error(message);
+    throw createErrorWithCode(
+      await parseErrorDetails(response, `Roadmap request failed (${response.status})`)
+    );
   }
 
   return (await response.json()) as RoadmapResponse;
 }
 
-function initialQuickCreateDraft(): QuickCreateDraft {
+function initialRoadmapCreateDraft(): RoadmapCreateDraft {
   return {
-    topicTitle: "",
-    topicDescription: ""
+    title: "",
+    type: "graph"
   };
 }
 
@@ -368,6 +561,15 @@ function createErrorWithCode(details: ApiErrorDetails): Error {
   return error;
 }
 
+function getErrorCode(error: unknown): string | null {
+  if (!error || typeof error !== "object") {
+    return null;
+  }
+
+  const code = (error as { code?: unknown }).code;
+  return typeof code === "string" ? code : null;
+}
+
 function getTopicStatusErrorMessage(
   validationResult: ReturnType<typeof validateRoadmapTopicStatusChange>,
   topic: Pick<RoadmapTopic, "status">,
@@ -386,15 +588,14 @@ function getTopicStatusErrorMessage(
   );
 }
 
-async function quickCreateFirstTopic(payload: {
-  roadmapTitle: string;
-  topicTitle: string;
-  topicDescription: string;
+async function createRoadmap(payload: {
+  title: string;
+  type: RoadmapType;
 }): Promise<string> {
   const roadmapResponse = await authFetch("/api/roadmaps", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ title: payload.roadmapTitle })
+    body: JSON.stringify(payload)
   });
 
   if (!roadmapResponse.ok) {
@@ -405,19 +606,6 @@ async function quickCreateFirstTopic(payload: {
   const newRoadmapId: string = roadmapData.id ?? roadmapData.data?.id;
   if (!newRoadmapId) {
     throw new Error("Roadmap created but id is missing in response.");
-  }
-
-  const topicResponse = await authFetch(`/api/roadmaps/${encodeURIComponent(newRoadmapId)}/topics`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      title: payload.topicTitle,
-      description: payload.topicDescription
-    })
-  });
-
-  if (!topicResponse.ok) {
-    throw new Error(await parseErrorMessage(topicResponse, "Topic creation failed."));
   }
 
   return newRoadmapId;
@@ -555,8 +743,9 @@ function useRoadmapData(roadmapId: string | null, errorFallback: string) {
     if (!roadmapId) {
       setState({
         status: "success",
-        data: { stages: [] },
-        errorMessage: null
+        data: null,
+        errorMessage: null,
+        missingRoadmapId: null
       });
       return;
     }
@@ -570,17 +759,29 @@ function useRoadmapData(roadmapId: string | null, errorFallback: string) {
         setState({
           status: "success",
           data: payload,
-          errorMessage: null
+          errorMessage: null,
+          missingRoadmapId: null
         });
       } catch (error) {
         if (controller.signal.aborted) {
           return;
         }
 
+        if (getErrorCode(error) === "roadmap_not_found") {
+          setState({
+            status: "success",
+            data: null,
+            errorMessage: null,
+            missingRoadmapId: roadmapId
+          });
+          return;
+        }
+
         setState({
           status: "error",
           data: null,
-          errorMessage: error instanceof Error ? error.message : errorFallback
+          errorMessage: error instanceof Error ? error.message : errorFallback,
+          missingRoadmapId: null
         });
       }
     }
@@ -650,61 +851,301 @@ function TopicMutationPanel(props: {
   );
 }
 
-function QuickCreatePanel(props: {
-  copy: RoadmapCopy;
-  draft: QuickCreateDraft;
-  error: string | null;
-  isSubmitting: boolean;
-  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
-  onTopicTitleChange: (value: string) => void;
-  onTopicDescriptionChange: (value: string) => void;
+function RoadmapTypePill(props: { type: RoadmapType; language: AppLanguage }) {
+  return (
+    <span className="roadmap-type-pill">
+      {getRoadmapTypeBadge(props.type, props.language)}
+    </span>
+  );
+}
+
+function TypedRoadmapEmptyState(props: {
+  type: RoadmapType;
+  language: AppLanguage;
+  onCreateFirst: (triggerElement: HTMLElement) => void;
+  disabled: boolean;
 }) {
   return (
-    <section className="roadmap-quick-create">
-      <header>
-        <h3>{props.copy.quickCreateTitle}</h3>
-        <p>{props.copy.quickCreateSubtitle}</p>
-      </header>
+    <div className="panel roadmap-empty-panel roadmap-empty-panel-typed">
+      <RoadmapTypePill type={props.type} language={props.language} />
+      <h3>{getRoadmapEmptyTitle(props.type, props.language)}</h3>
+      <p className="dashboard-empty">{getRoadmapEmptyDescription(props.type, props.language)}</p>
+      <button
+        type="button"
+        className="button button-primary"
+        onClick={(event) => props.onCreateFirst(event.currentTarget)}
+        disabled={props.disabled}
+      >
+        {getFirstRoadmapItemActionLabel(props.type, props.language)}
+      </button>
+    </div>
+  );
+}
 
-      {props.error ? (
-        <div className="dashboard-error">
-          <p>{props.error}</p>
+function RoadmapCreateEntryState(props: {
+  language: AppLanguage;
+  onOpenCreate: () => void;
+}) {
+  return (
+    <div className="panel roadmap-empty-panel roadmap-roadmap-create-entry">
+      <h3>{props.language === "ru" ? "Создайте первую roadmap" : "Create your first roadmap"}</h3>
+      <p className="dashboard-empty">
+        {props.language === "ru"
+          ? "Сначала создайте roadmap, а затем выберите её тип и название."
+          : "Start by creating a roadmap, then choose its type and title."}
+      </p>
+      <button type="button" className="button button-primary" onClick={props.onOpenCreate}>
+        {props.language === "ru" ? "Создать первую roadmap" : "Create first roadmap"}
+      </button>
+    </div>
+  );
+}
+
+function LevelsRoadmapRenderer(props: {
+  topics: RoadmapTopic[];
+  copy: RoadmapCopy;
+  language: AppLanguage;
+  onEdit: (topic: RoadmapTopic, triggerElement: HTMLElement) => void;
+  onOpenWorkspace: (topicId: string) => void;
+  onCreateNext: (triggerElement: HTMLElement) => void;
+}) {
+  if (props.topics.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="roadmap-levels-layout">
+      <div className="roadmap-levels-stack">
+        {props.topics.map((topic, index) => {
+          return (
+            <article
+              key={topic.id}
+              className="roadmap-level-card roadmap-level-card-unified"
+            >
+              <div className="roadmap-level-card-topline">
+                <span className="roadmap-level-index">
+                  {props.language === "ru" ? `Уровень ${index + 1}` : `Level ${index + 1}`}
+                </span>
+                <span className={`roadmap-status-badge ${getStatusClassName(topic.status)}`}>
+                  {getStatusLabel(topic.status, props.language)}
+                </span>
+              </div>
+              <div className="roadmap-level-card-title">{topic.title}</div>
+              <div className="roadmap-level-card-description">{topic.goal || topic.description}</div>
+
+              <div className="roadmap-structured-progress">
+                <div className="roadmap-progress-row">
+                  <span>{props.copy.progress}</span>
+                  <strong>{topic.progressPercent}%</strong>
+                </div>
+                <div className="roadmap-progress-track">
+                  <span className="roadmap-progress-fill" style={{ width: `${topic.progressPercent}%` }} />
+                </div>
+              </div>
+
+              <div className="roadmap-level-card-meta">
+                <span>{props.copy.tasksCount(topic.tasksCount)}</span>
+                <span>{props.copy.materialsCount(topic.materialsCount)}</span>
+              </div>
+
+              <div className="roadmap-structured-actions">
+                <button
+                  type="button"
+                  className="button button-outline"
+                  onClick={(event) => props.onEdit(topic, event.currentTarget)}
+                >
+                  {props.copy.topicEditButton}
+                </button>
+                <button
+                  type="button"
+                  className="button button-primary"
+                  onClick={() => props.onOpenWorkspace(topic.id)}
+                >
+                  <ExternalLink size={14} />
+                  {getRoadmapStructuredOpenLabel("levels", props.language)}
+                </button>
+              </div>
+            </article>
+          );
+        })}
+
+        <div className="roadmap-level-create-card">
+          <h3>{props.language === "ru" ? "Следующий уровень" : "Next level"}</h3>
+          <p>
+            {props.language === "ru"
+              ? "Добавьте следующий уровень прямо в последовательность roadmap."
+              : "Add the next level directly into the roadmap sequence."}
+          </p>
+          <button
+            type="button"
+            className="button button-primary"
+            onClick={(event) => props.onCreateNext(event.currentTarget)}
+          >
+            {getNextRoadmapItemActionLabel("levels", props.language)}
+          </button>
         </div>
-      ) : null}
+      </div>
+    </div>
+  );
+}
 
-      <form className="roadmap-quick-create-form" onSubmit={props.onSubmit}>
-        <label className="roadmap-quick-create-field">
-          <span>{props.copy.quickCreateTopicLabel}</span>
-          <input
-            type="text"
-            className="input"
-            value={props.draft.topicTitle}
-            onChange={(event) => props.onTopicTitleChange(event.target.value)}
-            placeholder={props.copy.quickCreateTopicPlaceholder}
-          />
-        </label>
+function getCycleStageLabel(status: RoadmapTopicStatus, language: AppLanguage): string {
+  const labels =
+    language === "ru"
+      ? ["План", "Делаю", "Отслеживаю", "Ревью", "Корректирую"]
+      : ["Plan", "Do", "Track", "Review", "Adjust"];
 
-        <label className="roadmap-quick-create-field roadmap-quick-create-field-description">
-          <span>{props.copy.quickCreateDescriptionLabel}</span>
-          <textarea
-            value={props.draft.topicDescription}
-            onChange={(event) => props.onTopicDescriptionChange(event.target.value)}
-            placeholder={props.copy.quickCreateDescriptionPlaceholder}
-          />
-        </label>
+  switch (status) {
+    case "completed":
+      return labels[3];
+    case "in_progress":
+      return labels[1];
+    case "paused":
+      return labels[2];
+    default:
+      return labels[0];
+  }
+}
 
-        <button type="submit" className="button button-primary" disabled={props.isSubmitting}>
-          {props.isSubmitting ? props.copy.quickCreatingButton : props.copy.quickCreateButton}
-        </button>
-      </form>
-    </section>
+function CyclesRoadmapRenderer(props: {
+  topics: RoadmapTopic[];
+  copy: RoadmapCopy;
+  language: AppLanguage;
+  onEdit: (topic: RoadmapTopic, triggerElement: HTMLElement) => void;
+  onOpenWorkspace: (topicId: string) => void;
+  onCreateNext: (triggerElement: HTMLElement) => void;
+  onStatusChange: (topic: RoadmapTopic, status: RoadmapTopicStatus) => void;
+  updatingTopicId: string | null;
+}) {
+  if (props.topics.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="roadmap-cycles-layout">
+      <div className="roadmap-cycles-stack">
+        {props.topics.map((topic) => {
+          const loopLabels =
+            props.language === "ru"
+              ? ["План", "Делаю", "Отслеживаю", "Ревью", "Корректирую"]
+              : ["Plan", "Do", "Track", "Review", "Adjust"];
+          const activeStage = getCycleStageLabel(topic.status, props.language);
+          return (
+            <article
+              key={topic.id}
+              className="roadmap-cycle-card roadmap-cycle-card-unified"
+            >
+              <div className="roadmap-cycle-card-header">
+                <div>
+                  <div className="roadmap-cycle-card-title">{topic.title}</div>
+                  <div className="roadmap-cycle-card-description">{topic.goal || topic.description}</div>
+                </div>
+                <span className="roadmap-cycle-stage">{getCycleStageLabel(topic.status, props.language)}</span>
+              </div>
+
+              <div className="roadmap-cycle-card-main">
+                <div className="roadmap-cycle-wheel">
+                  <div className="roadmap-cycle-wheel-ring" />
+                  {loopLabels.map((label, index) => (
+                    <div
+                      key={`${topic.id}-${label}`}
+                      className={`roadmap-cycle-wheel-step${label === activeStage ? " roadmap-cycle-wheel-step-active" : ""}`}
+                      style={{ transform: `rotate(${index * 72}deg)` }}
+                    >
+                      <span>{label}</span>
+                    </div>
+                  ))}
+                  <div className="roadmap-cycle-wheel-core">
+                    <strong>{topic.progressPercent}%</strong>
+                    <span>{props.language === "ru" ? "прогресс цикла" : "cycle progress"}</span>
+                  </div>
+                </div>
+
+                <div className="roadmap-cycle-card-content">
+                  <div className="roadmap-structured-progress">
+                    <div className="roadmap-progress-row">
+                      <span>{props.copy.progress}</span>
+                      <strong>{topic.progressPercent}%</strong>
+                    </div>
+                    <div className="roadmap-progress-track">
+                      <span className="roadmap-progress-fill" style={{ width: `${topic.progressPercent}%` }} />
+                    </div>
+                  </div>
+
+                  <div className="roadmap-cycle-card-meta">
+                    <span>{props.copy.tasksCount(topic.tasksCount)}</span>
+                    <span>{props.copy.materialsCount(topic.materialsCount)}</span>
+                  </div>
+
+                  <div className="roadmap-cycle-status-block">
+                    <span className="roadmap-cycle-status-label">
+                      {props.language === "ru" ? "Статус цикла" : "Cycle status"}
+                    </span>
+                    <div className="roadmap-cycle-status-switcher" role="group" aria-label={props.copy.topicFieldStatus}>
+                      {getRoadmapTopicStatuses().map((status) => (
+                        <button
+                          key={`${topic.id}-${status}`}
+                          type="button"
+                          className={`roadmap-cycle-status-button${
+                            topic.status === status ? " roadmap-cycle-status-button-active" : ""
+                          }`}
+                          disabled={props.updatingTopicId === topic.id}
+                          onClick={() => props.onStatusChange(topic, status)}
+                        >
+                          {getStatusLabel(status, props.language)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="roadmap-structured-actions">
+                    <button
+                      type="button"
+                      className="button button-outline"
+                      onClick={(event) => props.onEdit(topic, event.currentTarget)}
+                    >
+                      {props.copy.topicEditButton}
+                    </button>
+                    <button
+                      type="button"
+                      className="button button-primary"
+                      onClick={() => props.onOpenWorkspace(topic.id)}
+                    >
+                      <ExternalLink size={14} />
+                      {getRoadmapStructuredOpenLabel("cycles", props.language)}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+            </article>
+          );
+        })}
+
+        <div className="roadmap-level-create-card">
+          <h3>{props.language === "ru" ? "Следующий цикл" : "Next cycle"}</h3>
+          <p>
+            {props.language === "ru"
+              ? "Добавьте следующий цикл и продолжайте итерации в рамках roadmap."
+              : "Add the next cycle and continue iterating inside the roadmap."}
+          </p>
+          <button
+            type="button"
+            className="button button-primary"
+            onClick={(event) => props.onCreateNext(event.currentTarget)}
+          >
+            {getNextRoadmapItemActionLabel("cycles", props.language)}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
 export function RoadmapView() {
   const router = useRouter();
   const { language, activeRoadmapId, setActiveRoadmapId } = useUserPreferences();
-  const copy = ROADMAP_COPY.ru;
+  const copy = ROADMAP_COPY[language];
   const roadmap = useRoadmapData(activeRoadmapId, copy.errorFallback);
   const graphRef = useRef<HTMLDivElement | null>(null);
   const topicRefs = useRef<Map<string, HTMLElement>>(new Map());
@@ -728,9 +1169,10 @@ export function RoadmapView() {
     topicRefs,
     transform: sceneTransform
   });
-  const [quickCreateDraft, setQuickCreateDraft] = useState<QuickCreateDraft>(initialQuickCreateDraft());
-  const [quickCreateError, setQuickCreateError] = useState<string | null>(null);
-  const [isQuickCreating, setIsQuickCreating] = useState(false);
+  const [roadmapCreateDraft, setRoadmapCreateDraft] = useState<RoadmapCreateDraft>(initialRoadmapCreateDraft());
+  const [roadmapCreateError, setRoadmapCreateError] = useState<string | null>(null);
+  const [isRoadmapCreating, setIsRoadmapCreating] = useState(false);
+  const [isRoadmapCreatePanelOpen, setIsRoadmapCreatePanelOpen] = useState(false);
   const [topicCreateDraft, setTopicCreateDraft] = useState<TopicCreateDraft>(initialTopicCreateDraft());
   const [topicEditDraft, setTopicEditDraft] = useState<TopicEditDraft | null>(null);
   const [editingTopicId, setEditingTopicId] = useState<string | null>(null);
@@ -766,6 +1208,8 @@ export function RoadmapView() {
       ),
     [stages]
   );
+  const roadmapType = roadmap.state.data?.type ?? "graph";
+  const hasActiveRoadmap = Boolean(activeRoadmapId && roadmap.state.data);
   const topicGridPlacementById = useMemo(() => buildTopicGridPlacementById(stages), [stages]);
   const maxGridColumns = useMemo(
     () => Math.max(...Array.from(topicGridPlacementById.values()).map((placement) => placement.column), 1),
@@ -796,6 +1240,16 @@ export function RoadmapView() {
       ) ?? null
     );
   }, [allTopics]);
+  const roadmapActionLabel =
+    allTopics.length > 0
+      ? getNextRoadmapItemActionLabel(roadmapType, language)
+      : getFirstRoadmapItemActionLabel(roadmapType, language);
+
+  useEffect(() => {
+    if (activeRoadmapId && roadmap.state.missingRoadmapId === activeRoadmapId) {
+      setActiveRoadmapId(null);
+    }
+  }, [activeRoadmapId, roadmap.state.missingRoadmapId, setActiveRoadmapId]);
 
   const updateSceneScale = useCallback((
     nextScaleCandidate: number,
@@ -1188,31 +1642,33 @@ export function RoadmapView() {
     topicRefs.current.delete(topicId);
   }
 
-  async function handleQuickCreate(event: FormEvent<HTMLFormElement>) {
+  async function handleRoadmapCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    const topicTitle = quickCreateDraft.topicTitle.trim();
-    if (!topicTitle) {
-      setQuickCreateError(copy.quickCreateTopicRequired);
+    const submission = prepareRoadmapCreateSubmission(roadmapCreateDraft);
+    if (!submission.ok) {
+      setRoadmapCreateError(language === "ru" ? "Укажите название roadmap." : "Roadmap title is required.");
       return;
     }
 
-    setQuickCreateError(null);
-    setIsQuickCreating(true);
+    setRoadmapCreateError(null);
+    setIsRoadmapCreating(true);
     try {
-      const newRoadmapId = await quickCreateFirstTopic({
-        roadmapTitle: copy.defaultRoadmapTitle,
-        topicTitle,
-        topicDescription: quickCreateDraft.topicDescription.trim()
-      });
+      const newRoadmapId = await createRoadmap(submission.payload);
       setActiveRoadmapId(newRoadmapId);
-      pendingFirstTopicCenterRef.current = true;
-      setQuickCreateDraft(initialQuickCreateDraft());
+      setRoadmapCreateDraft(initialRoadmapCreateDraft());
+      setIsRoadmapCreatePanelOpen(false);
       roadmap.reload();
     } catch (error) {
-      setQuickCreateError(error instanceof Error ? error.message : copy.quickCreateFailed);
+      setRoadmapCreateError(
+        error instanceof Error
+          ? error.message
+          : language === "ru"
+            ? "Не удалось создать roadmap."
+            : "Failed to create roadmap."
+      );
     } finally {
-      setIsQuickCreating(false);
+      setIsRoadmapCreating(false);
     }
   }
 
@@ -1228,11 +1684,18 @@ export function RoadmapView() {
     setTopicMutationError(null);
     setIsTopicCreating(true);
     try {
+      if (allTopics.length === 0 && roadmapType === "graph") {
+        pendingFirstTopicCenterRef.current = true;
+      }
       await createRoadmapTopic(
         activeRoadmapId!,
         buildTopicCreatePayload({
           title,
           description: topicCreateDraft.description.trim(),
+          position:
+            !topicCreateAnchor && (roadmapType === "levels" || roadmapType === "cycles") && allTopics.length > 0
+              ? Math.max(...allTopics.map((topic) => topic.position), 0) + 1
+              : undefined,
           anchor: topicCreateAnchor
             ? {
                 parentId: topicCreateAnchor.parentId,
@@ -1254,6 +1717,46 @@ export function RoadmapView() {
       setTopicMutationError(error instanceof Error ? error.message : copy.topicCreateFailed);
     } finally {
       setIsTopicCreating(false);
+    }
+  }
+
+  async function handleStructuredTopicStatusChange(topic: RoadmapTopic, nextStatus: RoadmapTopicStatus) {
+    const submission = prepareRoadmapTopicEditSubmission({
+      topic,
+      draft: {
+        title: topic.title,
+        description: topic.description,
+        status: nextStatus
+      }
+    });
+
+    if (!submission.ok) {
+      if (submission.reason === "title_required") {
+        setTopicMutationError(copy.topicTitleRequired);
+        return;
+      }
+
+      setTopicMutationError(
+        getTopicStatusErrorMessage(
+          submission.validationResult,
+          topic,
+          nextStatus,
+          copy,
+          language
+        )
+      );
+      return;
+    }
+
+    setTopicMutationError(null);
+    setUpdatingTopicId(topic.id);
+    try {
+      await updateRoadmapTopic(activeRoadmapId!, topic.id, submission.payload);
+      roadmap.reload();
+    } catch (error) {
+      setTopicMutationError(error instanceof Error ? error.message : copy.topicUpdateFailed);
+    } finally {
+      setUpdatingTopicId(null);
     }
   }
 
@@ -1384,17 +1887,17 @@ export function RoadmapView() {
     }));
   }
 
-  function handleQuickCreateTopicTitleChange(value: string) {
-    setQuickCreateDraft((current) => ({
+  function handleRoadmapCreateTitleChange(value: string) {
+    setRoadmapCreateDraft((current) => ({
       ...current,
-      topicTitle: value
+      title: value
     }));
   }
 
-  function handleQuickCreateTopicDescriptionChange(value: string) {
-    setQuickCreateDraft((current) => ({
+  function handleRoadmapCreateTypeChange(value: RoadmapType) {
+    setRoadmapCreateDraft((current) => ({
       ...current,
-      topicDescription: value
+      type: value
     }));
   }
 
@@ -1515,6 +2018,28 @@ export function RoadmapView() {
       }),
     [connections, topicById]
   );
+  const roadmapCreateFormCopy = useMemo(
+    () => ({
+      title: language === "ru" ? "Создать roadmap" : "Create roadmap",
+      description:
+        language === "ru"
+          ? "Выберите тип roadmap, задайте название и создайте отдельное пространство обучения."
+          : "Choose a roadmap type, give it a title, and create a dedicated learning space.",
+      roadmapTitleLabel: language === "ru" ? "Название roadmap" : "Roadmap title",
+      roadmapTitlePlaceholder:
+        language === "ru" ? "Например: Engineering Base" : "For example: Engineering Base",
+      typeLabel: language === "ru" ? "Тип roadmap" : "Roadmap type",
+      submitLabel: language === "ru" ? "Создать roadmap" : "Create roadmap",
+      submitLoadingLabel: language === "ru" ? "Создание..." : "Creating...",
+      graphLabel: "Graph",
+      graphDescription: getRoadmapTypeDescription("graph", language),
+      levelsLabel: "Levels",
+      levelsDescription: getRoadmapTypeDescription("levels", language),
+      cyclesLabel: "Cycles",
+      cyclesDescription: getRoadmapTypeDescription("cycles", language)
+    }),
+    [language]
+  );
 
   return (
     <section className="roadmap-view">
@@ -1522,50 +2047,53 @@ export function RoadmapView() {
         <div>
           <h2>{copy.title}</h2>
           <p>{copy.subtitle}</p>
+          {hasActiveRoadmap ? <RoadmapTypePill type={roadmapType} language={language} /> : null}
           <RoadmapSwitcher className="roadmap-switcher roadmap-switcher-roadmap" />
-          {roadmap.state.status === "success" && stages.length > 0 ? (
+          {roadmap.state.status === "success" && hasActiveRoadmap ? (
             <div className="roadmap-header-actions">
-              <div className="roadmap-canvas-controls" role="group" aria-label="Roadmap canvas controls">
-                <button
-                  type="button"
-                  className="button button-outline"
-                  onClick={handleZoomOut}
-                  disabled={sceneTransform.scale <= ROADMAP_MIN_SCALE}
-                  aria-label={copy.zoomOut}
-                >
-                  -
-                </button>
-                <button
-                  type="button"
-                  className="button button-outline"
-                  onClick={handleZoomIn}
-                  disabled={sceneTransform.scale >= ROADMAP_MAX_SCALE}
-                  aria-label={copy.zoomIn}
-                >
-                  +
-                </button>
-                <button
-                  type="button"
-                  className="button button-outline"
-                  onClick={() => recenterGraphScene(1)}
-                >
-                  {copy.recenter}
-                </button>
-                <button
-                  type="button"
-                  className="button button-outline"
-                  onClick={handleFitAll}
-                >
-                  {copy.fitAll}
-                </button>
-              </div>
+              {roadmapType === "graph" && stages.length > 0 ? (
+                <div className="roadmap-canvas-controls" role="group" aria-label="Roadmap canvas controls">
+                  <button
+                    type="button"
+                    className="button button-outline"
+                    onClick={handleZoomOut}
+                    disabled={sceneTransform.scale <= ROADMAP_MIN_SCALE}
+                    aria-label={copy.zoomOut}
+                  >
+                    -
+                  </button>
+                  <button
+                    type="button"
+                    className="button button-outline"
+                    onClick={handleZoomIn}
+                    disabled={sceneTransform.scale >= ROADMAP_MAX_SCALE}
+                    aria-label={copy.zoomIn}
+                  >
+                    +
+                  </button>
+                  <button
+                    type="button"
+                    className="button button-outline"
+                    onClick={() => recenterGraphScene(1)}
+                  >
+                    {copy.recenter}
+                  </button>
+                  <button
+                    type="button"
+                    className="button button-outline"
+                    onClick={handleFitAll}
+                  >
+                    {copy.fitAll}
+                  </button>
+                </div>
+              ) : null}
               <button
                 type="button"
                 className="button button-outline"
                 onClick={(event) => openTopicCreateModal(event.currentTarget)}
                 disabled={isTopicCreating}
               >
-                {copy.topicCreateButton}
+                {roadmapActionLabel}
               </button>
             </div>
           ) : null}
@@ -1599,7 +2127,8 @@ export function RoadmapView() {
       ) : null}
 
       {roadmap.state.status === "success" ? (
-        stages.length > 0 ? (
+        hasActiveRoadmap ? (
+          stages.length > 0 ? (
           <>
             {isTopicCreateModalOpen ? (
               <div className="roadmap-modal-overlay" role="presentation">
@@ -1611,9 +2140,9 @@ export function RoadmapView() {
                 >
                   <div className="roadmap-modal-header">
                     <h4 id="roadmap-topic-create-modal-title">
-                      {topicCreateAnchor
-                        ? copy.topicCreateDirectionTitle(topicCreateAnchor.direction)
-                        : copy.topicCreateTitle}
+            {topicCreateAnchor
+              ? copy.topicCreateDirectionTitle(topicCreateAnchor.direction)
+              : getRoadmapItemCreateTitle(roadmapType, language)}
                     </h4>
                     <button
                       type="button"
@@ -1633,7 +2162,7 @@ export function RoadmapView() {
                     title={
                       topicCreateAnchor && topicCreateAnchorTopic
                         ? copy.topicCreateDirectionTitle(topicCreateAnchor.direction)
-                        : copy.topicCreateTitle
+                        : getRoadmapItemCreateTitle(roadmapType, language)
                     }
                     subtitle={
                       topicCreateAnchor && topicCreateAnchorTopic
@@ -1641,17 +2170,17 @@ export function RoadmapView() {
                             topicCreateAnchorTopic.title,
                             topicCreateAnchor.direction
                           )
-                        : copy.topicCreateSubtitle
+                        : getRoadmapItemCreateSubtitle(roadmapType, language)
                     }
                     submitLabel={
                       topicCreateAnchor
                         ? copy.topicCreateDirectionButton(topicCreateAnchor.direction)
-                        : copy.topicCreateButton
+                        : getRoadmapItemSubmitLabel(roadmapType, language)
                     }
                     submitLoadingLabel={
                       topicCreateAnchor
                         ? copy.topicCreatingDirectionButton(topicCreateAnchor.direction)
-                        : copy.topicCreatingButton
+                        : getRoadmapItemSubmittingLabel(roadmapType, language)
                     }
                     isSubmitting={isTopicCreating}
                     onSubmit={handleTopicCreate}
@@ -1784,6 +2313,42 @@ export function RoadmapView() {
               </div>
             ) : null}
 
+            {roadmapType === "levels" ? (
+              <>
+                <LevelsRoadmapRenderer
+                  topics={allTopics}
+                  copy={copy}
+                  language={language}
+                  onEdit={startTopicEditing}
+                  onOpenWorkspace={handleTopicCardActivate}
+                  onCreateNext={openTopicCreateModal}
+                />
+                {topicMutationError && !isTopicCreateModalOpen ? (
+                  <div className="dashboard-error">
+                    <p>{topicMutationError}</p>
+                  </div>
+                ) : null}
+              </>
+            ) : roadmapType === "cycles" ? (
+              <>
+                <CyclesRoadmapRenderer
+                  topics={allTopics}
+                  copy={copy}
+                  language={language}
+                  onEdit={startTopicEditing}
+                  onOpenWorkspace={handleTopicCardActivate}
+                  onCreateNext={openTopicCreateModal}
+                  onStatusChange={handleStructuredTopicStatusChange}
+                  updatingTopicId={updatingTopicId}
+                />
+                {topicMutationError && !isTopicCreateModalOpen ? (
+                  <div className="dashboard-error">
+                    <p>{topicMutationError}</p>
+                  </div>
+                ) : null}
+              </>
+            ) : (
+              <>
             <div
               className="roadmap-graph"
               ref={graphRef}
@@ -2053,20 +2618,38 @@ export function RoadmapView() {
                 {copy.nextAvailableTopic(nextTopic ? nextTopic.title : copy.noUnlockedTopics)}
               </p>
             </footer>
+              </>
+            )}
           </>
         ) : (
-          <div className="panel roadmap-empty-panel">
-            <p className="dashboard-empty">{copy.empty}</p>
-            <QuickCreatePanel
-              copy={copy}
-              draft={quickCreateDraft}
-              error={quickCreateError}
-              isSubmitting={isQuickCreating}
-              onSubmit={handleQuickCreate}
-              onTopicTitleChange={handleQuickCreateTopicTitleChange}
-              onTopicDescriptionChange={handleQuickCreateTopicDescriptionChange}
+            <TypedRoadmapEmptyState
+              type={roadmapType}
+              language={language}
+              disabled={isTopicCreating}
+              onCreateFirst={openTopicCreateModal}
             />
-          </div>
+          )
+        ) : (
+          isRoadmapCreatePanelOpen ? (
+            <RoadmapCreateForm
+              copy={roadmapCreateFormCopy}
+              draft={roadmapCreateDraft}
+              error={roadmapCreateError}
+              isSubmitting={isRoadmapCreating}
+              onSubmit={handleRoadmapCreate}
+              onTitleChange={handleRoadmapCreateTitleChange}
+              onTypeChange={handleRoadmapCreateTypeChange}
+            />
+          ) : (
+            <RoadmapCreateEntryState
+              language={language}
+              onOpenCreate={() => {
+                setRoadmapCreateError(null);
+                setRoadmapCreateDraft(initialRoadmapCreateDraft());
+                setIsRoadmapCreatePanelOpen(true);
+              }}
+            />
+          )
         )
       ) : null}
     </section>

@@ -1,6 +1,5 @@
 import { NextRequest } from "next/server";
 import {
-  applyDashboardError,
   createDashboardClient,
   dashboardJson,
   dashboardUnavailableResponse,

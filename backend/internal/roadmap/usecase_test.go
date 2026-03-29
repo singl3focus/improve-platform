@@ -11,7 +11,7 @@ import (
 
 // mockRepo implements roadmap.Repository for unit tests.
 type mockRepo struct {
-	createRoadmapFn          func(ctx context.Context, userID, title string) (roadmap.Roadmap, error)
+	createRoadmapFn          func(ctx context.Context, userID, title string, roadmapType roadmap.RoadmapType) (roadmap.Roadmap, error)
 	getRoadmapByUserIDFn     func(ctx context.Context, userID string) (roadmap.Roadmap, error)
 	getRoadmapByIDFn         func(ctx context.Context, id, userID string) (roadmap.Roadmap, error)
 	listRoadmapsFn           func(ctx context.Context, userID string) ([]roadmap.Roadmap, error)
@@ -31,8 +31,8 @@ type mockRepo struct {
 	getTopicMetricsFn        func(ctx context.Context, roadmapID, userID string) (map[string]roadmap.TopicMetrics, error)
 }
 
-func (m *mockRepo) CreateRoadmap(ctx context.Context, userID, title string) (roadmap.Roadmap, error) {
-	return m.createRoadmapFn(ctx, userID, title)
+func (m *mockRepo) CreateRoadmap(ctx context.Context, userID, title string, roadmapType roadmap.RoadmapType) (roadmap.Roadmap, error) {
+	return m.createRoadmapFn(ctx, userID, title, roadmapType)
 }
 func (m *mockRepo) GetRoadmapByUserID(ctx context.Context, userID string) (roadmap.Roadmap, error) {
 	return m.getRoadmapByUserIDFn(ctx, userID)
@@ -146,6 +146,77 @@ func TestCreateTopic_DirectionalSuccess(t *testing.T) {
 	}
 	if len(resp.Dependencies) != 1 || resp.Dependencies[0] != "11111111-1111-1111-1111-111111111111" {
 		t.Fatalf("expected response to include dependency, got %v", resp.Dependencies)
+	}
+}
+
+func TestCreateRoadmap_WithType(t *testing.T) {
+	var receivedType roadmap.RoadmapType
+	repo := &mockRepo{
+		createRoadmapFn: func(_ context.Context, userID, title string, roadmapType roadmap.RoadmapType) (roadmap.Roadmap, error) {
+			if userID != "u-1" || title != "Typed roadmap" {
+				t.Fatalf("unexpected create payload: %s / %s", userID, title)
+			}
+			receivedType = roadmapType
+			return roadmap.Roadmap{
+				ID:    "rm-1",
+				Title: title,
+				Type:  roadmapType,
+			}, nil
+		},
+	}
+
+	uc := roadmap.NewUseCase(repo)
+	resp, err := uc.CreateRoadmap(context.Background(), "u-1", roadmap.CreateRoadmapRequest{
+		Title: "Typed roadmap",
+		Type:  roadmap.RoadmapTypeLevels,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if receivedType != roadmap.RoadmapTypeLevels {
+		t.Fatalf("expected levels type, got %s", receivedType)
+	}
+	if resp.Type != roadmap.RoadmapTypeLevels {
+		t.Fatalf("expected response type levels, got %s", resp.Type)
+	}
+}
+
+func TestCreateRoadmap_InvalidType(t *testing.T) {
+	repo := &mockRepo{}
+	uc := roadmap.NewUseCase(repo)
+
+	_, err := uc.CreateRoadmap(context.Background(), "u-1", roadmap.CreateRoadmapRequest{
+		Title: "Typed roadmap",
+		Type:  roadmap.RoadmapType("invalid"),
+	})
+	if !errors.Is(err, roadmap.ErrInvalidRoadmapType) {
+		t.Fatalf("expected ErrInvalidRoadmapType, got %v", err)
+	}
+}
+
+func TestListRoadmaps_IncludesType(t *testing.T) {
+	repo := &mockRepo{
+		listRoadmapsFn: func(_ context.Context, userID string) ([]roadmap.Roadmap, error) {
+			if userID != "u-1" {
+				t.Fatalf("unexpected userID: %s", userID)
+			}
+			return []roadmap.Roadmap{
+				{ID: "rm-1", Title: "Graph", Type: roadmap.RoadmapTypeGraph, TotalTopics: 4, CompletedTopics: 2},
+				{ID: "rm-2", Title: "Levels", Type: roadmap.RoadmapTypeLevels, TotalTopics: 0, CompletedTopics: 0},
+			}, nil
+		},
+	}
+	uc := roadmap.NewUseCase(repo)
+
+	items, err := uc.ListRoadmaps(context.Background(), "u-1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(items) != 2 {
+		t.Fatalf("expected 2 roadmaps, got %d", len(items))
+	}
+	if items[0].Type != roadmap.RoadmapTypeGraph || items[1].Type != roadmap.RoadmapTypeLevels {
+		t.Fatalf("unexpected roadmap types: %+v", items)
 	}
 }
 
@@ -389,7 +460,7 @@ func TestUpdateTopicStatus_ToInProgress_SetsStartDate(t *testing.T) {
 func TestGetFullRoadmap_WithBlockageInfo(t *testing.T) {
 	repo := &mockRepo{
 		getRoadmapByIDFn: func(_ context.Context, id, _ string) (roadmap.Roadmap, error) {
-			return roadmap.Roadmap{ID: id, Title: "My Roadmap"}, nil
+			return roadmap.Roadmap{ID: id, Title: "My Roadmap", Type: roadmap.RoadmapTypeCycles}, nil
 		},
 		getTopicsByRoadmapIDFn: func(_ context.Context, _, _ string) ([]roadmap.Topic, error) {
 			return []roadmap.Topic{
@@ -419,6 +490,9 @@ func TestGetFullRoadmap_WithBlockageInfo(t *testing.T) {
 	if len(resp.Topics) != 2 {
 		t.Fatalf("expected 2 topics, got %d", len(resp.Topics))
 	}
+	if resp.Type != roadmap.RoadmapTypeCycles {
+		t.Fatalf("expected cycles type, got %s", resp.Type)
+	}
 
 	topicA := resp.Topics[0]
 	if topicA.TasksCount != 0 || topicA.MaterialsCount != 1 || topicA.ProgressPercent != 0 {
@@ -437,7 +511,7 @@ func TestGetFullRoadmap_WithBlockageInfo(t *testing.T) {
 func TestGetFullRoadmap_MetricsZeroValuesWhenMissing(t *testing.T) {
 	repo := &mockRepo{
 		getRoadmapByIDFn: func(_ context.Context, id, _ string) (roadmap.Roadmap, error) {
-			return roadmap.Roadmap{ID: id, Title: "My Roadmap"}, nil
+			return roadmap.Roadmap{ID: id, Title: "My Roadmap", Type: roadmap.RoadmapTypeGraph}, nil
 		},
 		getTopicsByRoadmapIDFn: func(_ context.Context, _, _ string) ([]roadmap.Topic, error) {
 			return []roadmap.Topic{{ID: "t1", Title: "Topic A", Status: "not_started"}}, nil

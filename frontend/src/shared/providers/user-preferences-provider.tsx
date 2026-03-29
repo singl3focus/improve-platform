@@ -18,7 +18,7 @@ interface UserPreferencesContextValue {
   activeRoadmapId: string | null;
   setLanguage: (language: AppLanguage) => void;
   setTheme: (theme: AppTheme) => void;
-  setActiveRoadmapId: (id: string) => void;
+  setActiveRoadmapId: (id: string | null) => void;
 }
 
 const ACTIVE_ROADMAP_KEY = "improve:activeRoadmapId";
@@ -38,9 +38,14 @@ export function UserPreferencesProvider({
     return localStorage.getItem(ACTIVE_ROADMAP_KEY);
   });
 
-  const setActiveRoadmapId = useCallback((id: string) => {
+  const setActiveRoadmapId = useCallback((id: string | null) => {
     setActiveRoadmapIdState(id);
-    localStorage.setItem(ACTIVE_ROADMAP_KEY, id);
+    if (id) {
+      localStorage.setItem(ACTIVE_ROADMAP_KEY, id);
+      return;
+    }
+
+    localStorage.removeItem(ACTIVE_ROADMAP_KEY);
   }, []);
 
   useEffect(() => {

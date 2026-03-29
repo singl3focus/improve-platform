@@ -35,7 +35,7 @@ test.describe("MVP UI flows (Docker stack)", () => {
 
     await mainNav(page).getByRole("link", { name: "Дорожная карта" }).click();
     await expect(page).toHaveURL(/\/roadmap/);
-    await expect(page.locator(".roadmap-quick-create, .roadmap-topic-mutation-panel").first()).toBeVisible({
+    await expect(page.locator(".roadmap-roadmap-create-entry, .roadmap-create-panel, .roadmap-topic-mutation-panel, .roadmap-empty-panel-typed").first()).toBeVisible({
       timeout: 30_000
     });
 

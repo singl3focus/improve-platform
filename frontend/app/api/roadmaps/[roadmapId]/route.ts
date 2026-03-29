@@ -38,6 +38,7 @@ interface BackendFlatRoadmapTopic {
 interface BackendFlatRoadmapResponse {
   id: string;
   title: string;
+  type?: RoadmapResponse["type"];
   topics: BackendFlatRoadmapTopic[];
 }
 
@@ -122,17 +123,6 @@ export async function GET(request: NextRequest, context: RouteContext) {
     );
 
     if (!roadmapResult.response.ok) {
-      if (
-        roadmapResult.response.status === 404 &&
-        isBackendErrorCode(roadmapResult.payload, "roadmap_not_found")
-      ) {
-        const response = NextResponse.json({ stages: [] } satisfies RoadmapResponse, {
-          status: 200
-        });
-        client.applyUpdatedSession(response);
-        return response;
-      }
-
       const errorResponse = createBackendErrorResponse(
         roadmapResult.response,
         roadmapResult.payload,
@@ -151,6 +141,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
           {
             id: (roadmapPayload as BackendFlatRoadmapResponse).id,
             title: (roadmapPayload as BackendFlatRoadmapResponse).title,
+            type: (roadmapPayload as BackendFlatRoadmapResponse).type ?? "graph",
             position: 1,
             topics: Array.isArray((roadmapPayload as BackendFlatRoadmapResponse).topics)
               ? [...(roadmapPayload as BackendFlatRoadmapResponse).topics].sort(
@@ -159,6 +150,9 @@ export async function GET(request: NextRequest, context: RouteContext) {
               : []
           }
         ];
+    const roadmapMeta = isBackendRoadmapResponse(roadmapPayload)
+      ? roadmapPayload
+      : (roadmapPayload as BackendFlatRoadmapResponse);
 
     for (const stage of normalizedStages) {
       const mappedTopics: RoadmapTopic[] = [];
@@ -196,7 +190,12 @@ export async function GET(request: NextRequest, context: RouteContext) {
       });
     }
 
-    const response = NextResponse.json({ stages: mappedStages } satisfies RoadmapResponse, {
+    const response = NextResponse.json({
+      id: roadmapMeta.id,
+      title: roadmapMeta.title,
+      type: roadmapMeta.type ?? "graph",
+      stages: mappedStages
+    } satisfies RoadmapResponse, {
       status: 200
     });
     client.applyUpdatedSession(response);

@@ -28,14 +28,14 @@ func NewRepo(pool *pgxpool.Pool) *Repo {
 
 // --- Roadmap ---
 
-func (r *Repo) CreateRoadmap(ctx context.Context, userID, title string) (Roadmap, error) {
+func (r *Repo) CreateRoadmap(ctx context.Context, userID, title string, roadmapType RoadmapType) (Roadmap, error) {
 	const op apperr.Op = "Repo.CreateRoadmap"
 	var rm Roadmap
 	err := r.pool.QueryRow(ctx,
-		`INSERT INTO roadmaps (user_id, title) VALUES ($1, $2)
-		 RETURNING id, user_id, title, created_at, updated_at`,
-		userID, title,
-	).Scan(&rm.ID, &rm.UserID, &rm.Title, &rm.CreatedAt, &rm.UpdatedAt)
+		`INSERT INTO roadmaps (user_id, title, type) VALUES ($1, $2, $3)
+		 RETURNING id, user_id, title, type, created_at, updated_at`,
+		userID, title, roadmapType,
+	).Scan(&rm.ID, &rm.UserID, &rm.Title, &rm.Type, &rm.CreatedAt, &rm.UpdatedAt)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if apperr.As(err, &pgErr) && pgErr.Code == uniqueViolation {
@@ -50,10 +50,10 @@ func (r *Repo) GetRoadmapByUserID(ctx context.Context, userID string) (Roadmap, 
 	const op apperr.Op = "Repo.GetRoadmapByUserID"
 	var rm Roadmap
 	err := r.pool.QueryRow(ctx,
-		`SELECT id, user_id, title, created_at, updated_at
+		`SELECT id, user_id, title, type, created_at, updated_at
 		 FROM roadmaps WHERE user_id = $1 ORDER BY created_at ASC LIMIT 1`,
 		userID,
-	).Scan(&rm.ID, &rm.UserID, &rm.Title, &rm.CreatedAt, &rm.UpdatedAt)
+	).Scan(&rm.ID, &rm.UserID, &rm.Title, &rm.Type, &rm.CreatedAt, &rm.UpdatedAt)
 	if apperr.Is(err, pgx.ErrNoRows) {
 		return Roadmap{}, apperr.E(op, ErrRoadmapNotFound)
 	}
@@ -64,10 +64,10 @@ func (r *Repo) GetRoadmapByID(ctx context.Context, id, userID string) (Roadmap, 
 	const op apperr.Op = "Repo.GetRoadmapByID"
 	var rm Roadmap
 	err := r.pool.QueryRow(ctx,
-		`SELECT id, user_id, title, created_at, updated_at
+		`SELECT id, user_id, title, type, created_at, updated_at
 		 FROM roadmaps WHERE id = $1 AND user_id = $2`,
 		id, userID,
-	).Scan(&rm.ID, &rm.UserID, &rm.Title, &rm.CreatedAt, &rm.UpdatedAt)
+	).Scan(&rm.ID, &rm.UserID, &rm.Title, &rm.Type, &rm.CreatedAt, &rm.UpdatedAt)
 	if apperr.Is(err, pgx.ErrNoRows) {
 		return Roadmap{}, apperr.E(op, ErrRoadmapNotFound)
 	}
@@ -77,7 +77,7 @@ func (r *Repo) GetRoadmapByID(ctx context.Context, id, userID string) (Roadmap, 
 func (r *Repo) ListRoadmaps(ctx context.Context, userID string) ([]Roadmap, error) {
 	const op apperr.Op = "Repo.ListRoadmaps"
 	rows, err := r.pool.Query(ctx,
-		`SELECT r.id, r.user_id, r.title, r.created_at, r.updated_at,
+		`SELECT r.id, r.user_id, r.title, r.type, r.created_at, r.updated_at,
 		        COALESCE(s.total, 0), COALESCE(s.completed, 0)
 		 FROM roadmaps r
 		 LEFT JOIN LATERAL (
@@ -96,7 +96,7 @@ func (r *Repo) ListRoadmaps(ctx context.Context, userID string) ([]Roadmap, erro
 	var roadmaps []Roadmap
 	for rows.Next() {
 		var rm Roadmap
-		if err := rows.Scan(&rm.ID, &rm.UserID, &rm.Title, &rm.CreatedAt, &rm.UpdatedAt,
+		if err := rows.Scan(&rm.ID, &rm.UserID, &rm.Title, &rm.Type, &rm.CreatedAt, &rm.UpdatedAt,
 			&rm.TotalTopics, &rm.CompletedTopics); err != nil {
 			return nil, apperr.E(op, err)
 		}

@@ -79,6 +79,10 @@ func (h *Handler) CreateRoadmap() http.HandlerFunc {
 			httpresp.Error(w, http.StatusBadRequest, "validation_error", "title is required")
 			return
 		}
+		if !req.Type.IsValid() {
+			httpresp.Error(w, http.StatusBadRequest, "invalid_roadmap_type", "roadmap type must be one of: graph, levels, cycles")
+			return
+		}
 
 		resp, err := h.svc.CreateRoadmap(r.Context(), userID, req)
 		if err != nil {
@@ -385,6 +389,8 @@ func handleError(w http.ResponseWriter, err error) {
 		httpresp.Error(w, http.StatusNotFound, "roadmap_not_found", "roadmap not found")
 	case apperr.Is(err, ErrRoadmapExists):
 		httpresp.Error(w, http.StatusConflict, "roadmap_exists", "roadmap already exists for this user")
+	case apperr.Is(err, ErrInvalidRoadmapType):
+		httpresp.Error(w, http.StatusBadRequest, "invalid_roadmap_type", "roadmap type must be one of: graph, levels, cycles")
 	case apperr.Is(err, ErrTopicNotFound):
 		httpresp.Error(w, http.StatusNotFound, "topic_not_found", "topic not found")
 	case apperr.Is(err, ErrInvalidDirection):

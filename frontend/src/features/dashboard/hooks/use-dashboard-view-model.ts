@@ -165,6 +165,7 @@ function useRoadmapList(copy: DashboardCopy) {
         const mapped: RoadmapListItem[] = raw.map((r) => ({
           id: r.id,
           title: r.title,
+          type: r.type,
           totalTopics: r.total_topics,
           completedTopics: r.completed_topics,
           progressPercent: r.progress_percent,

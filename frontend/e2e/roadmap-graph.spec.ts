@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { registerUser } from "./helpers/auth";
+import { createFirstGraphTopic } from "./helpers/roadmap";
 
 const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 const email = `roadmap.${runId}@example.com`;
@@ -14,16 +15,7 @@ test.describe("Roadmap graph: направления, стрелки, без п�
     page
   }) => {
     await registerUser(page, { email, password, fullName });
-
-    await page.goto("/roadmap");
-    await expect(page.getByRole("heading", { name: "Быстрое создание первой темы" })).toBeVisible({
-      timeout: 30_000
-    });
-
-    await page.getByLabel("Название темы").fill(rootTitle);
-    await page.getByRole("button", { name: "Создать первую тему" }).click();
-
-    await expect(page.locator("article.roadmap-topic-card")).toHaveCount(1, { timeout: 30_000 });
+    await createFirstGraphTopic(page, "Roadmap Graph E2E", rootTitle);
     await expect(page.getByRole("heading", { name: "Дорожная карта обучения" })).toBeVisible();
 
     const rootMenu = page.getByRole("button", { name: `Действия для темы «${rootTitle}»` });
@@ -41,13 +33,7 @@ test.describe("Roadmap graph: направления, стрелки, без п�
       const dialog = page.getByRole("dialog");
       await expect(dialog).toBeVisible();
       await dialog.getByRole("textbox").first().fill(title);
-      const submit =
-        direction === "left"
-          ? "Создать слева"
-          : direction === "right"
-            ? "Создать справа"
-            : "Создать ниже";
-      await dialog.getByRole("button", { name: submit }).click();
+      await dialog.getByRole("button", { name: itemName }).click();
       await expect(dialog).toBeHidden({ timeout: 30_000 });
       await page.keyboard.press("Escape");
     }
@@ -76,13 +62,7 @@ test.describe("Roadmap graph: направления, стрелки, без п�
           const overlapW = Math.min(a.right, b.right) - Math.max(a.left, b.left);
           const overlapH = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
           if (overlapW > 4 && overlapH > 4) {
-            return {
-              ok: false as const,
-              i,
-              j,
-              overlapW,
-              overlapH
-            };
+            return { ok: false as const, i, j, overlapW, overlapH };
           }
         }
       }
@@ -90,10 +70,8 @@ test.describe("Roadmap graph: направления, стрелки, без п�
     });
 
     expect(noTileOverlap.ok, noTileOverlap.ok ? "" : JSON.stringify(noTileOverlap)).toBe(true);
-
     await expect(page.getByText("заблокирован", { exact: false })).toHaveCount(0);
     await expect(page.getByText("blocked", { exact: false })).toHaveCount(0);
-
     await expect(page.locator("ul.roadmap-graph-nodes")).toBeVisible();
 
     const pathDs = await page
@@ -104,8 +82,6 @@ test.describe("Roadmap graph: направления, стрелки, без п�
       expect(d.length).toBeGreaterThan(12);
     }
 
-    // Визуальная регрессия по видимой области (viewport): размеры .roadmap-graph / сетки
-    // могут долго меняться из‑за пересчёта canvas, из‑за чего toHaveScreenshot по элементу нестабилен.
     await expect(page).toHaveScreenshot("roadmap-viewport-four-topics.png", {
       animations: "disabled",
       fullPage: false,
@@ -119,14 +95,7 @@ test.describe("Roadmap graph: направления, стрелки, без п�
     const parentTitle = "E2E Below Parent";
 
     await registerUser(page, { email: belowEmail, password, fullName: "Below E2E" });
-
-    await page.goto("/roadmap");
-    await expect(page.getByRole("heading", { name: "Быстрое создание первой темы" })).toBeVisible({
-      timeout: 30_000
-    });
-    await page.getByLabel("Название темы").fill(parentTitle);
-    await page.getByRole("button", { name: "Создать первую тему" }).click();
-    await expect(page.locator("article.roadmap-topic-card")).toHaveCount(1, { timeout: 30_000 });
+    await createFirstGraphTopic(page, "Below Graph E2E", parentTitle);
 
     const parentMenu = page.getByRole("button", { name: `Действия для темы «${parentTitle}»` });
 
@@ -147,7 +116,6 @@ test.describe("Roadmap graph: направления, стрелки, без п�
     await createBelow("E2E Below 2");
     await expect(page.locator("article.roadmap-topic-card")).toHaveCount(3, { timeout: 30_000 });
 
-    // Проверяем: дочерние карточки «снизу» на одной горизонтальной линии
     const layout = await page.evaluate(() => {
       const cards = [...document.querySelectorAll<HTMLElement>(".roadmap-topic-card")];
       return cards.map((el) => {
@@ -160,19 +128,14 @@ test.describe("Roadmap graph: направления, стрелки, без п�
     const below2 = layout.find((c) => c.title.includes("Below 2"));
     expect(below1).toBeTruthy();
     expect(below2).toBeTruthy();
-
-    // Одинаковый top (±10px) = одна строка
     expect(Math.abs(below1!.top - below2!.top)).toBeLessThan(10);
-    // Разный left = разные столбцы
     expect(Math.abs(below1!.left - below2!.left)).toBeGreaterThan(50);
 
-    // Стрелки от родителя к каждому дочернему
     const arrowPaths = page.locator(
       "svg.roadmap-connections path.roadmap-connection:not(.roadmap-connection-preview)"
     );
     await expect(arrowPaths).toHaveCount(2);
 
-    // Нет пересечений карточек
     const noOverlap = await page.evaluate(() => {
       const nodes = [...document.querySelectorAll<HTMLElement>(".roadmap-topic-card")];
       const rects = nodes.map((el) => el.getBoundingClientRect());
@@ -196,14 +159,7 @@ test.describe("Roadmap graph: направления, стрелки, без п�
     const parentTitle = "E2E Right Parent";
 
     await registerUser(page, { email: rightEmail, password, fullName: "Right E2E" });
-
-    await page.goto("/roadmap");
-    await expect(page.getByRole("heading", { name: "Быстрое создание первой темы" })).toBeVisible({
-      timeout: 30_000
-    });
-    await page.getByLabel("Название темы").fill(parentTitle);
-    await page.getByRole("button", { name: "Создать первую тему" }).click();
-    await expect(page.locator("article.roadmap-topic-card")).toHaveCount(1, { timeout: 30_000 });
+    await createFirstGraphTopic(page, "Right Graph E2E", parentTitle);
 
     const parentMenu = page.getByRole("button", { name: `Действия для темы «${parentTitle}»` });
 
@@ -224,7 +180,6 @@ test.describe("Roadmap graph: направления, стрелки, без п�
     await createRight("E2E Right 2");
     await expect(page.locator("article.roadmap-topic-card")).toHaveCount(3, { timeout: 30_000 });
 
-    // Проверяем: дочерние карточки «справа» в одном вертикальном столбце
     const layout = await page.evaluate(() => {
       const cards = [...document.querySelectorAll<HTMLElement>(".roadmap-topic-card")];
       return cards.map((el) => {
@@ -237,19 +192,14 @@ test.describe("Roadmap graph: направления, стрелки, без п�
     const right2 = layout.find((c) => c.title.includes("Right 2"));
     expect(right1).toBeTruthy();
     expect(right2).toBeTruthy();
-
-    // Одинаковый left (±10px) = один столбец
     expect(Math.abs(right1!.left - right2!.left)).toBeLessThan(10);
-    // Разный top = разные строки
     expect(Math.abs(right1!.top - right2!.top)).toBeGreaterThan(50);
 
-    // Стрелки от родителя к каждому дочернему
     const arrowPaths = page.locator(
       "svg.roadmap-connections path.roadmap-connection:not(.roadmap-connection-preview)"
     );
     await expect(arrowPaths).toHaveCount(2);
 
-    // Нет пересечений карточек
     const noOverlap = await page.evaluate(() => {
       const nodes = [...document.querySelectorAll<HTMLElement>(".roadmap-topic-card")];
       const rects = nodes.map((el) => el.getBoundingClientRect());

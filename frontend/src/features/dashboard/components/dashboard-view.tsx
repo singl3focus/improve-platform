@@ -9,16 +9,35 @@ import {
   isDashboardTaskOverdue,
   useDashboardViewModel
 } from "@features/dashboard/hooks/use-dashboard-view-model";
-import type { DashboardChartsPayload, DashboardFocus, DashboardFocusTask, DashboardHistoryEvent } from "@features/dashboard/types";
+import type { DashboardChartsPayload } from "@features/dashboard/types";
 import type { DashboardCopy } from "@shared/i18n/ui-copy";
 import { DashboardCalendarRibbon } from "@features/dashboard/components/dashboard-calendar-ribbon";
 import { ActivityHeatmap } from "@features/dashboard/components/activity-heatmap";
 import {
-  formatHistoryEventTitle,
+  formatHistoryEventBadge,
   formatHistoryEventSubtitle,
-  formatHistoryEventBadge
+  formatHistoryEventTitle
 } from "@features/history/lib/format-history-event";
 import { authFetch } from "@features/auth/lib/auth-fetch";
+
+const MOMENTUM_COPY = {
+  ru: {
+    title: "Динамика обучения",
+    description: "Темп недели, фокус и общее движение вперёд.",
+    focusHours: "Фокус-часы",
+    roadmap: "Закрыто тем",
+    activePlans: "Активных карт",
+    weeklyReviewNote: "Пять минут на разбор недели и следующего шага."
+  },
+  en: {
+    title: "Learning momentum",
+    description: "Weekly pace, focus rhythm, and visible forward motion.",
+    focusHours: "Focus hours",
+    roadmap: "Topics closed",
+    activePlans: "Active plans",
+    weeklyReviewNote: "Take five minutes to review the week and the next move."
+  }
+} as const;
 
 function DashboardPanel({
   title,
@@ -119,10 +138,6 @@ function formatChartDayLabel(value: string, locale: string): string {
   }).format(date);
 }
 
-function formatHistorySubtitleLegacy(entry: DashboardHistoryEvent, locale: string, copy: DashboardCopy): string {
-  return `${entry.entityType} · ${entry.eventType} · ${formatDashboardDate(entry.createdAt, locale, copy.noDate)}`;
-}
-
 function DashboardCharts({
   copy,
   locale,
@@ -187,7 +202,9 @@ function DashboardCharts({
                         style={{ width: `${Math.round((item.value / topicsByStatusMax) * 100)}%` }}
                       />
                     </div>
-                    <strong>{item.value} ({pct}%)</strong>
+                    <strong>
+                      {item.value} ({pct}%)
+                    </strong>
                   </li>
                 );
               })}
@@ -211,7 +228,6 @@ function DashboardCharts({
               ))}
             </ul>
           </section>
-
         </div>
       )}
       <button type="button" className="button button-outline dashboard-chart-retry" onClick={onRetry}>
@@ -223,18 +239,25 @@ function DashboardCharts({
 
 function focusPriorityLabel(level: string, copy: DashboardCopy): string {
   switch (level) {
-    case "overdue": return copy.focusPriorityOverdue;
-    case "due_today": return copy.focusPriorityToday;
-    case "in_progress": return copy.focusPriorityActive;
-    default: return copy.focusPriorityActive;
+    case "overdue":
+      return copy.focusPriorityOverdue;
+    case "due_today":
+      return copy.focusPriorityToday;
+    case "in_progress":
+      return copy.focusPriorityActive;
+    default:
+      return copy.focusPriorityActive;
   }
 }
 
 function focusPriorityClass(level: string): string {
   switch (level) {
-    case "overdue": return "dashboard-badge-overdue";
-    case "due_today": return "dashboard-badge-today";
-    default: return "";
+    case "overdue":
+      return "dashboard-badge-overdue";
+    case "due_today":
+      return "dashboard-badge-today";
+    default:
+      return "";
   }
 }
 
@@ -258,6 +281,20 @@ export function DashboardView() {
     todayLabel
   } = useDashboardViewModel();
 
+  const momentumCopy = language === "ru" ? MOMENTUM_COPY.ru : MOMENTUM_COPY.en;
+  const focusHoursValue =
+    progress.state.status === "success" && progress.state.data
+      ? `${progress.state.data.focusHoursCompleted}/${progress.state.data.focusHoursTarget}`
+      : "—";
+  const completedTopicsValue =
+    progress.state.status === "success" && progress.state.data
+      ? `${progress.state.data.completedTopics}/${progress.state.data.totalTopics}`
+      : "—";
+  const activePlansValue =
+    roadmapList.state.status === "success" && roadmapList.state.data
+      ? `${roadmapList.state.data.length}`
+      : "—";
+
   function onHeroKeyDown(event: KeyboardEvent<HTMLElement>, href: string) {
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
@@ -273,115 +310,190 @@ export function DashboardView() {
       </section>
 
       <DashboardCalendarRibbon locale={locale} />
-      <ActivityHeatmap />
 
-      {/* Focus Today block */}
-      <section className="dashboard-focus panel" style={{ padding: "1rem", marginBottom: "1rem" }}>
-        <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
-          <h3>{dashboardCopy.focusToday}</h3>
-          <span style={{ fontSize: "0.85rem", color: "var(--color-text-muted)" }}>{todayLabel}</span>
-        </header>
-        {focus.state.status === "loading" ? <DashboardLoading lines={3} /> : null}
-        {focus.state.status === "error" ? (
-          <DashboardError
-            message={focus.state.errorMessage ?? dashboardCopy.blockLoadFailed}
-            onRetry={focus.reload}
-            retryLabel={dashboardCopy.retry}
-          />
-        ) : null}
-        {focus.state.status === "success" && focus.state.data ? (
-          !focus.state.data.primaryTask ? (
-            <div className="dashboard-empty">
-              <p>{dashboardCopy.focusEmptyState}</p>
-              <button type="button" className="button button-outline" style={{ marginTop: "0.5rem" }}
-                onClick={() => router.push("/tasks")}>
-                {dashboardCopy.open}
-              </button>
+      <section className="dashboard-hero dashboard-hero-ranked">
+        <section className="dashboard-focus panel dashboard-focus-panel">
+          <header className="dashboard-focus-header">
+            <div>
+              <p className="dashboard-eyebrow">{dashboardCopy.focusToday}</p>
+              <h3>{dashboardCopy.focusToday}</h3>
             </div>
-          ) : (
-            <>
-              <div style={{ marginBottom: "0.75rem" }}>
-                <span className={`dashboard-badge ${focusPriorityClass(focus.state.data.primaryTask.priorityLevel)}`}>
-                  {focusPriorityLabel(focus.state.data.primaryTask.priorityLevel, dashboardCopy)}
-                </span>
-                <p className="dashboard-list-title" style={{ marginTop: "0.25rem", fontSize: "1.05rem" }}>
-                  {focus.state.data.primaryTask.title}
-                </p>
-                <p className="dashboard-list-subtitle">
-                  {focus.state.data.primaryTask.topicTitle ?? dashboardCopy.noTopic}
-                  {" · "}
-                  {focus.state.data.primaryTask.deadline
-                    ? `Due: ${focus.state.data.primaryTask.deadline}`
-                    : dashboardCopy.focusNoDue}
-                </p>
-                <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem" }}>
-                  <button type="button" className="button" style={{ fontSize: "0.85rem" }}
-                    onClick={async (e) => {
-                      e.stopPropagation();
-                      const taskId = focus.state.data?.primaryTask?.id;
-                      if (!taskId) return;
-                      await authFetch(`/api/tasks/${encodeURIComponent(taskId)}/status`, {
-                        method: "PATCH",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ status: "done" })
-                      });
-                      focus.reload();
-                    }}>
-                    {dashboardCopy.focusMarkDone}
-                  </button>
-                  <button type="button" className="button button-outline" style={{ fontSize: "0.85rem" }}
-                    onClick={() => router.push("/tasks")}>
-                    {dashboardCopy.open} →
-                  </button>
-                </div>
+            <span className="dashboard-focus-date">{todayLabel}</span>
+          </header>
+
+          {focus.state.status === "loading" ? <DashboardLoading lines={3} /> : null}
+          {focus.state.status === "error" ? (
+            <DashboardError
+              message={focus.state.errorMessage ?? dashboardCopy.blockLoadFailed}
+              onRetry={focus.reload}
+              retryLabel={dashboardCopy.retry}
+            />
+          ) : null}
+          {focus.state.status === "success" && focus.state.data ? (
+            !focus.state.data.primaryTask ? (
+              <div className="dashboard-empty dashboard-focus-empty">
+                <p>{dashboardCopy.focusEmptyState}</p>
+                <button
+                  type="button"
+                  className="button button-outline"
+                  onClick={() => router.push("/tasks")}
+                >
+                  {dashboardCopy.open}
+                </button>
               </div>
+            ) : (
+              <>
+                <div className="dashboard-focus-main">
+                  <div className="dashboard-focus-copy">
+                    <span
+                      className={`dashboard-badge ${focusPriorityClass(
+                        focus.state.data.primaryTask.priorityLevel
+                      )}`}
+                    >
+                      {focusPriorityLabel(
+                        focus.state.data.primaryTask.priorityLevel,
+                        dashboardCopy
+                      )}
+                    </span>
+                    <p className="dashboard-focus-title">{focus.state.data.primaryTask.title}</p>
+                    <p className="dashboard-focus-subtitle">
+                      {focus.state.data.primaryTask.topicTitle ?? dashboardCopy.noTopic}
+                      {" · "}
+                      {focus.state.data.primaryTask.deadline
+                        ? `Due: ${focus.state.data.primaryTask.deadline}`
+                        : dashboardCopy.focusNoDue}
+                    </p>
+                  </div>
 
-              {focus.state.data.secondaryTasks.length > 0 && (
-                <div style={{ borderTop: "1px solid var(--color-border)", paddingTop: "0.5rem" }}>
-                  <p style={{ fontSize: "0.85rem", fontWeight: 500, marginBottom: "0.25rem" }}>
-                    {dashboardCopy.focusAlsoToday}
-                  </p>
-                  <ul className="dashboard-list">
-                    {focus.state.data.secondaryTasks.map((task) => (
-                      <li key={task.id} className="dashboard-list-item">
-                        <div>
-                          <p className="dashboard-list-title">{task.title}</p>
-                          <p className="dashboard-list-subtitle">
-                            {task.topicTitle ?? dashboardCopy.noTopic}
-                          </p>
-                        </div>
-                        <button type="button" className="button button-outline"
-                          style={{ fontSize: "0.75rem", padding: "0.15rem 0.4rem" }}
-                          onClick={(e) => { e.stopPropagation(); router.push("/tasks"); }}>
-                          →
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {focus.state.data.continueTopic && (
-                <div style={{ borderTop: "1px solid var(--color-border)", paddingTop: "0.5rem", marginTop: "0.5rem" }}>
-                  <p style={{ fontSize: "0.85rem", fontWeight: 500, marginBottom: "0.25rem" }}>
-                    {dashboardCopy.focusContinue}
-                  </p>
-                  <div className="dashboard-list-item" style={{ cursor: "pointer" }}
-                    onClick={() => router.push(`/topics?topicId=${focus.state.data!.continueTopic!.id}`)}>
-                    <div>
-                      <p className="dashboard-list-title">{focus.state.data.continueTopic.title}</p>
-                      <p className="dashboard-list-subtitle">
-                        Last: {focus.state.data.continueTopic.lastTaskTitle}
-                      </p>
-                    </div>
-                    <span className="dashboard-badge">{focus.state.data.continueTopic.progressPercent}%</span>
+                  <div className="dashboard-focus-actions">
+                    <button
+                      type="button"
+                      className="button button-primary"
+                      onClick={async (event) => {
+                        event.stopPropagation();
+                        const taskId = focus.state.data?.primaryTask?.id;
+                        if (!taskId) return;
+                        await authFetch(`/api/tasks/${encodeURIComponent(taskId)}/status`, {
+                          method: "PATCH",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ status: "done" })
+                        });
+                        focus.reload();
+                      }}
+                    >
+                      {dashboardCopy.focusMarkDone}
+                    </button>
+                    <button
+                      type="button"
+                      className="button button-outline"
+                      onClick={() => router.push("/tasks")}
+                    >
+                      {dashboardCopy.open}
+                    </button>
                   </div>
                 </div>
-              )}
-            </>
-          )
-        ) : null}
+
+                {focus.state.data.secondaryTasks.length > 0 ? (
+                  <div className="dashboard-focus-support">
+                    <p className="dashboard-focus-section-label">{dashboardCopy.focusAlsoToday}</p>
+                    <ul className="dashboard-list dashboard-focus-list">
+                      {focus.state.data.secondaryTasks.map((task) => (
+                        <li key={task.id} className="dashboard-list-item">
+                          <div>
+                            <p className="dashboard-list-title">{task.title}</p>
+                            <p className="dashboard-list-subtitle">
+                              {task.topicTitle ?? dashboardCopy.noTopic}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            className="button button-outline dashboard-list-mini-action"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              router.push("/tasks");
+                            }}
+                          >
+                            →
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+
+                {focus.state.data.continueTopic ? (
+                  <div className="dashboard-focus-support">
+                    <p className="dashboard-focus-section-label">{dashboardCopy.focusContinue}</p>
+                    <div
+                      className="dashboard-list-item dashboard-focus-topic"
+                      onClick={() =>
+                        router.push(`/topics?topicId=${focus.state.data!.continueTopic!.id}`)
+                      }
+                    >
+                      <div>
+                        <p className="dashboard-list-title">{focus.state.data.continueTopic.title}</p>
+                        <p className="dashboard-list-subtitle">
+                          Last: {focus.state.data.continueTopic.lastTaskTitle}
+                        </p>
+                      </div>
+                      <span className="dashboard-badge">
+                        {focus.state.data.continueTopic.progressPercent}%
+                      </span>
+                    </div>
+                  </div>
+                ) : null}
+              </>
+            )
+          ) : null}
+        </section>
+
+        <section className="dashboard-hero-progress panel dashboard-momentum-panel">
+          <header className="dashboard-momentum-header">
+            <div>
+              <p className="dashboard-eyebrow">{momentumCopy.title}</p>
+              <h3>{momentumCopy.title}</h3>
+              <p>{momentumCopy.description}</p>
+            </div>
+            <span className="dashboard-momentum-pill">{roadmapProgressLabel}</span>
+          </header>
+
+          <div className="dashboard-momentum-grid">
+            <article className="dashboard-momentum-card">
+              <span>{momentumCopy.focusHours}</span>
+              <strong>{focusHoursValue}</strong>
+            </article>
+            <article className="dashboard-momentum-card">
+              <span>{momentumCopy.roadmap}</span>
+              <strong>{completedTopicsValue}</strong>
+            </article>
+            <article className="dashboard-momentum-card">
+              <span>{momentumCopy.activePlans}</span>
+              <strong>{activePlansValue}</strong>
+            </article>
+          </div>
+
+          {progress.state.status === "loading" ? <DashboardLoading lines={2} /> : null}
+          {progress.state.status === "error" ? (
+            <DashboardError
+              message={progress.state.errorMessage ?? dashboardCopy.roadmapProgressLoadFailed}
+              onRetry={progress.reload}
+              retryLabel={dashboardCopy.retry}
+            />
+          ) : null}
+          {progress.state.status === "success" && progress.state.data ? (
+            <div className="dashboard-momentum-progress">
+              <div className="dashboard-progress-track">
+                <span
+                  className="dashboard-progress-fill"
+                  style={{ width: `${progress.state.data.roadmapProgressPercent}%` }}
+                />
+              </div>
+            </div>
+          ) : null}
+        </section>
       </section>
+
+      <ActivityHeatmap />
 
       {charts.state.status === "loading" ? (
         <section className="dashboard-charts panel">
@@ -452,41 +564,27 @@ export function DashboardView() {
           ) : null}
         </div>
 
-        <div
-          className="dashboard-hero-progress dashboard-hero-clickable"
-          role="link"
-          tabIndex={0}
-          onClick={() => router.push("/roadmap")}
-          onKeyDown={(event) => onHeroKeyDown(event, "/roadmap")}
-        >
+        <div className="dashboard-hero-progress dashboard-hero-secondary panel">
           <p className="dashboard-hero-progress-title">{dashboardCopy.roadmapProgressTitle}</p>
           <p className="dashboard-hero-progress-value">{roadmapProgressLabel}</p>
-          {progress.state.status === "loading" ? <DashboardLoading lines={1} /> : null}
-          {progress.state.status === "error" ? (
-            <DashboardError
-              message={progress.state.errorMessage ?? dashboardCopy.roadmapProgressLoadFailed}
-              onRetry={progress.reload}
-              retryLabel={dashboardCopy.retry}
-            />
-          ) : null}
           {progress.state.status === "success" && progress.state.data ? (
             hasRoadmapProgress(progress.state.data) ? (
               roadmapList.state.status === "success" &&
               roadmapList.state.data &&
               roadmapList.state.data.length > 1 ? (
                 <div className="dashboard-roadmap-list">
-                  {roadmapList.state.data.map((rm) => (
-                    <div key={rm.id} className="dashboard-roadmap-item">
+                  {roadmapList.state.data.map((roadmap) => (
+                    <div key={roadmap.id} className="dashboard-roadmap-item">
                       <div className="dashboard-roadmap-item-header">
-                        <span className="dashboard-roadmap-item-title">{rm.title}</span>
+                        <span className="dashboard-roadmap-item-title">{roadmap.title}</span>
                         <span className="dashboard-roadmap-item-stats">
-                          {rm.completedTopics}/{rm.totalTopics}
+                          {roadmap.completedTopics}/{roadmap.totalTopics}
                         </span>
                       </div>
                       <div className="dashboard-progress-track dashboard-progress-track--mini">
                         <span
                           className="dashboard-progress-fill"
-                          style={{ width: `${rm.progressPercent}%` }}
+                          style={{ width: `${roadmap.progressPercent}%` }}
                         />
                       </div>
                     </div>
@@ -572,7 +670,11 @@ export function DashboardView() {
                         <p className="dashboard-list-subtitle">
                           {dashboardCopy.openedAt(
                             material.topicTitle,
-                            formatDashboardDate(material.lastOpenedAt, locale, dashboardCopy.noDate)
+                            formatDashboardDate(
+                              material.lastOpenedAt,
+                              locale,
+                              dashboardCopy.noDate
+                            )
                           )}
                         </p>
                       </div>
@@ -652,12 +754,20 @@ export function DashboardView() {
                   {history.state.data.map((entry) => (
                     <li key={entry.id} className="dashboard-list-item">
                       <div>
-                        <p className="dashboard-list-title">{formatHistoryEventTitle(entry, language)}</p>
+                        <p className="dashboard-list-title">
+                          {formatHistoryEventTitle(entry, language)}
+                        </p>
                         <p className="dashboard-list-subtitle">
-                          {formatHistoryEventSubtitle(entry, language, formatDashboardDate(entry.createdAt, locale, dashboardCopy.noDate))}
+                          {formatHistoryEventSubtitle(
+                            entry,
+                            language,
+                            formatDashboardDate(entry.createdAt, locale, dashboardCopy.noDate)
+                          )}
                         </p>
                       </div>
-                      <span className="dashboard-badge">{formatHistoryEventBadge(entry, language)}</span>
+                      <span className="dashboard-badge">
+                        {formatHistoryEventBadge(entry, language)}
+                      </span>
                     </li>
                   ))}
                 </ul>
@@ -667,15 +777,12 @@ export function DashboardView() {
         </div>
       </div>
 
-      {/* Weekly Review banner */}
-      <section className="panel" style={{ padding: "1rem", marginTop: "1rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div>
+      <section className="panel dashboard-review-banner">
+        <div className="dashboard-review-copy">
           <button type="button" className="button" onClick={() => router.push("/weekly-review")}>
             {dashboardCopy.weeklyReviewCTA}
           </button>
-          <span style={{ marginLeft: "0.75rem", fontSize: "0.85rem", color: "var(--color-text-muted)" }}>
-            Take 5 min to reflect on your week
-          </span>
+          <span className="dashboard-review-note">{momentumCopy.weeklyReviewNote}</span>
         </div>
       </section>
     </div>

@@ -37,6 +37,18 @@ async function saveReflectionAPI(reflection: string): Promise<void> {
   }
 }
 
+async function createTaskAPI(title: string): Promise<{ id: string }> {
+  const response = await authFetch("/api/tasks", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title })
+  });
+  if (!response.ok) {
+    throw new Error("Failed to create task");
+  }
+  return (await response.json()) as { id: string };
+}
+
 async function setTasksAPI(taskIds: string[]): Promise<void> {
   const response = await authFetch("/api/today/tasks", {
     method: "PUT",
@@ -110,6 +122,19 @@ export function useTodayViewModel() {
     }
   });
 
+  const createTaskMutation = useMutation({
+    mutationFn: async (title: string) => {
+      const createdTask = await createTaskAPI(title);
+      const currentTaskIds =
+        queryClient.getQueryData<TodayResponse>([TODAY_QUERY_KEY])?.tasks.map((task) => task.id) ?? [];
+      await setTasksAPI([...currentTaskIds, createdTask.id]);
+      return createdTask;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [TODAY_QUERY_KEY] });
+    }
+  });
+
   const toggleTask = useCallback(
     (taskId: string) => {
       const task = today?.tasks.find((t) => t.id === taskId);
@@ -135,6 +160,8 @@ export function useTodayViewModel() {
     reflectionDraft,
     setReflectionDraft,
     setTasksMutation,
-    reflectionSaving: reflectionMutation.isPending
+    reflectionSaving: reflectionMutation.isPending,
+    createTodayTask: (title: string) => createTaskMutation.mutateAsync(title),
+    creatingTask: createTaskMutation.isPending
   };
 }

@@ -57,6 +57,7 @@ func (uc *UseCase) ListRoadmaps(ctx context.Context, userID string) ([]RoadmapLi
 		items = append(items, RoadmapListItem{
 			ID:              rm.ID,
 			Title:           rm.Title,
+			Type:            rm.Type,
 			TotalTopics:     rm.TotalTopics,
 			CompletedTopics: rm.CompletedTopics,
 			ProgressPercent: pct,
@@ -69,7 +70,11 @@ func (uc *UseCase) ListRoadmaps(ctx context.Context, userID string) ([]RoadmapLi
 
 func (uc *UseCase) CreateRoadmap(ctx context.Context, userID string, req CreateRoadmapRequest) (RoadmapResponse, error) {
 	const op apperr.Op = "UseCase.CreateRoadmap"
-	rm, err := uc.repo.CreateRoadmap(ctx, userID, req.Title)
+	if !req.Type.IsValid() {
+		return RoadmapResponse{}, apperr.E(op, ErrInvalidRoadmapType)
+	}
+
+	rm, err := uc.repo.CreateRoadmap(ctx, userID, req.Title, req.Type)
 	if err != nil {
 		return RoadmapResponse{}, apperr.E(op, err)
 	}
@@ -77,12 +82,13 @@ func (uc *UseCase) CreateRoadmap(ctx context.Context, userID string, req CreateR
 	uc.record(ctx, history.Event{
 		UserID: userID, EntityType: "roadmap", EntityID: rm.ID,
 		EventType: "technical", EventName: "entity.created",
-		Payload: map[string]any{"title": rm.Title},
+		Payload: map[string]any{"title": rm.Title, "type": rm.Type},
 	})
 
 	return RoadmapResponse{
 		ID:           rm.ID,
 		Title:        rm.Title,
+		Type:         rm.Type,
 		CreatedAt:    rm.CreatedAt,
 		UpdatedAt:    rm.UpdatedAt,
 		Topics:       []TopicResponse{},
@@ -399,6 +405,7 @@ func (uc *UseCase) assembleRoadmap(rm Roadmap, topics []Topic, deps []TopicDep, 
 	return RoadmapResponse{
 		ID:           rm.ID,
 		Title:        rm.Title,
+		Type:         rm.Type,
 		CreatedAt:    rm.CreatedAt,
 		UpdatedAt:    rm.UpdatedAt,
 		Topics:       topicResponses,

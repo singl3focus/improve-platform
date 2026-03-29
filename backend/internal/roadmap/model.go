@@ -9,6 +9,7 @@ import (
 var (
 	ErrRoadmapNotFound    = errors.New("roadmap not found")
 	ErrRoadmapExists      = errors.New("roadmap already exists")
+	ErrInvalidRoadmapType = errors.New("invalid roadmap type")
 	ErrTopicNotFound      = errors.New("topic not found")
 	ErrInvalidDirection   = errors.New("invalid create direction")
 	ErrCycleDetected      = errors.New("dependency would create a cycle")
@@ -21,10 +22,28 @@ var (
 
 // Domain models
 
+type RoadmapType string
+
+const (
+	RoadmapTypeGraph  RoadmapType = "graph"
+	RoadmapTypeLevels RoadmapType = "levels"
+	RoadmapTypeCycles RoadmapType = "cycles"
+)
+
+func (t RoadmapType) IsValid() bool {
+	switch t {
+	case RoadmapTypeGraph, RoadmapTypeLevels, RoadmapTypeCycles:
+		return true
+	default:
+		return false
+	}
+}
+
 type Roadmap struct {
 	ID              string
 	UserID          string
 	Title           string
+	Type            RoadmapType
 	TotalTopics     int
 	CompletedTopics int
 	CreatedAt       time.Time
@@ -64,7 +83,8 @@ type TopicMetrics struct {
 // Request types
 
 type CreateRoadmapRequest struct {
-	Title string `json:"title"`
+	Title string      `json:"title"`
+	Type  RoadmapType `json:"type"`
 }
 
 type UpdateRoadmapRequest struct {
@@ -124,18 +144,20 @@ type AddDependencyRequest struct {
 // Response types
 
 type RoadmapListItem struct {
-	ID              string    `json:"id"`
-	Title           string    `json:"title"`
-	TotalTopics     int       `json:"total_topics"`
-	CompletedTopics int       `json:"completed_topics"`
-	ProgressPercent int       `json:"progress_percent"`
-	CreatedAt       time.Time `json:"created_at"`
-	UpdatedAt       time.Time `json:"updated_at"`
+	ID              string      `json:"id"`
+	Title           string      `json:"title"`
+	Type            RoadmapType `json:"type"`
+	TotalTopics     int         `json:"total_topics"`
+	CompletedTopics int         `json:"completed_topics"`
+	ProgressPercent int         `json:"progress_percent"`
+	CreatedAt       time.Time   `json:"created_at"`
+	UpdatedAt       time.Time   `json:"updated_at"`
 }
 
 type RoadmapResponse struct {
 	ID           string                    `json:"id"`
 	Title        string                    `json:"title"`
+	Type         RoadmapType               `json:"type"`
 	CreatedAt    time.Time                 `json:"created_at"`
 	UpdatedAt    time.Time                 `json:"updated_at"`
 	Topics       []TopicResponse           `json:"topics"`
@@ -170,7 +192,7 @@ type TopicDependencyResponse struct {
 // Interfaces
 
 type Repository interface {
-	CreateRoadmap(ctx context.Context, userID, title string) (Roadmap, error)
+	CreateRoadmap(ctx context.Context, userID, title string, roadmapType RoadmapType) (Roadmap, error)
 	GetRoadmapByUserID(ctx context.Context, userID string) (Roadmap, error)
 	GetRoadmapByID(ctx context.Context, id, userID string) (Roadmap, error)
 	ListRoadmaps(ctx context.Context, userID string) ([]Roadmap, error)

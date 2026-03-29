@@ -1,8 +1,11 @@
+export type RoadmapType = "graph" | "levels" | "cycles";
+
 export type RoadmapTopicStatus = "not_started" | "in_progress" | "paused" | "completed";
 
 export interface RoadmapListItem {
   id: string;
   title: string;
+  type: RoadmapType;
   totalTopics: number;
   completedTopics: number;
   progressPercent: number;
@@ -33,6 +36,9 @@ export interface RoadmapStage {
 }
 
 export interface RoadmapResponse {
+  id?: string;
+  title?: string;
+  type?: RoadmapType;
   stages?: RoadmapStage[];
   topics?: RoadmapTopic[];
 }

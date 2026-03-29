@@ -156,9 +156,8 @@ function NoteEditor({
 }
 
 export function TopicNotes({ topicId }: { topicId: string }) {
-  const { copy: appCopy } = useUserPreferences();
-  const isRu = appCopy.navigation.ariaPrimary === "Основная навигация";
-  const copy = isRu ? RU_NOTES : EN_NOTES;
+  const { language } = useUserPreferences();
+  const copy = language === "ru" ? RU_NOTES : EN_NOTES;
   const queryClient = useQueryClient();
   const [collapsed, setCollapsed] = useState(false);
   const [activeNoteId, setActiveNoteId] = useState<string | null>(null);

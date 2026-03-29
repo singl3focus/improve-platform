@@ -4,34 +4,42 @@ import { ReactNode, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
-  Sun,
-  LayoutDashboard,
-  Map,
-  ListTodo,
   Library,
+  LayoutDashboard,
+  ListTodo,
   LogOut,
   LucideIcon,
+  Map,
+  Sparkles,
+  Sun
 } from "lucide-react";
 import { useUserPreferences } from "@shared/providers/user-preferences-provider";
 import { logout } from "@features/auth/lib/client";
 import { useCurrentUser } from "@features/profile/hooks/use-profile-view-model";
+import type { AppCopy } from "@shared/i18n/ui-copy";
 
 function getInitials(name: string): string {
   return name
     .trim()
     .split(/\s+/)
     .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase() ?? "")
+    .map((word) => word[0]?.toUpperCase() ?? "")
     .join("");
 }
 
 function getAvatarColor(name: string): string {
   const colors = [
-    "#2a7de1", "#7c3aed", "#059669", "#d97706",
-    "#dc2626", "#0891b2", "#be185d", "#65a30d"
+    "#2a7de1",
+    "#7c3aed",
+    "#059669",
+    "#d97706",
+    "#dc2626",
+    "#0891b2",
+    "#be185d",
+    "#65a30d"
   ];
   let hash = 0;
-  for (let i = 0; i < name.length; i++) {
+  for (let i = 0; i < name.length; i += 1) {
     hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
   }
   return colors[hash % colors.length];
@@ -55,11 +63,20 @@ const MAIN_NAV_ITEMS: ReadonlyArray<NavItem> = [
   { href: "/dashboard", key: "dashboardLabel", icon: LayoutDashboard },
   { href: "/roadmap", key: "roadmapLabel", icon: Map },
   { href: "/tasks", key: "tasksLabel", icon: ListTodo },
-  { href: "/materials", key: "materialsLabel", icon: Library },
+  { href: "/materials", key: "materialsLabel", icon: Library }
 ];
 
 function isItemActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+function getSectionLabel(pathname: string, copy: AppCopy): string {
+  if (isItemActive(pathname, "/today")) return copy.navigation.todayLabel;
+  if (isItemActive(pathname, "/dashboard")) return copy.navigation.dashboardLabel;
+  if (isItemActive(pathname, "/roadmap")) return copy.navigation.roadmapLabel;
+  if (isItemActive(pathname, "/tasks")) return copy.navigation.tasksLabel;
+  if (isItemActive(pathname, "/materials")) return copy.navigation.materialsLabel;
+  return copy.navigation.appLabel;
 }
 
 export function PrivateShell({ children }: { children: ReactNode }) {
@@ -68,6 +85,7 @@ export function PrivateShell({ children }: { children: ReactNode }) {
   const { copy } = useUserPreferences();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const { data: currentUser } = useCurrentUser();
+  const currentSection = getSectionLabel(pathname, copy);
 
   async function handleLogout() {
     setIsLoggingOut(true);
@@ -83,6 +101,16 @@ export function PrivateShell({ children }: { children: ReactNode }) {
   return (
     <div className="app-shell">
       <aside className="sidebar">
+        <div className="brand">
+          <span className="brand-mark" aria-hidden="true">
+            <Sparkles size={16} />
+          </span>
+          <div className="brand-copy">
+            <p className="brand-label">{copy.navigation.brand}</p>
+            <strong className="brand-title">Editorial Workspace</strong>
+          </div>
+        </div>
+
         <Link href="/profile" className="user-identity">
           {currentUser ? (
             <>
@@ -92,12 +120,16 @@ export function PrivateShell({ children }: { children: ReactNode }) {
               >
                 {getInitials(currentUser.full_name)}
               </span>
-              <span className="user-full-name">{currentUser.full_name}</span>
+              <span className="user-identity-copy">
+                <span className="user-full-name">{currentUser.full_name}</span>
+                <span className="user-email">{currentUser.email}</span>
+              </span>
             </>
           ) : (
             <span className="user-avatar user-avatar-placeholder" />
           )}
         </Link>
+
         <nav className="nav-list nav-list-main" aria-label={copy.navigation.ariaPrimary}>
           {MAIN_NAV_ITEMS.map((item) => {
             const isActive = isItemActive(pathname, item.href);
@@ -114,9 +146,15 @@ export function PrivateShell({ children }: { children: ReactNode }) {
             );
           })}
         </nav>
-        
+
         <div className="sidebar-spacer" />
-        
+
+        <div className="sidebar-status-card">
+          <span className="sidebar-status-label">Workspace</span>
+          <strong>{currentSection}</strong>
+          <p>Sharper hierarchy, calmer density, clearer daily flow.</p>
+        </div>
+
         <div className="nav-list nav-list-bottom" aria-label={copy.settings.title}>
           <button
             type="button"
@@ -131,6 +169,12 @@ export function PrivateShell({ children }: { children: ReactNode }) {
       </aside>
 
       <div className="content-column">
+        <header className="editorial-page-topline">
+          <div>
+            <p className="editorial-page-kicker">{copy.navigation.appLabel}</p>
+            <strong className="editorial-page-title">{currentSection}</strong>
+          </div>
+        </header>
         <main className="main-content">{children}</main>
       </div>
     </div>

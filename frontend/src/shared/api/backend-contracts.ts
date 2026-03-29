@@ -1,3 +1,5 @@
+export type BackendRoadmapType = "graph" | "levels" | "cycles";
+
 export interface BackendRoadmapTopic {
   id: string;
   roadmap_id: string;
@@ -17,6 +19,7 @@ export interface BackendRoadmapTopic {
 export interface BackendRoadmapListItem {
   id: string;
   title: string;
+  type: BackendRoadmapType;
   total_topics: number;
   completed_topics: number;
   progress_percent: number;
@@ -34,6 +37,7 @@ export interface BackendRoadmapStage {
 export interface BackendRoadmapResponse {
   id: string;
   title: string;
+  type: BackendRoadmapType;
   stages: BackendRoadmapStage[];
 }
 

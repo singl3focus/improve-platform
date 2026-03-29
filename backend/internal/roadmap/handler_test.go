@@ -104,12 +104,18 @@ func withURLParams(req *http.Request, pairs ...string) *http.Request {
 func TestHandler_CreateRoadmap_Success(t *testing.T) {
 	svc := &mockService{
 		createRoadmapFn: func(_ context.Context, _ string, req roadmap.CreateRoadmapRequest) (roadmap.RoadmapResponse, error) {
-			return roadmap.RoadmapResponse{ID: "rm-1", Title: req.Title, Topics: []roadmap.TopicResponse{}, Dependencies: []roadmap.TopicDependencyResponse{}}, nil
+			return roadmap.RoadmapResponse{
+				ID:           "rm-1",
+				Title:        req.Title,
+				Type:         req.Type,
+				Topics:       []roadmap.TopicResponse{},
+				Dependencies: []roadmap.TopicDependencyResponse{},
+			}, nil
 		},
 	}
 	h := roadmap.NewHandler(svc)
 
-	body, _ := json.Marshal(map[string]string{"title": "My Roadmap"})
+	body, _ := json.Marshal(map[string]string{"title": "My Roadmap", "type": string(roadmap.RoadmapTypeGraph)})
 	req := authedRequest(http.MethodPost, "/api/v1/roadmap", body)
 	rec := httptest.NewRecorder()
 
@@ -126,12 +132,15 @@ func TestHandler_CreateRoadmap_Success(t *testing.T) {
 	if resp.ID != "rm-1" {
 		t.Errorf("expected ID rm-1, got %s", resp.ID)
 	}
+	if resp.Type != roadmap.RoadmapTypeGraph {
+		t.Errorf("expected graph type, got %s", resp.Type)
+	}
 }
 
 func TestHandler_CreateRoadmap_MissingTitle(t *testing.T) {
 	h := roadmap.NewHandler(&mockService{})
 
-	body, _ := json.Marshal(map[string]string{"title": ""})
+	body, _ := json.Marshal(map[string]string{"title": "", "type": string(roadmap.RoadmapTypeGraph)})
 	req := authedRequest(http.MethodPost, "/api/v1/roadmap", body)
 	rec := httptest.NewRecorder()
 
@@ -150,7 +159,7 @@ func TestHandler_CreateRoadmap_AlreadyExists(t *testing.T) {
 	}
 	h := roadmap.NewHandler(svc)
 
-	body, _ := json.Marshal(map[string]string{"title": "Dup"})
+	body, _ := json.Marshal(map[string]string{"title": "Dup", "type": string(roadmap.RoadmapTypeGraph)})
 	req := authedRequest(http.MethodPost, "/api/v1/roadmap", body)
 	rec := httptest.NewRecorder()
 
@@ -161,12 +170,63 @@ func TestHandler_CreateRoadmap_AlreadyExists(t *testing.T) {
 	}
 }
 
+func TestHandler_CreateRoadmap_InvalidType(t *testing.T) {
+	h := roadmap.NewHandler(&mockService{})
+
+	body, _ := json.Marshal(map[string]string{"title": "Typed", "type": "invalid"})
+	req := authedRequest(http.MethodPost, "/api/v1/roadmap", body)
+	rec := httptest.NewRecorder()
+
+	h.CreateRoadmap().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", rec.Code)
+	}
+
+	var resp httpresp.ErrorResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode error: %v", err)
+	}
+	if resp.Error.Code != "invalid_roadmap_type" {
+		t.Fatalf("expected invalid_roadmap_type, got %s", resp.Error.Code)
+	}
+}
+
+func TestHandler_ListRoadmaps_IncludesType(t *testing.T) {
+	svc := &mockService{
+		listRoadmapsFn: func(_ context.Context, _ string) ([]roadmap.RoadmapListItem, error) {
+			return []roadmap.RoadmapListItem{
+				{ID: "rm-1", Title: "Levels", Type: roadmap.RoadmapTypeLevels},
+			}, nil
+		},
+	}
+	h := roadmap.NewHandler(svc)
+
+	req := authedRequest(http.MethodGet, "/api/v1/roadmaps", nil)
+	rec := httptest.NewRecorder()
+
+	h.ListRoadmaps().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+
+	var resp []roadmap.RoadmapListItem
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode error: %v", err)
+	}
+	if len(resp) != 1 || resp[0].Type != roadmap.RoadmapTypeLevels {
+		t.Fatalf("unexpected response: %+v", resp)
+	}
+}
+
 func TestHandler_GetRoadmap_Success(t *testing.T) {
 	svc := &mockService{
 		getFullRoadmapFn: func(_ context.Context, _, _ string) (roadmap.RoadmapResponse, error) {
 			return roadmap.RoadmapResponse{
 				ID:    "rm-1",
 				Title: "My RM",
+				Type:  roadmap.RoadmapTypeGraph,
 				Topics: []roadmap.TopicResponse{
 					{ID: "t-1", Title: "Topic 1", TasksCount: 4, MaterialsCount: 2, ProgressPercent: 75,
 						Dependencies: []string{"t-2"}},
@@ -195,6 +255,9 @@ func TestHandler_GetRoadmap_Success(t *testing.T) {
 	if len(resp.Topics) != 1 {
 		t.Fatalf("unexpected structure: %+v", resp)
 	}
+	if resp.Type != roadmap.RoadmapTypeGraph {
+		t.Fatalf("expected graph type, got %s", resp.Type)
+	}
 	topic := resp.Topics[0]
 	if topic.TasksCount != 4 || topic.MaterialsCount != 2 || topic.ProgressPercent != 75 {
 		t.Errorf("unexpected metrics: tasks=%d materials=%d progress=%d", topic.TasksCount, topic.MaterialsCount, topic.ProgressPercent)
@@ -207,6 +270,7 @@ func TestHandler_GetRoadmap_ResponseDoesNotContainStageFields(t *testing.T) {
 			return roadmap.RoadmapResponse{
 				ID:    "rm-1",
 				Title: "My RM",
+				Type:  roadmap.RoadmapTypeCycles,
 				Topics: []roadmap.TopicResponse{
 					{ID: "t-1", Title: "Topic 1"},
 				},

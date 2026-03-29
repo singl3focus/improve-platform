@@ -22,18 +22,18 @@ test.describe("Multiple Roadmaps", () => {
     await ctx.close();
   });
 
-  test("quick-create creates first roadmap and topic, switcher appears", async () => {
+  test("create first roadmap from roadmap section, switcher appears", async () => {
     await page.goto("/roadmap");
-    await expect(page.getByRole("heading", { name: "Быстрое создание первой темы" })).toBeVisible({
+    await page.getByRole("button", { name: "Создать первую roadmap" }).click();
+    await expect(page.locator(".roadmap-create-panel")).toBeVisible({ timeout: 30_000 });
+
+    await page.getByLabel("Название roadmap").fill("RM1 Graph");
+    await page.locator(".roadmap-type-card").first().click();
+    await page.getByRole("button", { name: "Создать roadmap" }).click();
+
+    await expect(page.locator(".roadmap-type-pill")).toContainText("Графовый roadmap", {
       timeout: 30_000
     });
-
-    await page.getByLabel("Название темы").fill("RM1 Topic");
-    await page.getByRole("button", { name: "Создать первую тему" }).click();
-
-    await expect(page.locator("article.roadmap-topic-card")).toHaveCount(1, { timeout: 30_000 });
-
-    // Roadmap switcher should appear in sidebar
     await expect(page.locator(".roadmap-switcher")).toBeVisible({ timeout: 10_000 });
   });
 
@@ -41,40 +41,40 @@ test.describe("Multiple Roadmaps", () => {
     await page.goto("/roadmap");
     await expect(page.locator(".roadmap-switcher")).toBeVisible({ timeout: 10_000 });
 
-    // Open switcher dropdown
     await page.locator(".roadmap-switcher-trigger").click();
     await expect(page.locator(".roadmap-switcher-dropdown")).toBeVisible();
-
-    // Click "Название новой дорожной карты" button to start creating
     await page.locator(".roadmap-switcher-new").click();
 
-    // Fill in new roadmap title and press Enter
-    const input = page.locator(".roadmap-switcher-create-input");
-    await expect(input).toBeVisible({ timeout: 5000 });
-    await input.fill("Second Roadmap");
-    await input.press("Enter");
+    await expect(page.locator(".roadmap-switcher-create-panel")).toBeVisible({ timeout: 5_000 });
+    await page.locator(".roadmap-switcher-create-panel .input").fill("Second Cycles");
+    await page.locator(".roadmap-switcher-create-panel .roadmap-type-card").nth(2).click();
+    await page
+      .locator(".roadmap-switcher-create-panel")
+      .getByRole("button", { name: "Создать roadmap" })
+      .click();
 
-    // Switcher should now show "Second Roadmap" as active
-    await expect(page.locator(".roadmap-switcher-label")).toHaveText("Second Roadmap", { timeout: 10_000 });
+    await expect(page.locator(".roadmap-switcher-label")).toHaveText("Second Cycles", {
+      timeout: 10_000
+    });
+    await expect(page.locator(".roadmap-type-pill")).toContainText("Cycles roadmap", {
+      timeout: 10_000
+    });
   });
 
-  test("switch back to first roadmap, topic is still there", async () => {
+  test("switch back to first roadmap", async () => {
     await page.goto("/roadmap");
     await expect(page.locator(".roadmap-switcher")).toBeVisible({ timeout: 10_000 });
 
-    // Open dropdown
     await page.locator(".roadmap-switcher-trigger").click();
     await expect(page.locator(".roadmap-switcher-dropdown")).toBeVisible();
 
-    // The first roadmap item (not the active one) should exist
     const items = page.locator(".roadmap-switcher-item:not(.roadmap-switcher-new)");
-    await expect(items).toHaveCount(2, { timeout: 5000 });
-
-    // Click the first item
+    await expect(items).toHaveCount(2, { timeout: 5_000 });
     await items.first().click();
 
-    // Topic card from first roadmap should be visible
-    await expect(page.locator("article.roadmap-topic-card")).toHaveCount(1, { timeout: 30_000 });
-    await expect(page.locator("article.roadmap-topic-card").getByText("RM1 Topic")).toBeVisible();
+    await expect(page.locator(".roadmap-switcher-label")).toHaveText("RM1 Graph", {
+      timeout: 10_000
+    });
+    await expect(page.locator(".roadmap-type-pill")).toContainText("Графовый roadmap");
   });
 });
