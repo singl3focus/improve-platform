@@ -25,7 +25,6 @@ function createEmptyTopicWorkspace(topicId: string): TopicWorkspace {
     id: topicId,
     title: "Topic workspace",
     description: "Create this topic in your roadmap to start working with tasks and materials.",
-    goal: "",
     status: "not_started",
     confidence: null,
     progressPercent: 0,
@@ -150,7 +149,6 @@ export async function GET(request: NextRequest, context: RouteContext) {
       id: topic.id,
       title: topic.title,
       description: topic.description,
-      goal: (topic as unknown as { goal?: string }).goal ?? "",
       status: topic.status,
       confidence: (topic as unknown as { confidence?: number | null }).confidence ?? null,
       progressPercent: buildProgressPercent(topicTasks),
@@ -194,4 +192,3 @@ export async function GET(request: NextRequest, context: RouteContext) {
     return createBackendUnavailableResponse("Topic backend is unavailable.");
   }
 }
-

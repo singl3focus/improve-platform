@@ -20,7 +20,6 @@ function createRoadmapFixture(): RoadmapResponse {
             stageId: "stage-a",
             title: "Topic A",
             description: "",
-            goal: "",
             position: 1,
             status: "in_progress",
             confidence: null,
@@ -34,7 +33,6 @@ function createRoadmapFixture(): RoadmapResponse {
             stageId: "stage-a",
             title: "Topic B",
             description: "",
-            goal: "",
             position: 2,
             status: "not_started",
             confidence: null,
@@ -56,7 +54,6 @@ function createStageFreeRoadmapFixture(): RoadmapResponse {
         id: "topic-a",
         title: "Topic A",
         description: "",
-        goal: "",
         position: 1,
         status: "in_progress",
         confidence: null,
@@ -69,7 +66,6 @@ function createStageFreeRoadmapFixture(): RoadmapResponse {
         id: "topic-b",
         title: "Topic B",
         description: "",
-        goal: "",
         position: 2,
         status: "not_started",
         confidence: null,
@@ -219,7 +215,6 @@ test("buildTopicGridColumnById spreads topics with duplicate positions into sepa
             stageId: "stage-a",
             title: "Topic B",
             description: "",
-            goal: "",
             position: 4,
             status: "not_started",
             confidence: null,
@@ -233,7 +228,6 @@ test("buildTopicGridColumnById spreads topics with duplicate positions into sepa
             stageId: "stage-a",
             title: "Topic A",
             description: "",
-            goal: "",
             position: 4,
             status: "in_progress",
             confidence: null,
@@ -247,7 +241,6 @@ test("buildTopicGridColumnById spreads topics with duplicate positions into sepa
             stageId: "stage-a",
             title: "Topic C",
             description: "",
-            goal: "",
             position: 6,
             status: "not_started",
             confidence: null,
@@ -280,7 +273,6 @@ test("child-topic layout keeps parent and child separate while dependency edge i
             stageId: "stage-a",
             title: "Parent",
             description: "",
-            goal: "",
             position: 1,
             status: "in_progress",
             confidence: null,
@@ -294,7 +286,6 @@ test("child-topic layout keeps parent and child separate while dependency edge i
             stageId: "stage-a",
             title: "Child",
             description: "",
-            goal: "",
             position: 1,
             status: "not_started",
             confidence: null,
@@ -363,7 +354,6 @@ test("buildRoadmapConnections keeps side anchors for topics on the same row", ()
             stageId: "stage-a",
             title: "Parent",
             description: "",
-            goal: "",
             position: 1,
             status: "in_progress",
             confidence: null,
@@ -377,7 +367,6 @@ test("buildRoadmapConnections keeps side anchors for topics on the same row", ()
             stageId: "stage-a",
             title: "Child",
             description: "",
-            goal: "",
             position: 2,
             status: "not_started",
             confidence: null,
@@ -437,7 +426,6 @@ test("buildRoadmapConnections links left topic to right topic using inner horizo
             stageId: "stage-a",
             title: "Left",
             description: "",
-            goal: "",
             position: 1,
             status: "not_started",
             confidence: null,
@@ -451,7 +439,6 @@ test("buildRoadmapConnections links left topic to right topic using inner horizo
             stageId: "stage-a",
             title: "Right",
             description: "",
-            goal: "",
             position: 2,
             status: "in_progress",
             confidence: null,
@@ -512,7 +499,6 @@ test("buildTopicGridPlacementById keeps directional semantics for left right and
             stageId: "stage-a",
             title: "Parent",
             description: "",
-            goal: "",
             position: 5,
             status: "in_progress",
             confidence: null,
@@ -526,7 +512,6 @@ test("buildTopicGridPlacementById keeps directional semantics for left right and
             stageId: "stage-a",
             title: "Left",
             description: "",
-            goal: "",
             position: 4,
             status: "not_started",
             confidence: null,
@@ -540,7 +525,6 @@ test("buildTopicGridPlacementById keeps directional semantics for left right and
             stageId: "stage-a",
             title: "Right",
             description: "",
-            goal: "",
             position: 6,
             status: "not_started",
             confidence: null,
@@ -554,7 +538,6 @@ test("buildTopicGridPlacementById keeps directional semantics for left right and
             stageId: "stage-a",
             title: "Below",
             description: "",
-            goal: "",
             position: 5,
             status: "not_started",
             confidence: null,
@@ -599,7 +582,6 @@ test("buildTopicGridPlacementById avoids collisions for sequential directional c
             stageId: "stage-a",
             title: "Parent",
             description: "",
-            goal: "",
             position: 10,
             status: "in_progress",
             confidence: null,
@@ -613,7 +595,6 @@ test("buildTopicGridPlacementById avoids collisions for sequential directional c
             stageId: "stage-a",
             title: "Right 1",
             description: "",
-            goal: "",
             position: 11,
             status: "not_started",
             confidence: null,
@@ -627,7 +608,6 @@ test("buildTopicGridPlacementById avoids collisions for sequential directional c
             stageId: "stage-a",
             title: "Right 2",
             description: "",
-            goal: "",
             position: 11,
             status: "not_started",
             confidence: null,
@@ -641,7 +621,6 @@ test("buildTopicGridPlacementById avoids collisions for sequential directional c
             stageId: "stage-a",
             title: "Below 1",
             description: "",
-            goal: "",
             position: 10,
             status: "not_started",
             confidence: null,
@@ -655,7 +634,6 @@ test("buildTopicGridPlacementById avoids collisions for sequential directional c
             stageId: "stage-a",
             title: "Below 2",
             description: "",
-            goal: "",
             position: 10,
             status: "not_started",
             confidence: null,
@@ -690,9 +668,9 @@ test("buildTopicGridPlacementById avoids collisions for sequential directional c
   assert.ok(below1);
   assert.ok(below2);
 
-  // Right children stack vertically in a column to the right
-  assert.equal(right1!.column, parent!.column + 1);
-  assert.equal(right2!.column, parent!.column + 1);
+  // Right children shift further right when the parent also owns a below row.
+  assert.equal(right1!.column, parent!.column + 2);
+  assert.equal(right2!.column, parent!.column + 2);
   assert.equal(right1!.row, parent!.row);
   assert.equal(right2!.row, parent!.row + 1);
 
@@ -715,7 +693,6 @@ test("buildTopicGridPlacementById stacks left children vertically in a column", 
             stageId: "stage-a",
             title: "Parent",
             description: "",
-            goal: "",
             position: 10,
             status: "in_progress",
             confidence: null,
@@ -729,7 +706,6 @@ test("buildTopicGridPlacementById stacks left children vertically in a column", 
             stageId: "stage-a",
             title: "Left 1",
             description: "",
-            goal: "",
             position: 9,
             status: "not_started",
             confidence: null,
@@ -743,7 +719,6 @@ test("buildTopicGridPlacementById stacks left children vertically in a column", 
             stageId: "stage-a",
             title: "Left 2",
             description: "",
-            goal: "",
             position: 9,
             status: "not_started",
             confidence: null,
@@ -785,7 +760,6 @@ test("buildTopicGridPlacementById stacks right children vertically in a column",
             stageId: "stage-a",
             title: "Parent",
             description: "",
-            goal: "",
             position: 10,
             status: "in_progress",
             confidence: null,
@@ -799,7 +773,6 @@ test("buildTopicGridPlacementById stacks right children vertically in a column",
             stageId: "stage-a",
             title: "Right 1",
             description: "",
-            goal: "",
             position: 11,
             status: "not_started",
             confidence: null,
@@ -813,7 +786,6 @@ test("buildTopicGridPlacementById stacks right children vertically in a column",
             stageId: "stage-a",
             title: "Right 2",
             description: "",
-            goal: "",
             position: 11,
             status: "not_started",
             confidence: null,
@@ -855,7 +827,6 @@ test("buildTopicGridPlacementById spreads below children horizontally in a row",
             stageId: "stage-a",
             title: "Parent",
             description: "",
-            goal: "",
             position: 10,
             status: "in_progress",
             confidence: null,
@@ -869,7 +840,6 @@ test("buildTopicGridPlacementById spreads below children horizontally in a row",
             stageId: "stage-a",
             title: "Below 1",
             description: "",
-            goal: "",
             position: 10,
             status: "not_started",
             confidence: null,
@@ -883,7 +853,6 @@ test("buildTopicGridPlacementById spreads below children horizontally in a row",
             stageId: "stage-a",
             title: "Below 2",
             description: "",
-            goal: "",
             position: 10,
             status: "not_started",
             confidence: null,
@@ -913,6 +882,138 @@ test("buildTopicGridPlacementById spreads below children horizontally in a row",
   assert.equal(below2!.column, parent!.column + 1);
 });
 
+test("buildTopicGridPlacementById aligns below rows across neighboring top-row branches", () => {
+  const roadmap: RoadmapResponse = {
+    stages: [
+      {
+        id: "stage-a",
+        title: "Stage A",
+        topics: [
+          {
+            id: "X",
+            stageId: "stage-a",
+            title: "X",
+            description: "",
+            position: 10,
+            status: "in_progress",
+            confidence: null,
+            progressPercent: 10,
+            tasksCount: 0,
+            materialsCount: 0,
+            prerequisiteTopicIds: []
+          },
+          {
+            id: "Y",
+            stageId: "stage-a",
+            title: "Y",
+            description: "",
+            position: 11,
+            status: "not_started",
+            confidence: null,
+            progressPercent: 0,
+            tasksCount: 0,
+            materialsCount: 0,
+            prerequisiteTopicIds: ["X"]
+          },
+          {
+            id: "x1",
+            stageId: "stage-a",
+            title: "x1",
+            description: "",
+            position: 10,
+            status: "not_started",
+            confidence: null,
+            progressPercent: 0,
+            tasksCount: 0,
+            materialsCount: 0,
+            prerequisiteTopicIds: ["X"]
+          },
+          {
+            id: "x2",
+            stageId: "stage-a",
+            title: "x2",
+            description: "",
+            position: 10,
+            status: "not_started",
+            confidence: null,
+            progressPercent: 0,
+            tasksCount: 0,
+            materialsCount: 0,
+            prerequisiteTopicIds: ["X"]
+          },
+          {
+            id: "x3",
+            stageId: "stage-a",
+            title: "x3",
+            description: "",
+            position: 10,
+            status: "not_started",
+            confidence: null,
+            progressPercent: 0,
+            tasksCount: 0,
+            materialsCount: 0,
+            prerequisiteTopicIds: ["X"]
+          },
+          {
+            id: "x4",
+            stageId: "stage-a",
+            title: "x4",
+            description: "",
+            position: 10,
+            status: "not_started",
+            confidence: null,
+            progressPercent: 0,
+            tasksCount: 0,
+            materialsCount: 0,
+            prerequisiteTopicIds: ["X"]
+          },
+          {
+            id: "y1",
+            stageId: "stage-a",
+            title: "y1",
+            description: "",
+            position: 11,
+            status: "not_started",
+            confidence: null,
+            progressPercent: 0,
+            tasksCount: 0,
+            materialsCount: 0,
+            prerequisiteTopicIds: ["Y"]
+          }
+        ]
+      }
+    ]
+  };
+
+  const placementById = buildTopicGridPlacementById(roadmap.stages ?? []);
+  const X = placementById.get("X");
+  const Y = placementById.get("Y");
+  const x1 = placementById.get("x1");
+  const x2 = placementById.get("x2");
+  const x3 = placementById.get("x3");
+  const x4 = placementById.get("x4");
+  const y1 = placementById.get("y1");
+
+  assert.ok(X);
+  assert.ok(Y);
+  assert.ok(x1);
+  assert.ok(x2);
+  assert.ok(x3);
+  assert.ok(x4);
+  assert.ok(y1);
+
+  assert.equal(Y!.row, X!.row);
+  assert.equal(y1!.row, x1!.row);
+  assert.equal(x1!.row, x2!.row);
+  assert.equal(x2!.row, x3!.row);
+  assert.equal(x3!.row, x4!.row);
+
+  assert.ok(x1!.column < X!.column);
+  assert.ok(x4!.column > X!.column);
+  assert.ok(Y!.column > x4!.column);
+  assert.equal(y1!.column, Y!.column);
+});
+
 test("buildTopicGridPlacementById centers parent among 3 right children", () => {
   const roadmap: RoadmapResponse = {
     stages: [
@@ -925,7 +1026,6 @@ test("buildTopicGridPlacementById centers parent among 3 right children", () => 
             stageId: "stage-a",
             title: "Parent",
             description: "",
-            goal: "",
             position: 10,
             status: "in_progress",
             confidence: null,
@@ -939,7 +1039,6 @@ test("buildTopicGridPlacementById centers parent among 3 right children", () => 
             stageId: "stage-a",
             title: "R1",
             description: "",
-            goal: "",
             position: 11,
             status: "not_started",
             confidence: null,
@@ -953,7 +1052,6 @@ test("buildTopicGridPlacementById centers parent among 3 right children", () => 
             stageId: "stage-a",
             title: "R2",
             description: "",
-            goal: "",
             position: 11,
             status: "not_started",
             confidence: null,
@@ -967,7 +1065,6 @@ test("buildTopicGridPlacementById centers parent among 3 right children", () => 
             stageId: "stage-a",
             title: "R3",
             description: "",
-            goal: "",
             position: 11,
             status: "not_started",
             confidence: null,
@@ -1013,7 +1110,6 @@ test("buildTopicGridPlacementById centers parent among 3 left children", () => {
             stageId: "stage-a",
             title: "Parent",
             description: "",
-            goal: "",
             position: 10,
             status: "in_progress",
             confidence: null,
@@ -1027,7 +1123,6 @@ test("buildTopicGridPlacementById centers parent among 3 left children", () => {
             stageId: "stage-a",
             title: "L1",
             description: "",
-            goal: "",
             position: 9,
             status: "not_started",
             confidence: null,
@@ -1041,7 +1136,6 @@ test("buildTopicGridPlacementById centers parent among 3 left children", () => {
             stageId: "stage-a",
             title: "L2",
             description: "",
-            goal: "",
             position: 9,
             status: "not_started",
             confidence: null,
@@ -1055,7 +1149,6 @@ test("buildTopicGridPlacementById centers parent among 3 left children", () => {
             stageId: "stage-a",
             title: "L3",
             description: "",
-            goal: "",
             position: 9,
             status: "not_started",
             confidence: null,
@@ -1101,7 +1194,6 @@ test("buildTopicGridPlacementById separates subtrees of sibling roots", () => {
             stageId: "stage-a",
             title: "X",
             description: "",
-            goal: "",
             position: 1,
             status: "in_progress",
             confidence: null,
@@ -1115,7 +1207,6 @@ test("buildTopicGridPlacementById separates subtrees of sibling roots", () => {
             stageId: "stage-a",
             title: "Y",
             description: "",
-            goal: "",
             position: 2,
             status: "in_progress",
             confidence: null,
@@ -1129,7 +1220,6 @@ test("buildTopicGridPlacementById separates subtrees of sibling roots", () => {
             stageId: "stage-a",
             title: "x1",
             description: "",
-            goal: "",
             position: 1,
             status: "not_started",
             confidence: null,
@@ -1143,7 +1233,6 @@ test("buildTopicGridPlacementById separates subtrees of sibling roots", () => {
             stageId: "stage-a",
             title: "x2",
             description: "",
-            goal: "",
             position: 1,
             status: "not_started",
             confidence: null,
@@ -1157,7 +1246,6 @@ test("buildTopicGridPlacementById separates subtrees of sibling roots", () => {
             stageId: "stage-a",
             title: "x3",
             description: "",
-            goal: "",
             position: 1,
             status: "not_started",
             confidence: null,
@@ -1171,7 +1259,6 @@ test("buildTopicGridPlacementById separates subtrees of sibling roots", () => {
             stageId: "stage-a",
             title: "y1",
             description: "",
-            goal: "",
             position: 2,
             status: "not_started",
             confidence: null,
@@ -1185,7 +1272,6 @@ test("buildTopicGridPlacementById separates subtrees of sibling roots", () => {
             stageId: "stage-a",
             title: "y2",
             description: "",
-            goal: "",
             position: 2,
             status: "not_started",
             confidence: null,
@@ -1227,3 +1313,4 @@ test("buildTopicGridPlacementById separates subtrees of sibling roots", () => {
   const yMinCol = Math.min(...yCols);
   assert.ok(yMinCol > xMaxCol + 1, `Gap between subtrees: xMax=${xMaxCol}, yMin=${yMinCol}`);
 });
+

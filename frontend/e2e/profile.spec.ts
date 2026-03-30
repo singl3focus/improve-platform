@@ -44,8 +44,9 @@ test.describe("Profile flow", () => {
     await page.goto("/profile");
 
     await expect(page.locator(".profile-name")).toHaveText(fullName, { timeout: 15_000 });
-    await expect(page.locator(".profile-email")).toHaveText(email);
-    await expect(page.locator(".profile-since")).toBeVisible();
+    await expect(page.locator(".profile-meta-card")).toHaveCount(4);
+    await expect(page.locator(".profile-meta-card").nth(1)).toContainText(email);
+    await expect(page.locator(".profile-meta-card").nth(2).locator("strong")).toContainText(/\S+/);
   });
 
   test("profile page allows changing full name", async () => {
@@ -53,8 +54,8 @@ test.describe("Profile flow", () => {
     await page.goto("/profile");
     await expect(page.locator(".profile-name")).toBeVisible({ timeout: 15_000 });
 
-    await page.locator(".profile-section").first().locator("input[type='text']").fill(newName);
-    await page.locator(".profile-section").first().locator("button[type='submit']").click();
+    await page.locator(".profile-section-card").first().locator("input[type='text']").fill(newName);
+    await page.locator(".profile-section-card").first().locator("button[type='submit']").click();
 
     await expect(page.locator(".profile-success").first()).toBeVisible({ timeout: 10_000 });
     await expect(page.locator(".profile-name")).toHaveText(newName);
@@ -65,7 +66,7 @@ test.describe("Profile flow", () => {
     await page.goto("/profile");
     await expect(page.locator(".profile-name")).toBeVisible({ timeout: 15_000 });
 
-    const passwordSection = page.locator(".profile-section").nth(2);
+    const passwordSection = page.locator(".profile-section-card").nth(2);
     await passwordSection.locator("input").nth(0).fill("wrongpassword");
     await passwordSection.locator("input").nth(1).fill("NewPassword123!");
     await passwordSection.locator("button[type='submit']").click();

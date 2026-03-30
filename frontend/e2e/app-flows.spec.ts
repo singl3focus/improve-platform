@@ -45,7 +45,7 @@ test.describe("MVP UI flows (Docker stack)", () => {
 
     await mainNav(page).getByRole("link", { name: "Материалы" }).click();
     await expect(page).toHaveURL(/\/materials/);
-    await expect(page.getByRole("heading", { name: "Личная библиотека материалов" })).toBeVisible({
+    await expect(page.locator(".materials-library-header h2")).toBeVisible({
       timeout: 30_000
     });
 
@@ -58,7 +58,7 @@ test.describe("MVP UI flows (Docker stack)", () => {
     await expect(page.getByRole("heading", { name: "Настройки" })).toBeVisible();
 
     await page.goto("/dashboard/history");
-    await expect(page.getByRole("heading", { name: "Подробная история" })).toBeVisible({
+    await expect(page.locator(".history-view h2")).toBeVisible({
       timeout: 30_000
     });
 

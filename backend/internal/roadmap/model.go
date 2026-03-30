@@ -56,7 +56,6 @@ type Topic struct {
 	RoadmapID     string
 	Title         string
 	Description   string
-	Goal          string
 	Status        string
 	Confidence    *int
 	StartDate     *time.Time
@@ -123,7 +122,6 @@ func (r CreateTopicRequest) IsDirectional() bool {
 type UpdateTopicRequest struct {
 	Title       string  `json:"title"`
 	Description string  `json:"description"`
-	Goal        string  `json:"goal"`
 	StartDate   *string `json:"start_date"`
 	TargetDate  *string `json:"target_date"`
 	Position    int     `json:"position"`
@@ -169,7 +167,6 @@ type TopicResponse struct {
 	RoadmapID       string    `json:"roadmap_id"`
 	Title           string    `json:"title"`
 	Description     string    `json:"description"`
-	Goal            string    `json:"goal"`
 	Status          string    `json:"status"`
 	Confidence      *int      `json:"confidence"`
 	StartDate       *string   `json:"start_date"`
@@ -203,7 +200,7 @@ type Repository interface {
 	CreateTopicDirectional(ctx context.Context, userID, roadmapID, currentTopicID, title, description string, direction TopicCreateDirection) (Topic, error)
 	GetTopicByID(ctx context.Context, id, userID string) (Topic, error)
 	GetTopicsByRoadmapID(ctx context.Context, roadmapID, userID string) ([]Topic, error)
-	UpdateTopic(ctx context.Context, id, userID, title, description, goal string, startDate, targetDate *time.Time, position int) error
+	UpdateTopic(ctx context.Context, id, userID, title, description string, startDate, targetDate *time.Time, position int) error
 	SetTopicConfidence(ctx context.Context, id, userID string, confidence int) error
 	UpdateTopicStatus(ctx context.Context, id, userID, status string, startDate, completedDate *time.Time) error
 	DeleteTopic(ctx context.Context, id, userID string) error

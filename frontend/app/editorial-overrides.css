@@ -119,28 +119,9 @@ select:focus {
 }
 
 .brand {
-  display: flex;
-  align-items: center;
-  gap: 14px;
   margin-bottom: 18px;
-  padding: 2px 2px 18px;
+  padding: 4px 2px 20px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.brand-mark {
-  width: 38px;
-  height: 38px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 999px;
-  color: #fff;
-  background: linear-gradient(135deg, #2f6bff, #7aa0ff);
-}
-
-.brand-copy {
-  display: grid;
-  gap: 3px;
 }
 
 .brand-label,
@@ -160,6 +141,16 @@ select:focus {
 .brand-label,
 .sidebar-status-label {
   color: rgba(255, 255, 255, 0.56);
+}
+
+.brand-wordmark {
+  display: block;
+  margin: 0;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.96rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
 }
 
 .brand-title {
@@ -243,6 +234,7 @@ select:focus {
 }
 
 .nav-list-bottom {
+  margin-top: 18px;
   padding-top: 14px;
   border-top-color: rgba(255, 255, 255, 0.1);
 }
@@ -261,32 +253,8 @@ select:focus {
   background: rgba(255, 255, 255, 0.08);
 }
 
-.content-column {
-  display: grid;
-  grid-template-rows: auto 1fr;
-}
-
-.editorial-page-topline {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin: 8px 10px 0;
-  padding: 0 8px;
-}
-
-.editorial-page-kicker {
-  color: var(--muted);
-}
-
-.editorial-page-title {
-  display: block;
-  margin-top: 4px;
-  font-size: 1.5rem;
-  color: var(--text);
-}
-
 .main-content {
-  padding: 14px 10px 12px;
+  padding: 8px 10px 12px;
 }
 
 .dashboard-view,
@@ -1779,14 +1747,9 @@ select:focus {
     justify-content: flex-start;
   }
 
-  .sidebar-status-card {
-    display: none;
-  }
-
   .nav-list-bottom {
-    margin-top: 0;
-    padding-top: 0;
-    border-top: 0;
+    margin-top: 16px;
+    padding-top: 14px;
   }
 
   .dashboard-review-copy,

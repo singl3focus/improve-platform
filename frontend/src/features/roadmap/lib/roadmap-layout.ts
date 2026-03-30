@@ -99,7 +99,13 @@ interface LayoutNode {
   leftChildren: LayoutNode[];
   rightChildren: LayoutNode[];
   belowChildren: LayoutNode[];
+  coreExtent: CoreExtent;
   extent: SubtreeExtent;
+}
+
+interface CoreExtent {
+  upRows: number;
+  downRows: number;
 }
 
 interface SubtreeExtent {
@@ -110,6 +116,30 @@ interface SubtreeExtent {
 }
 
 const SUBTREE_GAP = 1;
+
+function getBelowColumnMetrics(children: LayoutNode[]): {
+  totalSpan: number;
+  startOffset: number;
+  leftCols: number;
+  rightCols: number;
+} {
+  if (children.length === 0) {
+    return { totalSpan: 0, startOffset: 0, leftCols: 0, rightCols: 0 };
+  }
+
+  const totalSpan = children.reduce(
+    (sum, child) => sum + child.extent.leftCols + 1 + child.extent.rightCols,
+    0
+  );
+  const startOffset = -Math.floor((totalSpan - 1) / 2);
+
+  return {
+    totalSpan,
+    startOffset,
+    leftCols: Math.max(0, -startOffset),
+    rightCols: Math.max(0, totalSpan - 1 + startOffset)
+  };
+}
 
 function buildLayoutForest(
   topics: RoadmapTopic[],
@@ -161,6 +191,7 @@ function buildLayoutForest(
       leftChildren,
       rightChildren,
       belowChildren,
+      coreExtent: { upRows: 0, downRows: 0 },
       extent: { leftCols: 0, rightCols: 0, upRows: 0, downRows: 0 }
     };
   }
@@ -201,21 +232,29 @@ function computeSubtreeExtent(node: LayoutNode): void {
   }
 
   const leftRowSpan = node.leftChildren.reduce(
-    (sum, child) => sum + child.extent.upRows + 1 + child.extent.downRows,
+    (sum, child) => sum + child.coreExtent.upRows + 1 + child.coreExtent.downRows,
     0
   );
   const rightRowSpan = node.rightChildren.reduce(
-    (sum, child) => sum + child.extent.upRows + 1 + child.extent.downRows,
+    (sum, child) => sum + child.coreExtent.upRows + 1 + child.coreExtent.downRows,
     0
   );
 
   const maxSideRowSpan = Math.max(leftRowSpan, rightRowSpan, 1);
   const centerOffset = Math.floor((maxSideRowSpan - 1) / 2);
+  const sideDownSpan = maxSideRowSpan - 1 - centerOffset;
+
+  node.coreExtent = {
+    upRows: centerOffset,
+    downRows: sideDownSpan
+  };
+
+  const belowMetrics = getBelowColumnMetrics(node.belowChildren);
 
   let leftColsFromLeft = 0;
   if (node.leftChildren.length > 0) {
     const childRightOverlap = Math.max(...node.leftChildren.map((c) => c.extent.rightCols));
-    const gap = 1 + childRightOverlap;
+    const gap = Math.max(1, belowMetrics.leftCols + 1) + childRightOverlap;
     const childLeftExtension = Math.max(...node.leftChildren.map((c) => c.extent.leftCols));
     leftColsFromLeft = gap + childLeftExtension;
   }
@@ -223,37 +262,28 @@ function computeSubtreeExtent(node: LayoutNode): void {
   let rightColsFromRight = 0;
   if (node.rightChildren.length > 0) {
     const childLeftOverlap = Math.max(...node.rightChildren.map((c) => c.extent.leftCols));
-    const gap = 1 + childLeftOverlap;
+    const gap = Math.max(1, belowMetrics.rightCols + 1) + childLeftOverlap;
     const childRightExtension = Math.max(...node.rightChildren.map((c) => c.extent.rightCols));
     rightColsFromRight = gap + childRightExtension;
   }
 
-  let belowColSpan = 0;
   let belowDownExtension = 0;
   let belowUpExtension = 0;
   if (node.belowChildren.length > 0) {
-    belowColSpan = node.belowChildren.reduce(
-      (sum, child) => sum + child.extent.leftCols + 1 + child.extent.rightCols,
-      0
-    );
     belowDownExtension = Math.max(...node.belowChildren.map((c) => c.extent.downRows));
     belowUpExtension = Math.max(...node.belowChildren.map((c) => c.extent.upRows));
   }
 
-  const sideDownSpan = maxSideRowSpan - 1 - centerOffset;
   const belowRowOffset = node.belowChildren.length > 0
-    ? Math.max(1, sideDownSpan + 1) + belowUpExtension
+    ? Math.max(1, node.coreExtent.downRows + 1) + belowUpExtension
     : 0;
 
-  const leftCols = Math.max(leftColsFromLeft, 0);
-  const rightCols = Math.max(
-    rightColsFromRight,
-    belowColSpan > 0 ? belowColSpan - 1 : 0
-  );
+  const leftCols = Math.max(leftColsFromLeft, belowMetrics.leftCols);
+  const rightCols = Math.max(rightColsFromRight, belowMetrics.rightCols);
 
-  const upRows = centerOffset;
+  const upRows = node.coreExtent.upRows;
   const downRows = Math.max(
-    sideDownSpan,
+    node.coreExtent.downRows,
     belowRowOffset > 0 ? belowRowOffset + belowDownExtension : 0
   );
 
@@ -270,55 +300,46 @@ function placeSubtree(
 
   if (node.leftChildren.length > 0) {
     const leftRowSpan = node.leftChildren.reduce(
-      (sum, child) => sum + child.extent.upRows + 1 + child.extent.downRows,
+      (sum, child) => sum + child.coreExtent.upRows + 1 + child.coreExtent.downRows,
       0
     );
     const startRow = nodeRow - Math.floor((leftRowSpan - 1) / 2);
     const childRightOverlap = Math.max(...node.leftChildren.map((c) => c.extent.rightCols));
-    const childCol = nodeCol - 1 - childRightOverlap;
+    const belowMetrics = getBelowColumnMetrics(node.belowChildren);
+    const childCol = nodeCol - Math.max(1, belowMetrics.leftCols + 1) - childRightOverlap;
 
     let cursor = startRow;
     for (const child of node.leftChildren) {
-      const childRow = cursor + child.extent.upRows;
+      const childRow = cursor + child.coreExtent.upRows;
       placeSubtree(child, childRow, childCol, placementById);
-      cursor += child.extent.upRows + 1 + child.extent.downRows;
+      cursor += child.coreExtent.upRows + 1 + child.coreExtent.downRows;
     }
   }
 
   if (node.rightChildren.length > 0) {
     const rightRowSpan = node.rightChildren.reduce(
-      (sum, child) => sum + child.extent.upRows + 1 + child.extent.downRows,
+      (sum, child) => sum + child.coreExtent.upRows + 1 + child.coreExtent.downRows,
       0
     );
     const startRow = nodeRow - Math.floor((rightRowSpan - 1) / 2);
     const childLeftOverlap = Math.max(...node.rightChildren.map((c) => c.extent.leftCols));
-    const childCol = nodeCol + 1 + childLeftOverlap;
+    const belowMetrics = getBelowColumnMetrics(node.belowChildren);
+    const childCol = nodeCol + Math.max(1, belowMetrics.rightCols + 1) + childLeftOverlap;
 
     let cursor = startRow;
     for (const child of node.rightChildren) {
-      const childRow = cursor + child.extent.upRows;
+      const childRow = cursor + child.coreExtent.upRows;
       placeSubtree(child, childRow, childCol, placementById);
-      cursor += child.extent.upRows + 1 + child.extent.downRows;
+      cursor += child.coreExtent.upRows + 1 + child.coreExtent.downRows;
     }
   }
 
   if (node.belowChildren.length > 0) {
-    const leftRowSpanForBelow = node.leftChildren.reduce(
-      (sum, child) => sum + child.extent.upRows + 1 + child.extent.downRows,
-      0
-    );
-    const rightRowSpanForBelow = node.rightChildren.reduce(
-      (sum, child) => sum + child.extent.upRows + 1 + child.extent.downRows,
-      0
-    );
-    const maxSideForBelow = Math.max(leftRowSpanForBelow, rightRowSpanForBelow, 1);
-    const centerOffsetForBelow = Math.floor((maxSideForBelow - 1) / 2);
-    const sideDown = maxSideForBelow - 1 - centerOffsetForBelow;
-
     const belowUpExtension = Math.max(...node.belowChildren.map((c) => c.extent.upRows));
-    const belowRow = nodeRow + Math.max(1, sideDown + 1) + belowUpExtension;
+    const belowRow = nodeRow + Math.max(1, node.coreExtent.downRows + 1) + belowUpExtension;
+    const belowMetrics = getBelowColumnMetrics(node.belowChildren);
 
-    let cursor = nodeCol;
+    let cursor = nodeCol + belowMetrics.startOffset;
     for (const child of node.belowChildren) {
       const childCol = cursor + child.extent.leftCols;
       placeSubtree(child, belowRow, childCol, placementById);

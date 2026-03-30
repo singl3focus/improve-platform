@@ -6,7 +6,6 @@ export interface BackendRoadmapTopic {
   stage_id: string;
   title: string;
   description: string;
-  goal: string;
   position: number;
   status: "not_started" | "in_progress" | "paused" | "completed";
   confidence: number | null;

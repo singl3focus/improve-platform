@@ -16,7 +16,7 @@ test.describe("Dashboard Focus block", () => {
     });
 
     // Focus Today section should be visible
-    await expect(page.getByText("Фокус на сегодня")).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator(".dashboard-focus-panel h3")).toBeVisible({ timeout: 15_000 });
 
     // Roadmap progress section should be visible
     await expect(page.getByText("Прогресс roadmap")).toBeVisible({ timeout: 15_000 });

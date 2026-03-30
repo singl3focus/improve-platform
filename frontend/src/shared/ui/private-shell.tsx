@@ -10,13 +10,11 @@ import {
   LogOut,
   LucideIcon,
   Map,
-  Sparkles,
   Sun
 } from "lucide-react";
 import { useUserPreferences } from "@shared/providers/user-preferences-provider";
 import { logout } from "@features/auth/lib/client";
 import { useCurrentUser } from "@features/profile/hooks/use-profile-view-model";
-import type { AppCopy } from "@shared/i18n/ui-copy";
 
 function getInitials(name: string): string {
   return name
@@ -70,22 +68,12 @@ function isItemActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-function getSectionLabel(pathname: string, copy: AppCopy): string {
-  if (isItemActive(pathname, "/today")) return copy.navigation.todayLabel;
-  if (isItemActive(pathname, "/dashboard")) return copy.navigation.dashboardLabel;
-  if (isItemActive(pathname, "/roadmap")) return copy.navigation.roadmapLabel;
-  if (isItemActive(pathname, "/tasks")) return copy.navigation.tasksLabel;
-  if (isItemActive(pathname, "/materials")) return copy.navigation.materialsLabel;
-  return copy.navigation.appLabel;
-}
-
 export function PrivateShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { copy } = useUserPreferences();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const { data: currentUser } = useCurrentUser();
-  const currentSection = getSectionLabel(pathname, copy);
 
   async function handleLogout() {
     setIsLoggingOut(true);
@@ -102,13 +90,7 @@ export function PrivateShell({ children }: { children: ReactNode }) {
     <div className="app-shell">
       <aside className="sidebar">
         <div className="brand">
-          <span className="brand-mark" aria-hidden="true">
-            <Sparkles size={16} />
-          </span>
-          <div className="brand-copy">
-            <p className="brand-label">{copy.navigation.brand}</p>
-            <strong className="brand-title">Editorial Workspace</strong>
-          </div>
+          <strong className="brand-wordmark">{copy.navigation.brand}</strong>
         </div>
 
         <Link href="/profile" className="user-identity">
@@ -149,12 +131,6 @@ export function PrivateShell({ children }: { children: ReactNode }) {
 
         <div className="sidebar-spacer" />
 
-        <div className="sidebar-status-card">
-          <span className="sidebar-status-label">Workspace</span>
-          <strong>{currentSection}</strong>
-          <p>Sharper hierarchy, calmer density, clearer daily flow.</p>
-        </div>
-
         <div className="nav-list nav-list-bottom" aria-label={copy.settings.title}>
           <button
             type="button"
@@ -169,12 +145,6 @@ export function PrivateShell({ children }: { children: ReactNode }) {
       </aside>
 
       <div className="content-column">
-        <header className="editorial-page-topline">
-          <div>
-            <p className="editorial-page-kicker">{copy.navigation.appLabel}</p>
-            <strong className="editorial-page-title">{currentSection}</strong>
-          </div>
-        </header>
         <main className="main-content">{children}</main>
       </div>
     </div>

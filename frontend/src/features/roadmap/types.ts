@@ -19,7 +19,6 @@ export interface RoadmapTopic {
   stageId?: string;
   title: string;
   description: string;
-  goal: string;
   position: number;
   status: RoadmapTopicStatus;
   confidence: number | null;

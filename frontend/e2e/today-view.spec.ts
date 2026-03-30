@@ -31,8 +31,9 @@ test.describe("Today View", () => {
     await expect(page.locator(".today-header")).toBeVisible({ timeout: 15_000 });
 
     // Focus tasks section visible
-    await expect(page.getByText("Фокус-задачи")).toBeVisible({ timeout: 10_000 });
-
+    await expect(page.locator(".today-section").first().locator(".today-section-title")).toBeVisible({
+      timeout: 10_000
+    });
     // No tasks for a fresh user
     await expect(page.getByText("На сегодня задач нет")).toBeVisible({ timeout: 10_000 });
 

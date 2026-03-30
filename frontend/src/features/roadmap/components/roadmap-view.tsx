@@ -931,7 +931,7 @@ function LevelsRoadmapRenderer(props: {
                 </span>
               </div>
               <div className="roadmap-level-card-title">{topic.title}</div>
-              <div className="roadmap-level-card-description">{topic.goal || topic.description}</div>
+              <div className="roadmap-level-card-description">{topic.description}</div>
 
               <div className="roadmap-structured-progress">
                 <div className="roadmap-progress-row">
@@ -1038,7 +1038,7 @@ function CyclesRoadmapRenderer(props: {
               <div className="roadmap-cycle-card-header">
                 <div>
                   <div className="roadmap-cycle-card-title">{topic.title}</div>
-                  <div className="roadmap-cycle-card-description">{topic.goal || topic.description}</div>
+                  <div className="roadmap-cycle-card-description">{topic.description}</div>
                 </div>
                 <span className="roadmap-cycle-stage">{getCycleStageLabel(topic.status, props.language)}</span>
               </div>
@@ -1499,6 +1499,8 @@ export function RoadmapView() {
       return;
     }
 
+    document.body.classList.add("roadmap-graph-panning");
+
     const onPointerMove = (event: PointerEvent) => {
       if (event.pointerId !== panPointerId) {
         return;
@@ -1529,14 +1531,27 @@ export function RoadmapView() {
       panStartOffsetRef.current = null;
     };
 
+    const onContextMenu = (event: MouseEvent) => {
+      event.preventDefault();
+    };
+
+    const onSelectStart = (event: Event) => {
+      event.preventDefault();
+    };
+
     window.addEventListener("pointermove", onPointerMove);
     window.addEventListener("pointerup", onPointerUp);
     window.addEventListener("pointercancel", onPointerUp);
+    window.addEventListener("contextmenu", onContextMenu);
+    document.addEventListener("selectstart", onSelectStart);
 
     return () => {
+      document.body.classList.remove("roadmap-graph-panning");
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("pointerup", onPointerUp);
       window.removeEventListener("pointercancel", onPointerUp);
+      window.removeEventListener("contextmenu", onContextMenu);
+      document.removeEventListener("selectstart", onSelectStart);
     };
   }, [panPointerId]);
 
@@ -1919,6 +1934,7 @@ export function RoadmapView() {
       return;
     }
 
+    event.preventDefault();
     setPanPointerId(event.pointerId);
     panStartPointRef.current = {
       x: event.clientX,
@@ -2560,7 +2576,7 @@ export function RoadmapView() {
 
                             <div className="roadmap-topic-core">
                               <div className="roadmap-topic-center">
-                                <h4 className="roadmap-topic-title" title={topic.goal || undefined}>{topic.title}</h4>
+                                <h4 className="roadmap-topic-title" title={topic.description || undefined}>{topic.title}</h4>
 
                                 <div className="roadmap-topic-progress">
                                   <div className="roadmap-progress-row">

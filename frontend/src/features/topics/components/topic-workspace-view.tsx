@@ -4,7 +4,6 @@ import type { Dispatch, FormEvent, SetStateAction } from "react";
 import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Plus } from "lucide-react";
-import { TopicNotes } from "@features/topics/components/topic-notes";
 import { useUserPreferences } from "@shared/providers/user-preferences-provider";
 import {
   type TopicMaterialDraft,
@@ -83,7 +82,6 @@ const COPY = {
     unitLessons: "уроки",
     unitHours: "часы",
     eyebrow: "Рабочее пространство темы",
-    focusLabel: "Фокус темы",
     statsTasks: "Задач",
     statsMaterials: "Материалов",
     statsDependencies: "Зависимостей",
@@ -150,7 +148,6 @@ const COPY = {
     unitLessons: "lessons",
     unitHours: "hours",
     eyebrow: "Topic workspace",
-    focusLabel: "Topic focus",
     statsTasks: "Tasks",
     statsMaterials: "Materials",
     statsDependencies: "Dependencies",
@@ -273,12 +270,6 @@ function TopicHeroPanel({
       <div className="topic-hero-grid">
         <div className="topic-hero-copy">
           <p className="topic-hero-description">{topic.description}</p>
-          <section className="topic-focus-card">
-            <p className="topic-card-kicker">{copy.focusLabel}</p>
-            <p className={`topic-focus-copy ${topic.goal ? "" : "topic-focus-copy-muted"}`}>
-              {topic.goal || copy.notSet}
-            </p>
-          </section>
           <div className="topic-stat-grid">
             <article className="topic-stat-card">
               <span>{copy.statsTasks}</span>
@@ -883,7 +874,6 @@ export function TopicWorkspaceView() {
                 onAddDependency={handleAddDependency}
                 onRemoveDependency={handleRemoveDependency}
               />
-              <TopicNotes topicId={topicId} />
             </div>
             <div className="topic-grid-main">
               <TopicChecklistPanel
@@ -914,3 +904,4 @@ export function TopicWorkspaceView() {
     </section>
   );
 }
+

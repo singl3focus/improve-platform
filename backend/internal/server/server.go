@@ -19,7 +19,6 @@ import (
 	"improve-platform/internal/dashboard"
 	"improve-platform/internal/history"
 	"improve-platform/internal/material"
-	"improve-platform/internal/note"
 	"improve-platform/internal/roadmap"
 	"improve-platform/internal/server/handler"
 	"improve-platform/internal/task"
@@ -94,11 +93,6 @@ func (s *Server) routes() {
 	todayUC.WithRecorder(histUC)
 	todayH := today.NewHandler(todayUC)
 
-	noteRepo := note.NewRepo(s.pool)
-	noteUC := note.NewUseCase(noteRepo)
-	noteUC.WithRecorder(histUC)
-	noteH := note.NewHandler(noteUC)
-
 	s.router.Group(func(r chi.Router) {
 		r.Use(auth.Middleware([]byte(s.cfg.JWTSecret)))
 		r.Get("/api/v1/me", authH.Me())
@@ -148,12 +142,6 @@ func (s *Server) routes() {
 		r.Put("/api/v1/today/tasks", todayH.SetTasks())
 		r.Patch("/api/v1/today/tasks/{taskID}/toggle", todayH.ToggleTask())
 		r.Patch("/api/v1/today/reflection", todayH.SaveReflection())
-
-		r.Post("/api/v1/topics/{topicID}/notes", noteH.CreateNote())
-		r.Get("/api/v1/topics/{topicID}/notes", noteH.ListByTopic())
-		r.Get("/api/v1/notes/{noteID}", noteH.GetNote())
-		r.Put("/api/v1/notes/{noteID}", noteH.UpdateNote())
-		r.Delete("/api/v1/notes/{noteID}", noteH.DeleteNote())
 
 		// Legacy topic routes (no roadmapID prefix) — used by topic workspace, weekly review
 		r.Get("/api/v1/roadmap/topics/{topicID}", rmH.GetTopic())

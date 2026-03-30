@@ -27,7 +27,6 @@ interface BackendFlatRoadmapTopic {
   id: string;
   title: string;
   description: string;
-  goal?: string;
   position: number;
   status: BackendRoadmapTopic["status"];
   confidence?: number | null;
@@ -169,7 +168,6 @@ export async function GET(request: NextRequest, context: RouteContext) {
           stageId: topic.stage_id ?? stage.id,
           title: topic.title,
           description: topic.description,
-          goal: (topic as BackendFlatRoadmapTopic).goal ?? "",
           position:
             typeof topic.position === "number" && Number.isFinite(topic.position)
               ? topic.position

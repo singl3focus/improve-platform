@@ -119,10 +119,6 @@ export interface DashboardCopy {
   chartStatusCompleted: string;
   chartDeadlinesDayLabel: (date: string) => string;
   chartCountLabel: (count: number) => string;
-  // Feature 3: Goal + Confidence
-  topicGoal: string;
-  topicGoalPlaceholder: string;
-  topicGoalNudge: string;
   confidencePromptTitle: string;
   confidenceSkip: string;
   confidenceLabels: string[];
@@ -278,9 +274,6 @@ const RU_COPY: AppCopy = {
     chartStatusCompleted: "Завершено",
     chartDeadlinesDayLabel: (date) => date,
     chartCountLabel: (count) => `${count}`,
-    topicGoal: "Цель темы",
-    topicGoalPlaceholder: "Что вы сможете делать после изучения этой темы?",
-    topicGoalNudge: "Добавьте цель — это поможет оставаться в фокусе",
     confidencePromptTitle: "Насколько уверенно вы освоили тему?",
     confidenceSkip: "Пропустить",
     confidenceLabels: ["Поверхностно", "Знаю основы", "Понимаю", "Уверенно", "Могу объяснить"],
@@ -426,9 +419,6 @@ const EN_COPY: AppCopy = {
     chartStatusCompleted: "Completed",
     chartDeadlinesDayLabel: (date) => date,
     chartCountLabel: (count) => `${count}`,
-    topicGoal: "Topic goal",
-    topicGoalPlaceholder: "What will you be able to do after learning this topic?",
-    topicGoalNudge: "Add a goal to stay focused",
     confidencePromptTitle: "How confident are you about this topic?",
     confidenceSkip: "Skip",
     confidenceLabels: ["Scratched surface", "Know basics", "Understand", "Confident", "Can teach"],
@@ -464,3 +454,4 @@ export function getAppCopy(language: AppLanguage): AppCopy {
   }
   return EN_COPY;
 }
+

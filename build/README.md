@@ -16,16 +16,14 @@ cd C:\Users\Дом\Documents\1GitProjects\improve-platform
 docker compose -f build/docker-compose.yml up -d --build
 ```
 
-## 3. Важно: обязательный reset БД перед миграциями
+## 3. Поведение БД при старте
 
-Текущий compose-стек специально выполняет **destructive reset** БД при старте,
-чтобы корректно применялась обновлённая `000001_initial_schema.up.sql` даже на уже существующем volume.
+Compose-стек **не сбрасывает данные** при старте. Существующий volume PostgreSQL сохраняется,
+а сервис `migrations` автоматически выполняет `migrate up` и доводит схему до актуальной версии.
 
-- Сервис `migrations_reset` выполняет `DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;` через `psql`.
-- Затем сервис `migrations` выполняет `migrate up`.
-- Это удаляет все существующие данные в локальной БД.
-
-Используйте этот режим только для локального MVP-окружения.
+- На пустой БД миграции разворачивают схему с нуля.
+- На уже инициализированной БД применяются только недостающие миграции.
+- Если схема уже актуальна, состояние `no change` считается успешным и не блокирует запуск `backend`.
 
 ## 4. Первый запуск: миграции БД
 
@@ -35,23 +33,55 @@ docker compose -f build/docker-compose.yml up -d --build
 
 ```powershell
 docker compose -f build/docker-compose.yml up -d --build
-docker compose -f build/docker-compose.yml logs migrations_reset --tail=100
 docker compose -f build/docker-compose.yml logs migrations --tail=100
 ```
 
-## 5. Проверка работоспособности
+## 5. Rollback миграций
+
+`docker compose down` **не откатывает** миграции. Остановка стека и откат схемы БД — это разные операции.
+
+- Проверить текущую версию миграций:
+
+```powershell
+docker compose -f build/docker-compose.yml run --rm migrations version
+```
+
+- Откатить последнюю миграцию:
+
+```powershell
+docker compose -f build/docker-compose.yml run --rm -e MIGRATIONS_ALLOW_DESTRUCTIVE=true migrations down 1
+```
+
+- Откатиться к конкретной версии:
+
+```powershell
+docker compose -f build/docker-compose.yml run --rm -e MIGRATIONS_ALLOW_DESTRUCTIVE=true migrations goto 5
+```
+
+- Повторно применить миграции после rollback:
+
+```powershell
+docker compose -f build/docker-compose.yml up -d --build
+```
+
+Ограничения rollback:
+
+- `down`-миграции обратимы по схеме, но не всегда восстанавливают данные.
+- Миграции, которые удаляют столбцы или таблицы, не могут вернуть содержимое автоматически. Для production это означает: перед релизом с destructive-миграциями нужен backup или snapshot БД.
+- Откат `000004_multiple_roadmaps` назад к одной roadmap на пользователя допускается только если в данных всё ещё не появилось больше одной roadmap на пользователя. Иначе миграция завершится ошибкой и это корректное защитное поведение.
+
+## 6. Проверка работоспособности
 
 | Что проверить | Как |
 |---------------|-----|
 | Конфигурация compose | `docker compose -f build/docker-compose.yml config` — без ошибок |
-| Контейнеры запущены | `docker compose -f build/docker-compose.yml ps` — postgres, backend, frontend в состоянии Up; `migrations_reset` и `migrations` завершились как `Exited (0)` |
-| Reset БД | `docker compose -f build/docker-compose.yml logs migrations_reset --tail=100` — в логах есть `Dropped`/`drop` без ошибок |
+| Контейнеры запущены | `docker compose -f build/docker-compose.yml ps` — postgres, backend, frontend в состоянии Up; `migrations` завершился как `Exited (0)` |
 | Миграции БД | `docker compose -f build/docker-compose.yml logs migrations --tail=100` — в логах есть успешное применение миграций или `no change` |
 | Backend health | В браузере или curl: `http://localhost:8080/readyz` — ответ `{"status":"ok"}` |
 | Frontend | В браузере: `http://localhost:3000` — открывается приложение |
 | Регистрация/логин | Через UI (например, регистрация и вход) — запросы идут на backend |
 
-## 6. Остановка
+## 7. Остановка
 
 ```powershell
 docker compose -f build/docker-compose.yml down

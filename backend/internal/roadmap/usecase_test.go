@@ -21,7 +21,7 @@ type mockRepo struct {
 	createTopicDirectionalFn func(ctx context.Context, userID, roadmapID, currentTopicID, title, description string, direction roadmap.TopicCreateDirection) (roadmap.Topic, error)
 	getTopicByIDFn           func(ctx context.Context, id, userID string) (roadmap.Topic, error)
 	getTopicsByRoadmapIDFn   func(ctx context.Context, roadmapID, userID string) ([]roadmap.Topic, error)
-	updateTopicFn            func(ctx context.Context, id, userID, title, description, goal string, startDate, targetDate *time.Time, position int) error
+	updateTopicFn            func(ctx context.Context, id, userID, title, description string, startDate, targetDate *time.Time, position int) error
 	setTopicConfidenceFn     func(ctx context.Context, id, userID string, confidence int) error
 	updateTopicStatusFn      func(ctx context.Context, id, userID, status string, startDate, completedDate *time.Time) error
 	deleteTopicFn            func(ctx context.Context, id, userID string) error
@@ -73,8 +73,8 @@ func (m *mockRepo) GetTopicByID(ctx context.Context, id, userID string) (roadmap
 func (m *mockRepo) GetTopicsByRoadmapID(ctx context.Context, roadmapID, userID string) ([]roadmap.Topic, error) {
 	return m.getTopicsByRoadmapIDFn(ctx, roadmapID, userID)
 }
-func (m *mockRepo) UpdateTopic(ctx context.Context, id, userID, title, description, goal string, startDate, targetDate *time.Time, position int) error {
-	return m.updateTopicFn(ctx, id, userID, title, description, goal, startDate, targetDate, position)
+func (m *mockRepo) UpdateTopic(ctx context.Context, id, userID, title, description string, startDate, targetDate *time.Time, position int) error {
+	return m.updateTopicFn(ctx, id, userID, title, description, startDate, targetDate, position)
 }
 func (m *mockRepo) SetTopicConfidence(ctx context.Context, id, userID string, confidence int) error {
 	if m.setTopicConfidenceFn != nil {

@@ -1468,6 +1468,12 @@ a {
   cursor: grabbing;
 }
 
+body.roadmap-graph-panning,
+body.roadmap-graph-panning * {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
 body.roadmap-switcher-open .roadmap-graph {
   pointer-events: none;
 }

@@ -24,21 +24,10 @@ export interface TopicMaterial {
   progressPercent: number;
 }
 
-export interface TopicNote {
-  id: string;
-  topicId: string;
-  title: string;
-  content: string;
-  position: number;
-  createdAt: string;
-  updatedAt: string;
-}
-
 export interface TopicWorkspace {
   id: string;
   title: string;
   description: string;
-  goal: string;
   status: TopicWorkspaceStatus;
   confidence: number | null;
   progressPercent: number;

@@ -233,7 +233,7 @@ func (uc *UseCase) UpdateTopic(ctx context.Context, userID, topicID string, req 
 		return apperr.E(op, apperr.Fmt("target_date: %w", err))
 	}
 
-	if err := uc.repo.UpdateTopic(ctx, topicID, userID, req.Title, req.Description, req.Goal, startDate, targetDate, req.Position); err != nil {
+	if err := uc.repo.UpdateTopic(ctx, topicID, userID, req.Title, req.Description, startDate, targetDate, req.Position); err != nil {
 		return apperr.E(op, err)
 	}
 
@@ -423,7 +423,6 @@ func buildTopicResponse(t Topic, depIDs []string, metrics TopicMetrics) TopicRes
 		RoadmapID:       t.RoadmapID,
 		Title:           t.Title,
 		Description:     t.Description,
-		Goal:            t.Goal,
 		Status:          t.Status,
 		Confidence:      t.Confidence,
 		StartDate:       dateutil.Format(t.StartDate),

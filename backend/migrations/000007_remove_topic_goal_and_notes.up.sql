@@ -1,0 +1,3 @@
+DROP TABLE IF EXISTS topic_notes;
+
+ALTER TABLE topics DROP COLUMN IF EXISTS goal;
