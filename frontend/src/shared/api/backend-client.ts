@@ -58,7 +58,8 @@ function extractSessionTokens(payload: unknown): SessionTokens | null {
 async function requestBackend(
   path: string,
   options: BackendFetchOptions,
-  accessToken: string | null
+  accessToken: string | null,
+  forwardedTimeZone: string | null
 ): Promise<BackendFetchResult> {
   const headers: HeadersInit = {
     Accept: "application/json"
@@ -70,6 +71,10 @@ async function requestBackend(
 
   if (options.body !== undefined) {
     headers["Content-Type"] = "application/json";
+  }
+
+  if (forwardedTimeZone) {
+    headers["X-Timezone"] = forwardedTimeZone;
   }
 
   const response = await fetch(getBackendApiUrl(path), {
@@ -207,9 +212,10 @@ export function createBackendClient(request: NextRequest) {
   let accessToken = request.cookies.get(ACCESS_TOKEN_COOKIE)?.value ?? null;
   let refreshToken = request.cookies.get(REFRESH_TOKEN_COOKIE)?.value ?? null;
   let updatedSessionTokens: SessionTokens | null = null;
+  const forwardedTimeZone = request.headers.get("x-timezone");
 
   async function call(path: string, options: BackendFetchOptions): Promise<BackendFetchResult> {
-    const firstAttempt = await requestBackend(path, options, accessToken);
+    const firstAttempt = await requestBackend(path, options, accessToken, forwardedTimeZone);
 
     if (firstAttempt.response.status !== 401 || !refreshToken) {
       return firstAttempt;
@@ -224,7 +230,7 @@ export function createBackendClient(request: NextRequest) {
     accessToken = refreshed.accessToken;
     refreshToken = refreshed.refreshToken;
 
-    return requestBackend(path, options, accessToken);
+    return requestBackend(path, options, accessToken, forwardedTimeZone);
   }
 
   function applyUpdatedSession(response: NextResponse): void {

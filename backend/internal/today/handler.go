@@ -22,13 +22,14 @@ func NewHandler(svc Service) *Handler {
 
 func (h *Handler) GetToday() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := withTimezone(r.Context(), r.Header.Get(timezoneHeader))
 		userID, ok := auth.UserIDFromContext(r.Context())
 		if !ok {
 			httpresp.Error(w, http.StatusUnauthorized, "unauthorized", "user not authenticated")
 			return
 		}
 
-		resp, err := h.svc.GetToday(r.Context(), userID)
+		resp, err := h.svc.GetToday(ctx, userID)
 		if err != nil {
 			handleError(w, err)
 			return
@@ -40,6 +41,7 @@ func (h *Handler) GetToday() http.HandlerFunc {
 
 func (h *Handler) SetTasks() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := withTimezone(r.Context(), r.Header.Get(timezoneHeader))
 		userID, ok := auth.UserIDFromContext(r.Context())
 		if !ok {
 			httpresp.Error(w, http.StatusUnauthorized, "unauthorized", "user not authenticated")
@@ -52,7 +54,7 @@ func (h *Handler) SetTasks() http.HandlerFunc {
 			return
 		}
 
-		if err := h.svc.SetTasks(r.Context(), userID, req); err != nil {
+		if err := h.svc.SetTasks(ctx, userID, req); err != nil {
 			handleError(w, err)
 			return
 		}
@@ -63,6 +65,7 @@ func (h *Handler) SetTasks() http.HandlerFunc {
 
 func (h *Handler) ToggleTask() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := withTimezone(r.Context(), r.Header.Get(timezoneHeader))
 		userID, ok := auth.UserIDFromContext(r.Context())
 		if !ok {
 			httpresp.Error(w, http.StatusUnauthorized, "unauthorized", "user not authenticated")
@@ -81,7 +84,7 @@ func (h *Handler) ToggleTask() http.HandlerFunc {
 			return
 		}
 
-		if err := h.svc.ToggleTask(r.Context(), userID, taskID, req.IsCompleted); err != nil {
+		if err := h.svc.ToggleTask(ctx, userID, taskID, req.IsCompleted); err != nil {
 			handleError(w, err)
 			return
 		}
@@ -92,6 +95,7 @@ func (h *Handler) ToggleTask() http.HandlerFunc {
 
 func (h *Handler) SaveReflection() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := withTimezone(r.Context(), r.Header.Get(timezoneHeader))
 		userID, ok := auth.UserIDFromContext(r.Context())
 		if !ok {
 			httpresp.Error(w, http.StatusUnauthorized, "unauthorized", "user not authenticated")
@@ -104,7 +108,7 @@ func (h *Handler) SaveReflection() http.HandlerFunc {
 			return
 		}
 
-		if err := h.svc.SaveReflection(r.Context(), userID, req); err != nil {
+		if err := h.svc.SaveReflection(ctx, userID, req); err != nil {
 			handleError(w, err)
 			return
 		}

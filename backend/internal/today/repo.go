@@ -183,7 +183,7 @@ func (r *Repo) UpdateTaskStatus(ctx context.Context, taskID, status string) erro
 	return apperr.E(op, err)
 }
 
-func (r *Repo) GetFocusTaskIDs(ctx context.Context, userID string) ([]string, error) {
+func (r *Repo) GetFocusTaskIDs(ctx context.Context, userID string, date time.Time) ([]string, error) {
 	const op apperr.Op = "today.Repo.GetFocusTaskIDs"
 
 	rows, err := r.pool.Query(ctx,
@@ -193,21 +193,21 @@ func (r *Repo) GetFocusTaskIDs(ctx context.Context, userID string) ([]string, er
 		 WHERE t.user_id = $1
 		   AND t.status != 'done'
 		   AND (
-		     (t.deadline IS NOT NULL AND t.deadline <= CURRENT_DATE)
+		     (t.deadline IS NOT NULL AND t.deadline <= $2)
 		     OR t.status = 'in_progress'
 		     OR (t.topic_id IS NOT NULL AND top.status = 'in_progress')
 		   )
 		 ORDER BY
 		   CASE
-		     WHEN t.deadline < CURRENT_DATE AND t.status != 'done' THEN 1
-		     WHEN t.deadline = CURRENT_DATE AND t.status != 'done' THEN 2
+		     WHEN t.deadline < $2 AND t.status != 'done' THEN 1
+		     WHEN t.deadline = $2 AND t.status != 'done' THEN 2
 		     WHEN t.status = 'in_progress' THEN 3
 		     ELSE 4
 		   END ASC,
 		   top.target_date ASC NULLS LAST,
 		   t.created_at ASC
 		 LIMIT 3`,
-		userID)
+		userID, date)
 	if err != nil {
 		return nil, apperr.E(op, err)
 	}

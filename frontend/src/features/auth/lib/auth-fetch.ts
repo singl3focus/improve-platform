@@ -18,14 +18,30 @@ function redirectToLogin(): void {
   window.location.href = "/login";
 }
 
+function getBrowserTimeZone(): string | null {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export async function authFetch(
   input: URL | RequestInfo,
   init?: RequestInit
 ): Promise<Response> {
+  const headers = new Headers(init?.headers);
+  const timeZone = getBrowserTimeZone();
+
+  if (timeZone) {
+    headers.set("X-Timezone", timeZone);
+  }
+
   const response = await fetch(input, {
     ...init,
     cache: "no-store",
-    credentials: "include"
+    credentials: "include",
+    headers
   });
 
   if (response.status === 401) {

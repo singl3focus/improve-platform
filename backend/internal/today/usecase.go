@@ -3,18 +3,17 @@ package today
 import (
 	"context"
 	"log/slog"
-	"time"
 
 	"improve-platform/internal/history"
 	apperr "improve-platform/pkg/errors"
 )
 
 type UseCase struct {
-	repo     *Repo
+	repo     Repository
 	recorder history.EventRecorder
 }
 
-func NewUseCase(repo *Repo) *UseCase {
+func NewUseCase(repo Repository) *UseCase {
 	return &UseCase{repo: repo}
 }
 
@@ -34,8 +33,7 @@ func (uc *UseCase) record(ctx context.Context, ev history.Event) {
 
 func (uc *UseCase) GetToday(ctx context.Context, userID string) (TodayResponse, error) {
 	const op apperr.Op = "today.UseCase.GetToday"
-	now := time.Now()
-	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	today := currentDate(ctx)
 
 	plan, err := uc.repo.GetOrCreatePlan(ctx, userID, today)
 	if err != nil {
@@ -48,7 +46,7 @@ func (uc *UseCase) GetToday(ctx context.Context, userID string) (TodayResponse, 
 		return TodayResponse{}, apperr.E(op, err)
 	}
 	if count == 0 {
-		focusIDs, err := uc.repo.GetFocusTaskIDs(ctx, userID)
+		focusIDs, err := uc.repo.GetFocusTaskIDs(ctx, userID, today)
 		if err != nil {
 			return TodayResponse{}, apperr.E(op, err)
 		}
@@ -82,8 +80,7 @@ func (uc *UseCase) GetToday(ctx context.Context, userID string) (TodayResponse, 
 
 func (uc *UseCase) SetTasks(ctx context.Context, userID string, req SetTodayTasksRequest) error {
 	const op apperr.Op = "today.UseCase.SetTasks"
-	now := time.Now()
-	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	today := currentDate(ctx)
 
 	plan, err := uc.repo.GetOrCreatePlan(ctx, userID, today)
 	if err != nil {
@@ -108,8 +105,7 @@ func (uc *UseCase) SetTasks(ctx context.Context, userID string, req SetTodayTask
 
 func (uc *UseCase) ToggleTask(ctx context.Context, userID, taskID string, isCompleted bool) error {
 	const op apperr.Op = "today.UseCase.ToggleTask"
-	now := time.Now()
-	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	today := currentDate(ctx)
 
 	plan, err := uc.repo.GetOrCreatePlan(ctx, userID, today)
 	if err != nil {
@@ -140,8 +136,7 @@ func (uc *UseCase) ToggleTask(ctx context.Context, userID, taskID string, isComp
 
 func (uc *UseCase) SaveReflection(ctx context.Context, userID string, req SaveReflectionRequest) error {
 	const op apperr.Op = "today.UseCase.SaveReflection"
-	now := time.Now()
-	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	today := currentDate(ctx)
 
 	plan, err := uc.repo.GetOrCreatePlan(ctx, userID, today)
 	if err != nil {

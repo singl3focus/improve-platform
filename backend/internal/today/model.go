@@ -84,6 +84,8 @@ type Repository interface {
 	GetTodayTasks(ctx context.Context, userID string, date time.Time) ([]TodayTask, error)
 	GetCurrentMaterial(ctx context.Context, userID string) (*TodayMaterial, error)
 	GetPlanItemCount(ctx context.Context, planID string) (int, error)
+	GetFocusTaskIDs(ctx context.Context, userID string, date time.Time) ([]string, error)
+	UpdateTaskStatus(ctx context.Context, taskID, status string) error
 }
 
 type FocusTaskProvider interface {
