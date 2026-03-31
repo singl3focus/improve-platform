@@ -1,4 +1,4 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import type { BackendTopicTasksResponse } from "@shared/api/backend-contracts";
 import {
   applyDashboardError,
@@ -9,6 +9,10 @@ import {
   loadRoadmapOrEmpty
 } from "../_shared";
 import { createBackendErrorResponse, isBackendErrorCode } from "@shared/api/backend-client";
+import { mapWithConcurrency } from "@shared/lib/map-with-concurrency";
+
+const IN_PROGRESS_TOPICS_CONCURRENCY = 6;
+const IN_PROGRESS_TOPIC_TIMEOUT_MS = 8_000;
 
 export async function GET(request: NextRequest) {
   const client = createDashboardClient(request);
@@ -23,57 +27,76 @@ export async function GET(request: NextRequest) {
       (topic) => topic.status === "in_progress"
     );
 
-    const payload: Array<{
-      id: string;
-      title: string;
-      progressPercent: number;
-      targetDate: string;
-    }> = [];
+    const payload = await mapWithConcurrency(
+      inProgressTopics,
+      async (topic) => {
+        const tasksResult = await client.call(
+          `/api/v1/roadmap/topics/${encodeURIComponent(topic.id)}/tasks`,
+          {
+            method: "GET",
+            signal: request.signal,
+            timeoutMs: IN_PROGRESS_TOPIC_TIMEOUT_MS
+          }
+        );
 
-    for (const topic of inProgressTopics) {
-      const tasksResult = await client.call(
-        `/api/v1/roadmap/topics/${encodeURIComponent(topic.id)}/tasks`,
-        {
-          method: "GET"
+        if (!tasksResult.response.ok) {
+          if (
+            tasksResult.response.status === 404 &&
+            isBackendErrorCode(tasksResult.payload, "topic_not_found")
+          ) {
+            return {
+              item: {
+                id: topic.id,
+                title: topic.title,
+                progressPercent: 0,
+                targetDate: topic.target_date ?? ""
+              },
+              errorResponse: null as NextResponse | null
+            };
+          }
+
+          return {
+            item: null as {
+              id: string;
+              title: string;
+              progressPercent: number;
+              targetDate: string;
+            } | null,
+            errorResponse: createBackendErrorResponse(
+              tasksResult.response,
+              tasksResult.payload,
+              "Failed to load in-progress topics."
+            )
+          };
         }
-      );
 
-      if (!tasksResult.response.ok) {
-        if (
-          tasksResult.response.status === 404 &&
-          isBackendErrorCode(tasksResult.payload, "topic_not_found")
-        ) {
-          payload.push({
+        const tasksPayload = tasksResult.payload as BackendTopicTasksResponse;
+        return {
+          item: {
             id: topic.id,
             title: topic.title,
-            progressPercent: 0,
+            progressPercent: tasksPayload.percent ?? 0,
             targetDate: topic.target_date ?? ""
-          });
-          continue;
-        }
-
-        return applyDashboardError(
-          client,
-          createBackendErrorResponse(
-            tasksResult.response,
-            tasksResult.payload,
-            "Failed to load in-progress topics."
-          )
-        );
+          },
+          errorResponse: null as NextResponse | null
+        };
+      },
+      {
+        concurrency: IN_PROGRESS_TOPICS_CONCURRENCY,
+        signal: request.signal
       }
+    );
 
-      const tasksPayload = tasksResult.payload as BackendTopicTasksResponse;
-      payload.push({
-        id: topic.id,
-        title: topic.title,
-        progressPercent: tasksPayload.percent ?? 0,
-        targetDate: topic.target_date ?? ""
-      });
+    const failedItem = payload.find((entry) => entry.errorResponse);
+    if (failedItem?.errorResponse) {
+      return applyDashboardError(client, failedItem.errorResponse);
     }
 
-    return dashboardJson(client, payload);
-  } catch {
+    return dashboardJson(
+      client,
+      payload.flatMap((entry) => (entry.item ? [entry.item] : []))
+    );
+  } catch (error) {
     return dashboardUnavailableResponse();
   }
 }
-

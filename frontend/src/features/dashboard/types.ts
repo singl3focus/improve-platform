@@ -93,3 +93,26 @@ export interface DashboardFocus {
   secondaryTasks: DashboardFocusTask[];
   continueTopic: DashboardFocusTopic | null;
 }
+
+export interface DashboardSessionResponse {
+  authenticated: boolean;
+  user?: {
+    id?: string;
+    email?: string;
+    full_name?: string;
+  };
+}
+
+export interface DashboardOverviewResponse {
+  session: DashboardSessionResponse;
+  focus: DashboardFocus;
+  progress: DashboardProgress;
+  roadmapList: import("@features/roadmap/types").RoadmapListItem[];
+  dailySummary: DashboardDailySummary;
+  topicsInProgress: DashboardTopicInProgress[];
+  upcomingTasks: DashboardTask[];
+  charts: DashboardChartsPayload;
+  recentMaterials: DashboardRecentMaterial[];
+  history: DashboardHistoryEvent[];
+  heatmap: ActivityHeatmap;
+}

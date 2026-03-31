@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { Dispatch, FormEvent, SetStateAction } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useUserPreferences } from "@shared/providers/user-preferences-provider";
 import {
   type MaterialDraft,

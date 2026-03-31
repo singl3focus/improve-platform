@@ -11,6 +11,7 @@ import {
   isBackendErrorCode
 } from "@shared/api/backend-client";
 import { buildRoadmapTopicTitleMap } from "@features/roadmap/lib/roadmap-topic-helpers";
+import { mapWithConcurrency } from "@shared/lib/map-with-concurrency";
 
 export interface MaterialWithTopic {
   material: BackendMaterialResponse;
@@ -23,6 +24,9 @@ interface DashboardRoadmapTopic {
   status: "not_started" | "in_progress" | "paused" | "completed";
   target_date?: string | null;
 }
+
+const DASHBOARD_FANOUT_CONCURRENCY = 6;
+const DASHBOARD_BACKEND_TIMEOUT_MS = 8_000;
 
 export function dashboardJson(
   client: ReturnType<typeof createBackendClient>,
@@ -37,8 +41,15 @@ export function dashboardUnavailableResponse(): NextResponse {
   return createBackendUnavailableResponse("Dashboard backend is unavailable.");
 }
 
-export async function loadRoadmapOrEmpty(client: ReturnType<typeof createBackendClient>) {
-  const listResult = await client.call("/api/v1/roadmaps", { method: "GET" });
+export async function loadRoadmapOrEmpty(
+  client: ReturnType<typeof createBackendClient>,
+  options: { signal?: AbortSignal } = {}
+) {
+  const listResult = await client.call("/api/v1/roadmaps", {
+    method: "GET",
+    signal: options.signal,
+    timeoutMs: DASHBOARD_BACKEND_TIMEOUT_MS
+  });
   if (!listResult.response.ok) {
     return {
       roadmap: null as BackendRoadmapResponse | null,
@@ -53,7 +64,11 @@ export async function loadRoadmapOrEmpty(client: ReturnType<typeof createBackend
   const roadmapList = listResult.payload as Array<{ id: string }>;
   let roadmap: BackendRoadmapResponse | null = null;
   if (roadmapList.length > 0) {
-    const rmResult = await client.call(`/api/v1/roadmaps/${encodeURIComponent(roadmapList[0].id)}`, { method: "GET" });
+    const rmResult = await client.call(`/api/v1/roadmaps/${encodeURIComponent(roadmapList[0].id)}`, {
+      method: "GET",
+      signal: options.signal,
+      timeoutMs: DASHBOARD_BACKEND_TIMEOUT_MS
+    });
     if (rmResult.response.ok) {
       roadmap = rmResult.payload as BackendRoadmapResponse;
     }
@@ -83,8 +98,15 @@ export function flattenRoadmapTopics(roadmap: BackendRoadmapResponse | null) {
   return getRoadmapTopics(roadmap);
 }
 
-export async function loadTasks(client: ReturnType<typeof createBackendClient>) {
-  const tasksResult = await client.call("/api/v1/tasks", { method: "GET" });
+export async function loadTasks(
+  client: ReturnType<typeof createBackendClient>,
+  options: { signal?: AbortSignal } = {}
+) {
+  const tasksResult = await client.call("/api/v1/tasks", {
+    method: "GET",
+    signal: options.signal,
+    timeoutMs: DASHBOARD_BACKEND_TIMEOUT_MS
+  });
   if (!tasksResult.response.ok) {
     return {
       tasks: null as BackendTaskResponse[] | null,
@@ -104,7 +126,8 @@ export async function loadTasks(client: ReturnType<typeof createBackendClient>) 
 
 export async function loadMaterials(
   client: ReturnType<typeof createBackendClient>,
-  roadmap: BackendRoadmapResponse | null
+  roadmap: BackendRoadmapResponse | null,
+  options: { signal?: AbortSignal } = {}
 ) {
   const topics = getRoadmapTopics(roadmap);
   if (topics.length === 0) {
@@ -114,41 +137,63 @@ export async function loadMaterials(
     };
   }
 
-  const materials: MaterialWithTopic[] = [];
-  for (const topic of topics) {
-    const materialsResult = await client.call(
-      `/api/v1/roadmap/topics/${encodeURIComponent(topic.id)}/materials`,
-      { method: "GET" }
-    );
+  const batches = await mapWithConcurrency(
+    topics,
+    async (topic) => {
+      const materialsResult = await client.call(
+        `/api/v1/roadmap/topics/${encodeURIComponent(topic.id)}/materials`,
+        {
+          method: "GET",
+          signal: options.signal,
+          timeoutMs: DASHBOARD_BACKEND_TIMEOUT_MS
+        }
+      );
 
-    if (!materialsResult.response.ok) {
-      if (
-        materialsResult.response.status === 404 &&
-        isBackendErrorCode(materialsResult.payload, "topic_not_found")
-      ) {
-        continue;
+      if (!materialsResult.response.ok) {
+        if (
+          materialsResult.response.status === 404 &&
+          isBackendErrorCode(materialsResult.payload, "topic_not_found")
+        ) {
+          return {
+            materials: [] as MaterialWithTopic[],
+            errorResponse: null as NextResponse | null
+          };
+        }
+
+        return {
+          materials: [] as MaterialWithTopic[],
+          errorResponse: createBackendErrorResponse(
+            materialsResult.response,
+            materialsResult.payload,
+            "Failed to load materials."
+          )
+        };
       }
 
       return {
-        materials: [] as MaterialWithTopic[],
-        errorResponse: createBackendErrorResponse(
-          materialsResult.response,
-          materialsResult.payload,
-          "Failed to load materials."
-        )
+        materials: ((materialsResult.payload as BackendMaterialResponse[]) ?? []).map((material) => ({
+          material,
+          topicTitle: topic.title
+        })),
+        errorResponse: null as NextResponse | null
       };
+    },
+    {
+      concurrency: DASHBOARD_FANOUT_CONCURRENCY,
+      signal: options.signal
     }
+  );
 
-    for (const material of (materialsResult.payload as BackendMaterialResponse[]) ?? []) {
-      materials.push({
-        material,
-        topicTitle: topic.title
-      });
-    }
+  const failedBatch = batches.find((batch) => batch.errorResponse);
+  if (failedBatch?.errorResponse) {
+    return {
+      materials: [] as MaterialWithTopic[],
+      errorResponse: failedBatch.errorResponse
+    };
   }
 
   return {
-    materials,
+    materials: batches.flatMap((batch) => batch.materials),
     errorResponse: null as NextResponse | null
   };
 }

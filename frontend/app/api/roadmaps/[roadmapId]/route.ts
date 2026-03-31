@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { RoadmapResponse, RoadmapTopic } from "@features/roadmap/types";
+import type { RoadmapResponse } from "@features/roadmap/types";
 import type {
   BackendRoadmapTopic
 } from "@shared/api/backend-contracts";
@@ -10,6 +10,7 @@ import {
   createBackendUnavailableResponse,
   isBackendErrorCode
 } from "@shared/api/backend-client";
+import { mapWithConcurrency } from "@shared/lib/map-with-concurrency";
 
 interface RouteContext {
   params: {
@@ -41,6 +42,9 @@ interface BackendFlatRoadmapResponse {
   topics: BackendFlatRoadmapTopic[];
 }
 
+const ROADMAP_METRICS_CONCURRENCY = 6;
+const ROADMAP_BACKEND_TIMEOUT_MS = 8_000;
+
 function canSkipTopicMetricsError(status: number): boolean {
   return status >= 500;
 }
@@ -48,11 +52,16 @@ function canSkipTopicMetricsError(status: number): boolean {
 async function loadTopicMetrics(
   client: ReturnType<typeof createBackendClient>,
   roadmapId: string,
-  topicId: string
+  topicId: string,
+  signal?: AbortSignal
 ): Promise<{ metrics: TopicMetrics | null; errorResponse: NextResponse | null }> {
   const tasksResult = await client.call(
     `/api/v1/roadmaps/${encodeURIComponent(roadmapId)}/topics/${encodeURIComponent(topicId)}/tasks`,
-    { method: "GET" }
+    {
+      method: "GET",
+      signal,
+      timeoutMs: ROADMAP_BACKEND_TIMEOUT_MS
+    }
   );
 
   if (!tasksResult.response.ok) {
@@ -74,7 +83,11 @@ async function loadTopicMetrics(
 
   const materialsResult = await client.call(
     `/api/v1/roadmaps/${encodeURIComponent(roadmapId)}/topics/${encodeURIComponent(topicId)}/materials`,
-    { method: "GET" }
+    {
+      method: "GET",
+      signal,
+      timeoutMs: ROADMAP_BACKEND_TIMEOUT_MS
+    }
   );
 
   if (!materialsResult.response.ok) {
@@ -118,7 +131,11 @@ export async function GET(request: NextRequest, context: RouteContext) {
   try {
     const roadmapResult = await client.call(
       `/api/v1/roadmaps/${encodeURIComponent(roadmapId)}`,
-      { method: "GET" }
+      {
+        method: "GET",
+        signal: request.signal,
+        timeoutMs: ROADMAP_BACKEND_TIMEOUT_MS
+      }
     );
 
     if (!roadmapResult.response.ok) {
@@ -154,16 +171,32 @@ export async function GET(request: NextRequest, context: RouteContext) {
       : (roadmapPayload as BackendFlatRoadmapResponse);
 
     for (const stage of normalizedStages) {
-      const mappedTopics: RoadmapTopic[] = [];
-
-      for (const [topicIndex, topic] of (stage.topics ?? []).entries()) {
-        const metricsResult = await loadTopicMetrics(client, roadmapId, topic.id);
-        if (metricsResult.errorResponse) {
-          client.applyUpdatedSession(metricsResult.errorResponse);
-          return metricsResult.errorResponse;
+      const mappedTopics = await mapWithConcurrency(
+        (stage.topics ?? []).map((topic, topicIndex) => ({ topic, topicIndex })),
+        async ({ topic, topicIndex }) => {
+          const metricsResult = await loadTopicMetrics(client, roadmapId, topic.id, request.signal);
+          return {
+            topic,
+            topicIndex,
+            metricsResult
+          };
+        },
+        {
+          concurrency: ROADMAP_METRICS_CONCURRENCY,
+          signal: request.signal
         }
+      );
 
-        mappedTopics.push({
+      const failedTopic = mappedTopics.find((entry) => entry.metricsResult.errorResponse);
+      if (failedTopic?.metricsResult.errorResponse) {
+        client.applyUpdatedSession(failedTopic.metricsResult.errorResponse);
+        return failedTopic.metricsResult.errorResponse;
+      }
+
+      mappedStages.push({
+        id: stage.id,
+        title: stage.title,
+        topics: mappedTopics.map(({ topic, topicIndex, metricsResult }) => ({
           id: topic.id,
           stageId: topic.stage_id ?? stage.id,
           title: topic.title,
@@ -178,13 +211,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
           tasksCount: metricsResult.metrics?.tasksCount ?? 0,
           materialsCount: metricsResult.metrics?.materialsCount ?? 0,
           prerequisiteTopicIds: Array.isArray(topic.dependencies) ? topic.dependencies : []
-        });
-      }
-
-      mappedStages.push({
-        id: stage.id,
-        title: stage.title,
-        topics: mappedTopics
+        }))
       });
     }
 

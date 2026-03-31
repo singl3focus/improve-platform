@@ -97,7 +97,6 @@ select:focus {
   border: 1px solid var(--border);
   background: var(--surface);
   box-shadow: var(--surface-shadow);
-  backdrop-filter: blur(16px);
 }
 
 .app-shell {

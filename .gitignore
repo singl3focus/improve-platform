@@ -1,3 +1,9 @@
 .env
 .playwright-mcp/
 .gocache/
+frontend/.test-dist/
+frontend/perf-traces/
+frontend/playwright-report/
+frontend/test-results/
+frontend/*.log
+frontend/npm-debug.log*

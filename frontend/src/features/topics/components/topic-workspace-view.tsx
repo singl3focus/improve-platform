@@ -1,8 +1,9 @@
 "use client";
 
-import type { Dispatch, FormEvent, SetStateAction } from "react";
+import type { Dispatch, FormEvent, ReactNode, SetStateAction } from "react";
 import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { createPortal } from "react-dom";
 import { Plus } from "lucide-react";
 import { useUserPreferences } from "@shared/providers/user-preferences-provider";
 import {
@@ -28,18 +29,18 @@ const COPY = {
     retry: "Повторить",
     emptyTitle: "Тема не выбрана",
     emptyDescription:
-      "Откройте roadmap и выберите тему, чтобы увидеть рабочее пространство, чеклист и материалы.",
+      "Откройте roadmap и выберите тему, чтобы видеть рабочее пространство, задачи и материалы.",
     openRoadmap: "Открыть roadmap",
     notSet: "Не задано",
     progress: "Прогресс темы",
-    startDate: "Дата начала",
+    startDate: "Дата старта",
     targetDate: "Целевая дата",
     completedAt: "Завершено",
     dependenciesTitle: "Зависимости",
     dependenciesSummary: (done: number, pending: number) => `Выполнено: ${done} · Ожидают: ${pending}`,
     noDependencies: "Для этой темы нет зависимостей.",
     addDependency: "Добавить зависимость",
-    removeDependency: "Убрать",
+    removeDependency: "Удалить",
     selectTopic: "Выберите тему...",
     dependencyRequired: "Обязательная зависимость",
     dependencyOptional: "Необязательная зависимость",
@@ -62,8 +63,8 @@ const COPY = {
     fieldTotalAmount: "Полная мера",
     fieldCompletedAmount: "Выполнено",
     fieldPosition: "Позиция",
-    taskPlaceholderTitle: "Например: Разобрать flex/grid кейсы",
-    taskPlaceholderDescription: "Краткое описание задачи (опционально)",
+    taskPlaceholderTitle: "Например: проверить случаи flex/grid",
+    taskPlaceholderDescription: "Краткое описание задачи (необязательно)",
     materialPlaceholderTitle: "Название материала",
     materialPlaceholderDescription: "Описание материала",
     createButton: "Создать",
@@ -72,7 +73,7 @@ const COPY = {
     taskTitleRequired: "Название задачи обязательно.",
     taskCreateFailed: "Не удалось создать задачу.",
     materialTitleDescRequired: "Название и описание обязательны.",
-    materialAmountInvalid: "Выполненная мера должна быть меньше или равна полной мере.",
+    materialAmountInvalid: "Выполненный объём не может быть больше общего объёма.",
     materialCreateFailed: "Не удалось создать материал.",
     typeBook: "Книга",
     typeArticle: "Статья",
@@ -566,6 +567,9 @@ function MaterialCreateForm({
           onChange={(event) => setDraft((current) => ({ ...current, position: event.target.value }))}
         />
       </label>
+      <button type="submit" className="button button-primary" disabled={isCreating}>
+        {isCreating ? copy.creatingButton : copy.createButton}
+      </button>
       <label className="topic-inline-field topic-inline-field-description">
         <span>{copy.fieldDescription}</span>
         <textarea
@@ -574,11 +578,23 @@ function MaterialCreateForm({
           placeholder={copy.materialPlaceholderDescription}
         />
       </label>
-      <button type="submit" className="button button-primary" disabled={isCreating}>
-        {isCreating ? copy.creatingButton : copy.createButton}
-      </button>
     </form>
   );
+}
+
+function TopicModalPortal({ children }: { children: ReactNode }) {
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+    return () => setIsMounted(false);
+  }, []);
+
+  if (!isMounted) {
+    return null;
+  }
+
+  return createPortal(children, document.body);
 }
 
 function TopicChecklistPanel({
@@ -648,18 +664,20 @@ function TopicChecklistPanel({
         </button>
       </header>
       {isFormOpen ? (
-        <div className="roadmap-modal-overlay" role="presentation" onClick={() => setIsFormOpen(false)}>
-          <section className="roadmap-modal topic-create-modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
-            <div className="roadmap-modal-header">
-              <h4>{copy.addTask}</h4>
-              <button type="button" className="roadmap-modal-close" aria-label={copy.closeModalAria} onClick={() => setIsFormOpen(false)}>
-                ×
-              </button>
-            </div>
-            <TaskCreateForm copy={copy} draft={taskDraft} setDraft={setTaskDraft} isCreating={isCreatingTask} onSubmit={handleSubmit} />
-            {taskMutationError ? <div className="dashboard-error"><p>{taskMutationError}</p></div> : null}
-          </section>
-        </div>
+        <TopicModalPortal>
+          <div className="roadmap-modal-overlay" role="presentation" onClick={() => setIsFormOpen(false)}>
+            <section className="roadmap-modal topic-create-modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+              <div className="roadmap-modal-header">
+                <h4>{copy.addTask}</h4>
+                <button type="button" className="roadmap-modal-close" aria-label={copy.closeModalAria} onClick={() => setIsFormOpen(false)}>
+                  ×
+                </button>
+              </div>
+              <TaskCreateForm copy={copy} draft={taskDraft} setDraft={setTaskDraft} isCreating={isCreatingTask} onSubmit={handleSubmit} />
+              {taskMutationError ? <div className="dashboard-error"><p>{taskMutationError}</p></div> : null}
+            </section>
+          </div>
+        </TopicModalPortal>
       ) : null}
       {topic.checklist.length === 0 ? <p className="dashboard-empty">{copy.checklistEmpty}</p> : null}
       {topic.checklist.length > 0 ? (
@@ -752,18 +770,20 @@ function TopicMaterialsPanel({
         </button>
       </header>
       {isFormOpen ? (
-        <div className="roadmap-modal-overlay" role="presentation" onClick={() => setIsFormOpen(false)}>
-          <section className="roadmap-modal topic-create-modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
-            <div className="roadmap-modal-header">
-              <h4>{copy.addMaterial}</h4>
-              <button type="button" className="roadmap-modal-close" aria-label={copy.closeModalAria} onClick={() => setIsFormOpen(false)}>
-                ×
-              </button>
-            </div>
-            <MaterialCreateForm copy={copy} draft={materialDraft} setDraft={setMaterialDraft} isCreating={isCreatingMaterial} onSubmit={handleSubmit} />
-            {materialMutationError ? <div className="dashboard-error"><p>{materialMutationError}</p></div> : null}
-          </section>
-        </div>
+        <TopicModalPortal>
+          <div className="roadmap-modal-overlay" role="presentation" onClick={() => setIsFormOpen(false)}>
+            <section className="roadmap-modal topic-create-modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+              <div className="roadmap-modal-header">
+                <h4>{copy.addMaterial}</h4>
+                <button type="button" className="roadmap-modal-close" aria-label={copy.closeModalAria} onClick={() => setIsFormOpen(false)}>
+                  ×
+                </button>
+              </div>
+              <MaterialCreateForm copy={copy} draft={materialDraft} setDraft={setMaterialDraft} isCreating={isCreatingMaterial} onSubmit={handleSubmit} />
+              {materialMutationError ? <div className="dashboard-error"><p>{materialMutationError}</p></div> : null}
+            </section>
+          </div>
+        </TopicModalPortal>
       ) : null}
       {topic.materials.length === 0 ? <p className="dashboard-empty">{copy.materialsEmpty}</p> : null}
       {topic.materials.length > 0 ? (

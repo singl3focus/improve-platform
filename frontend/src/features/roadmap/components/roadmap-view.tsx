@@ -10,7 +10,8 @@ import {
   useRef,
   useState
 } from "react";
-import { useRouter } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
+import { useRouter, useSearchParams } from "next/navigation";
 import { authFetch } from "@features/auth/lib/auth-fetch";
 import { ExternalLink, MoreHorizontal, Pencil } from "lucide-react";
 import { useRoadmapGraphLayout } from "@features/roadmap/hooks/use-roadmap-graph-layout";
@@ -82,10 +83,10 @@ const ROADMAP_COPY = {
   ru: {
     title: "Дорожная карта обучения",
     subtitle: "Отслеживайте прогресс по этапам и связи между темами.",
-    loadingTitle: "Загрузка графа roadmap...",
+    loadingTitle: "Загрузка roadmap...",
     retry: "Повторить",
-    zoomIn: "Увеличить",
-    zoomOut: "Уменьшить",
+    zoomIn: "Приблизить",
+    zoomOut: "Отдалить",
     recenter: "Центр",
     fitAll: "Показать всё",
     errorFallback: "Не удалось загрузить roadmap.",
@@ -95,47 +96,47 @@ const ROADMAP_COPY = {
     progress: "Прогресс",
     tasksCount: (count: number) => `${count} задач`,
     materialsCount: (count: number) => `${count} материалов`,
-    legendCompleted: (count: number) => `Выполнено (${count})`,
+    legendCompleted: (count: number) => `Завершено (${count})`,
     legendInProgress: (count: number) => `В работе (${count})`,
     nextAvailableTopic: (value: string) => `Следующая тема: ${value}`,
-    noUnlockedTopics: "Нет незавершенных тем.",
-    empty: "Дорожная карта пока пуста. Добавьте темы и зависимости, чтобы построить граф.",
+    noUnlockedTopics: "Нет доступных тем.",
+    empty: "В roadmap пока нет тем. Добавьте темы и зависимости, чтобы построить граф.",
     quickCreateTitle: "Быстрое создание первой темы",
     quickCreateSubtitle:
-      "Создадим roadmap, этап и первую тему одним действием. Вы сможете отредактировать детали позже.",
+      "Создайте roadmap, этап и первую тему одним действием. Подробности можно изменить позже.",
     quickCreateTopicLabel: "Название темы",
-    quickCreateTopicPlaceholder: "Например: Основы HTML и CSS",
+    quickCreateTopicPlaceholder: "Например: основы HTML и CSS",
     quickCreateDescriptionLabel: "Описание темы",
-    quickCreateDescriptionPlaceholder: "Кратко: что нужно изучить по этой теме",
+    quickCreateDescriptionPlaceholder: "Коротко: что нужно изучить в этой теме",
     quickCreateButton: "Создать первую тему",
     quickCreatingButton: "Создание...",
-    quickCreateTopicRequired: "Укажите название первой темы.",
+    quickCreateTopicRequired: "Название первой темы обязательно.",
     quickCreateFailed: "Не удалось создать первую тему.",
     topicCreateTitle: "Добавить тему",
-    topicCreateSubtitle: "Создайте новую тему в текущем roadmap.",
+    topicCreateSubtitle: "Заполните данные темы и добавьте её в roadmap.",
     topicCreateDirectionTitle: (direction: TopicCreateDirection) => {
       if (direction === "left") {
-        return "Создать тему слева";
+        return "Добавить тему слева";
       }
       if (direction === "right") {
-        return "Создать тему справа";
+        return "Добавить тему справа";
       }
-      return "Создать тему ниже";
+      return "Добавить тему ниже";
     },
     topicCreateDirectionSubtitle: (parentTitle: string, direction: TopicCreateDirection) => {
       if (direction === "left") {
-        return `Новая тема будет создана слева от «${parentTitle}» со связью от текущей темы.`;
+        return `Новая тема будет показана слева от «${parentTitle}» и свяжется с текущей темой.`;
       }
       if (direction === "right") {
-        return `Новая тема будет создана справа от «${parentTitle}» со связью от текущей темы.`;
+        return `Новая тема будет показана справа от «${parentTitle}» и свяжется с текущей темой.`;
       }
-      return `Новая тема будет создана ниже «${parentTitle}» со связью от текущей темы.`;
+      return `Новая тема будет показана ниже «${parentTitle}» и свяжется с текущей темой.`;
     },
     topicFieldTitle: "Название",
     topicFieldDescription: "Описание",
     topicFieldStatus: "Статус",
-    topicTitlePlaceholder: "Например: Работа с формами",
-    topicDescriptionPlaceholder: "Кратко: что изучаем в этой теме",
+    topicTitlePlaceholder: "Например: основы JavaScript",
+    topicDescriptionPlaceholder: "Коротко: что будет внутри темы",
     topicCreateButton: "Добавить тему",
     topicCreatingButton: "Добавление...",
     topicCreateDirectionButton: (direction: TopicCreateDirection) => {
@@ -163,20 +164,20 @@ const ROADMAP_COPY = {
     topicMenuCreateRight: "Создать справа",
     topicMenuCreateBelow: "Создать ниже",
     topicCreateDependencyFailedAfterCreate:
-      "Тема создана, но автосвязь с родительской темой не добавлена. Свяжите темы вручную.",
-    topicCreateCloseAria: "Закрыть окно создания темы",
+      "Тема создана, но связь с родительской темой не сохранилась. Проверьте граф позже.",
+    topicCreateCloseAria: "Закрыть окно добавления темы",
     topicEditCloseAria: "Закрыть окно редактирования темы",
     topicSaveButton: "Сохранить",
     topicCancelButton: "Отмена",
     topicUpdatingButton: "Сохранение...",
     topicDeletingButton: "Удаление...",
     topicStageRequired: "Выберите этап для темы.",
-    topicTitleRequired: "Укажите название темы.",
-    topicCreateFailed: "Не удалось добавить тему.",
+    topicTitleRequired: "Название темы обязательно.",
+    topicCreateFailed: "Не удалось создать тему.",
     topicUpdateFailed: "Не удалось обновить тему.",
     topicDeleteFailed: "Не удалось удалить тему.",
     topicStatusInvalidTransition: (from: string, to: string, allowed: string) =>
-      `Нельзя перевести тему из «${from}» в «${to}». Допустимые переходы: ${allowed}.`,
+      `Нельзя перевести тему из «${from}» в «${to}». Доступные статусы: ${allowed}.`,
     topicDeleteConfirm: (title: string) => `Удалить тему «${title}»?`,
     dependencyControlsAria: "Управление связями графа",
     dependencyRemoveEdgeAria: (fromTitle: string, toTitle: string) =>
@@ -496,15 +497,6 @@ function getRoadmapItemSubmittingLabel(type: RoadmapType, language: AppLanguage)
   return "Adding...";
 }
 
-function initialRoadmapState(): RoadmapState {
-  return {
-    status: "loading",
-    data: null,
-    errorMessage: null,
-    missingRoadmapId: null
-  };
-}
-
 async function fetchRoadmap(roadmapId: string, signal: AbortSignal): Promise<RoadmapResponse> {
   const response = await authFetch(`/api/roadmaps/${encodeURIComponent(roadmapId)}`, {
     method: "GET",
@@ -735,64 +727,56 @@ function getStatusClassName(status: RoadmapTopicStatus): string {
 }
 
 function useRoadmapData(roadmapId: string | null, errorFallback: string) {
-  const [state, setState] = useState<RoadmapState>(initialRoadmapState());
-  const [reloadKey, setReloadKey] = useState(0);
-  const reload = useCallback(() => setReloadKey((value) => value + 1), []);
+  const roadmapQuery = useQuery({
+    queryKey: ["roadmap", roadmapId],
+    queryFn: ({ signal }) => fetchRoadmap(roadmapId!, signal),
+    enabled: Boolean(roadmapId),
+    retry: false
+  });
 
-  useEffect(() => {
-    if (!roadmapId) {
-      setState({
+  if (!roadmapId) {
+    return {
+      state: {
         status: "success",
         data: null,
         errorMessage: null,
         missingRoadmapId: null
-      });
-      return;
-    }
-
-    const controller = new AbortController();
-
-    async function load() {
-      setState(initialRoadmapState());
-      try {
-        const payload = await fetchRoadmap(roadmapId!, controller.signal);
-        setState({
-          status: "success",
-          data: payload,
-          errorMessage: null,
-          missingRoadmapId: null
-        });
-      } catch (error) {
-        if (controller.signal.aborted) {
-          return;
-        }
-
-        if (getErrorCode(error) === "roadmap_not_found") {
-          setState({
-            status: "success",
-            data: null,
-            errorMessage: null,
-            missingRoadmapId: roadmapId
-          });
-          return;
-        }
-
-        setState({
-          status: "error",
-          data: null,
-          errorMessage: error instanceof Error ? error.message : errorFallback,
-          missingRoadmapId: null
-        });
+      } satisfies RoadmapState,
+      reload: () => {
+        void roadmapQuery.refetch();
       }
-    }
+    };
+  }
 
-    void load();
-    return () => controller.abort();
-  }, [reloadKey, roadmapId, errorFallback]);
+  if (roadmapQuery.isError && getErrorCode(roadmapQuery.error) === "roadmap_not_found") {
+    return {
+      state: {
+        status: "success",
+        data: null,
+        errorMessage: null,
+        missingRoadmapId: roadmapId
+      } satisfies RoadmapState,
+      reload: () => {
+        void roadmapQuery.refetch();
+      }
+    };
+  }
 
   return {
-    state,
-    reload
+    state: {
+      status: roadmapQuery.isPending ? "loading" : roadmapQuery.isError ? "error" : "success",
+      data: roadmapQuery.data ?? null,
+      errorMessage:
+        roadmapQuery.isError && !(getErrorCode(roadmapQuery.error) === "roadmap_not_found")
+          ? roadmapQuery.error instanceof Error
+            ? roadmapQuery.error.message
+            : errorFallback
+          : null,
+      missingRoadmapId: null
+    } satisfies RoadmapState,
+    reload: () => {
+      void roadmapQuery.refetch();
+    }
   };
 }
 
@@ -884,6 +868,7 @@ function TypedRoadmapEmptyState(props: {
 
 function RoadmapCreateEntryState(props: {
   language: AppLanguage;
+  createHref: string;
   onOpenCreate: () => void;
 }) {
   return (
@@ -894,9 +879,17 @@ function RoadmapCreateEntryState(props: {
           ? "Сначала создайте roadmap, а затем выберите её тип и название."
           : "Start by creating a roadmap, then choose its type and title."}
       </p>
-      <button type="button" className="button button-primary" onClick={props.onOpenCreate}>
+      <a
+        href={props.createHref}
+        role="button"
+        className="button button-primary roadmap-empty-create-button"
+        onClick={(event) => {
+          event.preventDefault();
+          props.onOpenCreate();
+        }}
+      >
         {props.language === "ru" ? "Создать первую roadmap" : "Create first roadmap"}
-      </button>
+      </a>
     </div>
   );
 }
@@ -1144,11 +1137,16 @@ function CyclesRoadmapRenderer(props: {
 
 export function RoadmapView() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { language, activeRoadmapId, setActiveRoadmapId } = useUserPreferences();
+  const shouldOpenRoadmapCreatePanel = searchParams.get("create") === "1";
   const copy = ROADMAP_COPY[language];
   const roadmap = useRoadmapData(activeRoadmapId, copy.errorFallback);
   const graphRef = useRef<HTMLDivElement | null>(null);
+  const graphCanvasRef = useRef<HTMLDivElement | null>(null);
+  const graphSceneRef = useRef<HTMLDivElement | null>(null);
   const topicRefs = useRef<Map<string, HTMLElement>>(new Map());
+  const topicRefCallbacks = useRef<Map<string, (element: HTMLElement | null) => void>>(new Map());
   const topicCreateModalTitleInputRef = useRef<HTMLInputElement | null>(null);
   const topicModalTitleInputRef = useRef<HTMLInputElement | null>(null);
   const topicCreateModalTriggerRef = useRef<HTMLElement | null>(null);
@@ -1156,23 +1154,32 @@ export function RoadmapView() {
   const panStartPointRef = useRef<{ x: number; y: number } | null>(null);
   const panStartOffsetRef = useRef<{ x: number; y: number } | null>(null);
   const pendingFirstTopicCenterRef = useRef(false);
+  const transformFrameRef = useRef<number | null>(null);
+  const pendingTransformRef = useRef<{ scale: number; offsetX: number; offsetY: number } | null>(null);
+  const wheelCommitTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const interactionResetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [sceneTransform, setSceneTransform] = useState({
     scale: 1,
     offsetX: 0,
     offsetY: 0
   });
+  const sceneTransformRef = useRef(sceneTransform);
   const [panPointerId, setPanPointerId] = useState<number | null>(null);
+  const [isGraphInteracting, setIsGraphInteracting] = useState(false);
+  const [layoutVersion, setLayoutVersion] = useState(0);
   const { connections, graphSize } = useRoadmapGraphLayout({
     status: roadmap.state.status,
     data: roadmap.state.data,
     graphRef,
+    sceneRef: graphSceneRef,
     topicRefs,
-    transform: sceneTransform
+    transformRef: sceneTransformRef,
+    layoutVersion
   });
   const [roadmapCreateDraft, setRoadmapCreateDraft] = useState<RoadmapCreateDraft>(initialRoadmapCreateDraft());
   const [roadmapCreateError, setRoadmapCreateError] = useState<string | null>(null);
   const [isRoadmapCreating, setIsRoadmapCreating] = useState(false);
-  const [isRoadmapCreatePanelOpen, setIsRoadmapCreatePanelOpen] = useState(false);
+  const [isRoadmapCreatePanelOpen, setIsRoadmapCreatePanelOpen] = useState(shouldOpenRoadmapCreatePanel);
   const [topicCreateDraft, setTopicCreateDraft] = useState<TopicCreateDraft>(initialTopicCreateDraft());
   const [topicEditDraft, setTopicEditDraft] = useState<TopicEditDraft | null>(null);
   const [editingTopicId, setEditingTopicId] = useState<string | null>(null);
@@ -1188,6 +1195,67 @@ export function RoadmapView() {
   } | null>(null);
   const [dependencyMutationError, setDependencyMutationError] = useState<string | null>(null);
   const [removingDependencyKey, setRemovingDependencyKey] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (shouldOpenRoadmapCreatePanel) {
+      setIsRoadmapCreatePanelOpen(true);
+    }
+  }, [shouldOpenRoadmapCreatePanel]);
+
+  const applySceneTransform = useCallback(
+    (
+      nextTransform: { scale: number; offsetX: number; offsetY: number },
+      options: { commit?: boolean } = {}
+    ) => {
+      sceneTransformRef.current = nextTransform;
+      pendingTransformRef.current = nextTransform;
+
+      if (transformFrameRef.current === null) {
+        transformFrameRef.current = requestAnimationFrame(() => {
+          const latestTransform = pendingTransformRef.current;
+          transformFrameRef.current = null;
+          pendingTransformRef.current = null;
+          if (graphCanvasRef.current && latestTransform) {
+            graphCanvasRef.current.style.transform = `translate3d(${latestTransform.offsetX}px, ${latestTransform.offsetY}px, 0) scale(${latestTransform.scale})`;
+          }
+        });
+      }
+
+      if (options.commit !== false) {
+        setSceneTransform((current) =>
+          current.scale === nextTransform.scale &&
+          current.offsetX === nextTransform.offsetX &&
+          current.offsetY === nextTransform.offsetY
+            ? current
+            : nextTransform
+        );
+      }
+    },
+    []
+  );
+
+  const scheduleCommittedSceneTransform = useCallback(() => {
+    if (wheelCommitTimeoutRef.current) {
+      clearTimeout(wheelCommitTimeoutRef.current);
+    }
+
+    wheelCommitTimeoutRef.current = setTimeout(() => {
+      setSceneTransform(sceneTransformRef.current);
+      wheelCommitTimeoutRef.current = null;
+    }, 120);
+  }, []);
+
+  const markGraphInteraction = useCallback(() => {
+    setIsGraphInteracting(true);
+    if (interactionResetTimeoutRef.current) {
+      clearTimeout(interactionResetTimeoutRef.current);
+    }
+
+    interactionResetTimeoutRef.current = setTimeout(() => {
+      setIsGraphInteracting(false);
+      interactionResetTimeoutRef.current = null;
+    }, 180);
+  }, []);
 
   const stages = useMemo(() => roadmap.state.data?.stages ?? [], [roadmap.state.data]);
 
@@ -1246,6 +1314,22 @@ export function RoadmapView() {
       : getFirstRoadmapItemActionLabel(roadmapType, language);
 
   useEffect(() => {
+    applySceneTransform(sceneTransform, { commit: false });
+
+    return () => {
+      if (transformFrameRef.current) {
+        cancelAnimationFrame(transformFrameRef.current);
+      }
+      if (wheelCommitTimeoutRef.current) {
+        clearTimeout(wheelCommitTimeoutRef.current);
+      }
+      if (interactionResetTimeoutRef.current) {
+        clearTimeout(interactionResetTimeoutRef.current);
+      }
+    };
+  }, [applySceneTransform, sceneTransform]);
+
+  useEffect(() => {
     if (activeRoadmapId && roadmap.state.missingRoadmapId === activeRoadmapId) {
       setActiveRoadmapId(null);
     }
@@ -1253,22 +1337,25 @@ export function RoadmapView() {
 
   const updateSceneScale = useCallback((
     nextScaleCandidate: number,
-    anchor: { x: number; y: number }
+    anchor: { x: number; y: number },
+    options: { commit?: boolean } = {}
   ) => {
-    setSceneTransform((current) => {
-      const nextScale = clampGraphScale(nextScaleCandidate, ROADMAP_MIN_SCALE, ROADMAP_MAX_SCALE);
-      if (nextScale === current.scale) {
-        return current;
-      }
+    const current = sceneTransformRef.current;
+    const nextScale = clampGraphScale(nextScaleCandidate, ROADMAP_MIN_SCALE, ROADMAP_MAX_SCALE);
+    if (nextScale === current.scale) {
+      return;
+    }
 
-      const nextOffset = getGraphOffsetForScale(anchor, current, nextScale);
-      return {
+    const nextOffset = getGraphOffsetForScale(anchor, current, nextScale);
+    applySceneTransform(
+      {
         scale: nextScale,
         offsetX: nextOffset.x,
         offsetY: nextOffset.y
-      };
-    });
-  }, []);
+      },
+      options
+    );
+  }, [applySceneTransform]);
 
   const recenterGraphScene = useCallback((targetScale?: number) => {
     const graphElement = graphRef.current;
@@ -1277,7 +1364,7 @@ export function RoadmapView() {
     }
 
     const nextScale = clampGraphScale(
-      targetScale ?? sceneTransform.scale,
+      targetScale ?? sceneTransformRef.current.scale,
       ROADMAP_MIN_SCALE,
       ROADMAP_MAX_SCALE
     );
@@ -1295,10 +1382,11 @@ export function RoadmapView() {
 
       const topicRect = topicElement.getBoundingClientRect();
       const graphRect = graphElement.getBoundingClientRect();
-      const left = (topicRect.left - graphRect.left - sceneTransform.offsetX) / sceneTransform.scale;
-      const top = (topicRect.top - graphRect.top - sceneTransform.offsetY) / sceneTransform.scale;
-      const width = topicRect.width / sceneTransform.scale;
-      const height = topicRect.height / sceneTransform.scale;
+      const current = sceneTransformRef.current;
+      const left = (topicRect.left - graphRect.left - current.offsetX) / current.scale;
+      const top = (topicRect.top - graphRect.top - current.offsetY) / current.scale;
+      const width = topicRect.width / current.scale;
+      const height = topicRect.height / current.scale;
 
       minX = Math.min(minX, left);
       minY = Math.min(minY, top);
@@ -1315,12 +1403,12 @@ export function RoadmapView() {
     const viewportCenterX = graphElement.clientWidth / 2;
     const viewportCenterY = graphElement.clientHeight / 2;
 
-    setSceneTransform({
+    applySceneTransform({
       scale: nextScale,
       offsetX: viewportCenterX - centerX * nextScale,
       offsetY: viewportCenterY - centerY * nextScale
     });
-  }, [allTopics, sceneTransform.offsetX, sceneTransform.offsetY, sceneTransform.scale]);
+  }, [allTopics, applySceneTransform]);
 
   const centerTopicInViewport = useCallback((topicId: string, targetScale?: number) => {
     const graphElement = graphRef.current;
@@ -1330,7 +1418,7 @@ export function RoadmapView() {
     }
 
     const nextScale = clampGraphScale(
-      targetScale ?? sceneTransform.scale,
+      targetScale ?? sceneTransformRef.current.scale,
       ROADMAP_MIN_SCALE,
       ROADMAP_MAX_SCALE
     );
@@ -1340,17 +1428,18 @@ export function RoadmapView() {
       x: topicRect.left - graphRect.left + topicRect.width / 2,
       y: topicRect.top - graphRect.top + topicRect.height / 2
     };
+    const current = sceneTransformRef.current;
     const worldCenter = {
-      x: (renderedCenter.x - sceneTransform.offsetX) / sceneTransform.scale,
-      y: (renderedCenter.y - sceneTransform.offsetY) / sceneTransform.scale
+      x: (renderedCenter.x - current.offsetX) / current.scale,
+      y: (renderedCenter.y - current.offsetY) / current.scale
     };
 
-    setSceneTransform({
+    applySceneTransform({
       scale: nextScale,
       offsetX: graphElement.clientWidth / 2 - worldCenter.x * nextScale,
       offsetY: graphElement.clientHeight / 2 - worldCenter.y * nextScale
     });
-  }, [sceneTransform.offsetX, sceneTransform.offsetY, sceneTransform.scale]);
+  }, [applySceneTransform]);
 
   useEffect(() => {
     if (!editingTopicId) {
@@ -1454,29 +1543,17 @@ export function RoadmapView() {
       }
 
       event.preventDefault();
+      markGraphInteraction();
       const graphRect = graphElement.getBoundingClientRect();
       const anchor = {
         x: event.clientX - graphRect.left,
         y: event.clientY - graphRect.top
       };
 
-      setSceneTransform((current) => {
-        const nextScale = clampGraphScale(
-          current.scale + behavior.scaleDelta,
-          ROADMAP_MIN_SCALE,
-          ROADMAP_MAX_SCALE
-        );
-        if (nextScale === current.scale) {
-          return current;
-        }
-
-        const nextOffset = getGraphOffsetForScale(anchor, current, nextScale);
-        return {
-          scale: nextScale,
-          offsetX: nextOffset.x,
-          offsetY: nextOffset.y
-        };
+      updateSceneScale(sceneTransformRef.current.scale + behavior.scaleDelta, anchor, {
+        commit: false
       });
+      scheduleCommittedSceneTransform();
     };
 
     graphElement.addEventListener("wheel", onGraphWheel, { passive: false });
@@ -1484,7 +1561,7 @@ export function RoadmapView() {
     return () => {
       graphElement.removeEventListener("wheel", onGraphWheel);
     };
-  }, [roadmap.state.status, stages.length]);
+  }, [markGraphInteraction, roadmap.state.status, stages.length, scheduleCommittedSceneTransform, updateSceneScale]);
 
   useEffect(() => {
     if (!isTopicCreateModalOpen) {
@@ -1499,8 +1576,6 @@ export function RoadmapView() {
       return;
     }
 
-    document.body.classList.add("roadmap-graph-panning");
-
     const onPointerMove = (event: PointerEvent) => {
       if (event.pointerId !== panPointerId) {
         return;
@@ -1512,13 +1587,14 @@ export function RoadmapView() {
         return;
       }
 
+      markGraphInteraction();
       const nextOffsetX = startOffset.x + (event.clientX - startPoint.x);
       const nextOffsetY = startOffset.y + (event.clientY - startPoint.y);
-      setSceneTransform((current) => ({
-        ...current,
+      applySceneTransform({
+        ...sceneTransformRef.current,
         offsetX: nextOffsetX,
         offsetY: nextOffsetY
-      }));
+      }, { commit: false });
     };
 
     const onPointerUp = (event: PointerEvent) => {
@@ -1526,6 +1602,7 @@ export function RoadmapView() {
         return;
       }
 
+      setSceneTransform(sceneTransformRef.current);
       setPanPointerId(null);
       panStartPointRef.current = null;
       panStartOffsetRef.current = null;
@@ -1546,14 +1623,13 @@ export function RoadmapView() {
     document.addEventListener("selectstart", onSelectStart);
 
     return () => {
-      document.body.classList.remove("roadmap-graph-panning");
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("pointerup", onPointerUp);
       window.removeEventListener("pointercancel", onPointerUp);
       window.removeEventListener("contextmenu", onContextMenu);
       document.removeEventListener("selectstart", onSelectStart);
     };
-  }, [panPointerId]);
+  }, [applySceneTransform, markGraphInteraction, panPointerId]);
 
   useEffect(() => {
     if (!pendingFirstTopicCenterRef.current) {
@@ -1648,14 +1724,39 @@ export function RoadmapView() {
     }
   }
 
-  function setTopicElement(topicId: string, element: HTMLElement | null) {
+  const setTopicElement = useCallback((topicId: string, element: HTMLElement | null) => {
     if (element) {
+      if (topicRefs.current.get(topicId) === element) {
+        return;
+      }
       topicRefs.current.set(topicId, element);
+      setLayoutVersion((current) => current + 1);
       return;
     }
 
+    if (!topicRefs.current.has(topicId)) {
+      return;
+    }
     topicRefs.current.delete(topicId);
-  }
+    setLayoutVersion((current) => current + 1);
+  }, []);
+
+  const getTopicElementRef = useCallback((topicId: string) => {
+    const existing = topicRefCallbacks.current.get(topicId);
+    if (existing) {
+      return existing;
+    }
+
+    const callback = (element: HTMLElement | null) => {
+      setTopicElement(topicId, element);
+      if (element === null) {
+        topicRefCallbacks.current.delete(topicId);
+      }
+    };
+
+    topicRefCallbacks.current.set(topicId, callback);
+    return callback;
+  }, [setTopicElement]);
 
   async function handleRoadmapCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1941,8 +2042,8 @@ export function RoadmapView() {
       y: event.clientY
     };
     panStartOffsetRef.current = {
-      x: sceneTransform.offsetX,
-      y: sceneTransform.offsetY
+      x: sceneTransformRef.current.offsetX,
+      y: sceneTransformRef.current.offsetY
     };
   }
 
@@ -1960,10 +2061,11 @@ export function RoadmapView() {
       if (!el) continue;
       const tr = el.getBoundingClientRect();
       const gr = graphElement.getBoundingClientRect();
-      const left = (tr.left - gr.left - sceneTransform.offsetX) / sceneTransform.scale;
-      const top = (tr.top - gr.top - sceneTransform.offsetY) / sceneTransform.scale;
-      const width = tr.width / sceneTransform.scale;
-      const height = tr.height / sceneTransform.scale;
+      const current = sceneTransformRef.current;
+      const left = (tr.left - gr.left - current.offsetX) / current.scale;
+      const top = (tr.top - gr.top - current.offsetY) / current.scale;
+      const width = tr.width / current.scale;
+      const height = tr.height / current.scale;
       minX = Math.min(minX, left);
       minY = Math.min(minY, top);
       maxX = Math.max(maxX, left + width);
@@ -1986,7 +2088,7 @@ export function RoadmapView() {
     const centerX = (minX + maxX) / 2;
     const centerY = (minY + maxY) / 2;
 
-    setSceneTransform({
+    applySceneTransform({
       scale: fitScale,
       offsetX: graphElement.clientWidth / 2 - centerX * fitScale,
       offsetY: graphElement.clientHeight / 2 - centerY * fitScale
@@ -1999,7 +2101,7 @@ export function RoadmapView() {
       return;
     }
 
-    updateSceneScale(sceneTransform.scale + 0.12, {
+    updateSceneScale(sceneTransformRef.current.scale + 0.12, {
       x: graphElement.clientWidth / 2,
       y: graphElement.clientHeight / 2
     });
@@ -2011,7 +2113,7 @@ export function RoadmapView() {
       return;
     }
 
-    updateSceneScale(sceneTransform.scale - 0.12, {
+    updateSceneScale(sceneTransformRef.current.scale - 0.12, {
       x: graphElement.clientWidth / 2,
       y: graphElement.clientHeight / 2
     });
@@ -2371,13 +2473,15 @@ export function RoadmapView() {
               onPointerDown={handleGraphPointerDown}
               data-panning={panPointerId !== null ? "true" : "false"}
             >
-              <div
-                className="roadmap-graph-canvas"
-                style={{
-                  width: `${graphSize.width}px`,
-                  height: `${graphSize.height}px`,
-                  transform: `translate(${sceneTransform.offsetX}px, ${sceneTransform.offsetY}px) scale(${sceneTransform.scale})`
-                }}
+            <div
+              className="roadmap-graph-canvas"
+              ref={graphCanvasRef}
+              data-interacting={isGraphInteracting ? "true" : "false"}
+              style={{
+                width: `${graphSize.width}px`,
+                height: `${graphSize.height}px`,
+                transform: `translate3d(${sceneTransform.offsetX}px, ${sceneTransform.offsetY}px, 0) scale(${sceneTransform.scale})`
+              }}
               >
                 <svg
                   className="roadmap-connections"
@@ -2444,6 +2548,7 @@ export function RoadmapView() {
 
                 <div
                   className="roadmap-graph-scene"
+                  ref={graphSceneRef}
                   aria-label={copy.stageAria}
                 >
                 <ul
@@ -2464,7 +2569,7 @@ export function RoadmapView() {
                         }}
                       >
                           <article
-                            ref={(element) => setTopicElement(topic.id, element)}
+                            ref={getTopicElementRef(topic.id)}
                             data-roadmap-topic-id={topic.id}
                             className="roadmap-topic-card"
                             role="link"
@@ -2659,6 +2764,7 @@ export function RoadmapView() {
           ) : (
             <RoadmapCreateEntryState
               language={language}
+              createHref="/roadmap?create=1"
               onOpenCreate={() => {
                 setRoadmapCreateError(null);
                 setRoadmapCreateDraft(initialRoadmapCreateDraft());

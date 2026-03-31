@@ -43,7 +43,7 @@ const RU_HEATMAP: HeatmapCopy = {
   title: "Активность",
   streak: (n) => `Серия: ${n} дн.`,
   activeDays: (n) => `Активных дней: ${n}`,
-  tooltip: (date, count) => `${date}: ${count} событий`,
+  tooltip: (date, count) => `${date}: ${count} активностей`,
   loading: "Загрузка...",
   months: ["Янв", "Фев", "Мар", "Апр", "Май", "Июн", "Июл", "Авг", "Сен", "Окт", "Ноя", "Дек"],
   less: "Меньше",
@@ -131,17 +131,20 @@ function getMonthLabels(start: Date, totalWeeks: number, months: string[]) {
   return labels;
 }
 
-export function ActivityHeatmap() {
-  const { copy: appCopy } = useUserPreferences();
-  const isRu = appCopy.navigation.ariaPrimary === "Основная навигация";
+export function ActivityHeatmap({ data: initialData }: { data?: ActivityHeatmapData | null }) {
+  const { language } = useUserPreferences();
+  const isRu = language === "ru";
   const copy = isRu ? RU_HEATMAP : EN_HEATMAP;
   const [tooltip, setTooltip] = useState<string | null>(null);
 
-  const { data, isLoading } = useQuery({
+  const heatmapQuery = useQuery({
     queryKey: ["activity-heatmap"],
     queryFn: fetchHeatmap,
-    staleTime: 60 * 1000
+    staleTime: 60 * 1000,
+    enabled: !initialData
   });
+  const data = initialData ?? heatmapQuery.data;
+  const isLoading = !initialData && heatmapQuery.isLoading;
 
   const grid = useMemo(() => {
     if (!data) return null;

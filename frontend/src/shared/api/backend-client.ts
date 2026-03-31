@@ -12,6 +12,8 @@ interface SessionTokens {
 interface BackendFetchOptions {
   method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   body?: unknown;
+  signal?: AbortSignal;
+  timeoutMs?: number;
 }
 
 interface BackendFetchResult {
@@ -77,15 +79,42 @@ async function requestBackend(
     headers["X-Timezone"] = forwardedTimeZone;
   }
 
-  const response = await fetch(getBackendApiUrl(path), {
-    method: options.method,
-    cache: "no-store",
-    headers,
-    body: options.body !== undefined ? JSON.stringify(options.body) : undefined
-  });
+  const controller = new AbortController();
+  const cleanupCallbacks: Array<() => void> = [];
 
-  const payload = await readResponseJson(response);
-  return { response, payload };
+  if (options.signal) {
+    if (options.signal.aborted) {
+      controller.abort(options.signal.reason);
+    } else {
+      const abortFromSource = () => controller.abort(options.signal?.reason);
+      options.signal.addEventListener("abort", abortFromSource, { once: true });
+      cleanupCallbacks.push(() => options.signal?.removeEventListener("abort", abortFromSource));
+    }
+  }
+
+  let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
+  if (typeof options.timeoutMs === "number" && Number.isFinite(options.timeoutMs) && options.timeoutMs > 0) {
+    timeoutHandle = setTimeout(() => controller.abort(new Error("Backend request timed out.")), options.timeoutMs);
+    cleanupCallbacks.push(() => {
+      if (timeoutHandle) {
+        clearTimeout(timeoutHandle);
+      }
+    });
+  }
+
+  try {
+    const response = await fetch(getBackendApiUrl(path), {
+      method: options.method,
+      cache: "no-store",
+      headers,
+      signal: controller.signal,
+      body: options.body !== undefined ? JSON.stringify(options.body) : undefined
+    });
+    const payload = await readResponseJson(response);
+    return { response, payload };
+  } finally {
+    cleanupCallbacks.forEach((cleanup) => cleanup());
+  }
 }
 
 async function refreshSessionTokens(refreshToken: string): Promise<SessionTokens | null> {

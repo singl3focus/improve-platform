@@ -1,6 +1,7 @@
 "use client";
 
 import { type FormEvent, useEffect, useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { authFetch } from "@features/auth/lib/auth-fetch";
 import type { TopicWorkspace } from "@features/topics/types";
 import type { MaterialType } from "@features/materials/types";
@@ -201,10 +202,19 @@ async function createMaterialForTopic(payload: {
 }
 
 export function useTopicWorkspaceViewModel(topicId: string | null, copy: TopicWorkspaceCopy) {
-  const [state, setState] = useState<TopicResourceState>(() =>
-    initialTopicState(topicId ? "loading" : "idle")
-  );
-  const [reloadKey, setReloadKey] = useState(0);
+  const queryClient = useQueryClient();
+  const workspaceQuery = useQuery({
+    queryKey: ["topic-workspace", topicId],
+    queryFn: ({ signal }) => fetchTopicWorkspace(topicId!, signal),
+    enabled: Boolean(topicId),
+    retry: false
+  });
+  const topicsQuery = useQuery({
+    queryKey: ["roadmap-topic-options"],
+    queryFn: fetchAllTopics,
+    enabled: Boolean(topicId),
+    retry: false
+  });
 
   // Task creation state
   const [taskDraft, setTaskDraft] = useState<TopicTaskDraft>(initialTaskDraft());
@@ -220,60 +230,23 @@ export function useTopicWorkspaceViewModel(topicId: string | null, copy: TopicWo
   const [materialMutationError, setMaterialMutationError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!topicId) {
-      setState(initialTopicState("idle"));
-      return;
-    }
-
-    const currentTopicId = topicId;
-    const controller = new AbortController();
-
-    async function load() {
-      setState(initialTopicState());
-      try {
-        const topic = await fetchTopicWorkspace(currentTopicId, controller.signal);
-        setState({
-          status: "success",
-          data: topic,
-          errorMessage: null
-        });
-      } catch (error) {
-        if (controller.signal.aborted) {
-          return;
-        }
-
-        setState({
-          status: "error",
-          data: null,
-          errorMessage: error instanceof Error ? error.message : copy.loadError
-        });
-      }
-    }
-
-    void load();
-    return () => controller.abort();
-  }, [topicId, reloadKey, copy.loadError]);
+    setAvailableTopics(topicsQuery.data ?? []);
+  }, [topicsQuery.data]);
 
   useEffect(() => {
-    if (topicId) {
-      fetchAllTopics().then(setAvailableTopics).catch(() => setAvailableTopics([]));
-    }
-  }, [topicId, reloadKey]);
-
-  useEffect(() => {
-    if (state.status === "success" && state.data) {
+    if (workspaceQuery.isSuccess && workspaceQuery.data) {
       setMaterialDraft((current) => {
         if (current.title === "" && current.description === "") {
-          const nextPosition = computeNextMaterialPosition(state.data!.materials);
+          const nextPosition = computeNextMaterialPosition(workspaceQuery.data.materials);
           return { ...current, position: String(nextPosition) };
         }
         return current;
       });
     }
-  }, [state.status, state.data]);
+  }, [workspaceQuery.data, workspaceQuery.isSuccess]);
 
   const dependencySummary = useMemo(() => {
-    const topic = state.data;
+    const topic = workspaceQuery.data;
     if (!topic) {
       return {
         completed: 0,
@@ -286,10 +259,11 @@ export function useTopicWorkspaceViewModel(topicId: string | null, copy: TopicWo
       pending: topic.dependencies.filter((dependency) => dependency.isRequired && !dependency.isCompleted)
         .length
     };
-  }, [state.data]);
+  }, [workspaceQuery.data]);
 
   function reload() {
-    setReloadKey((value) => value + 1);
+    void workspaceQuery.refetch();
+    void topicsQuery.refetch();
   }
 
   async function handleCreateTask(event: FormEvent<HTMLFormElement>): Promise<boolean> {
@@ -317,7 +291,7 @@ export function useTopicWorkspaceViewModel(topicId: string | null, copy: TopicWo
         ...(deadline ? { deadline } : {})
       });
       setTaskDraft(initialTaskDraft());
-      reload();
+      await queryClient.invalidateQueries({ queryKey: ["topic-workspace", topicId] });
       return true;
     } catch (error) {
       setTaskMutationError(error instanceof Error ? error.message : copy.taskCreateFailed);
@@ -360,12 +334,12 @@ export function useTopicWorkspaceViewModel(topicId: string | null, copy: TopicWo
         completedAmount,
         position: submittedPosition
       });
-      const maxExisting = state.data?.materials
-        ? Math.max(0, ...state.data.materials.map((m) => m.position))
+      const maxExisting = workspaceQuery.data?.materials
+        ? Math.max(0, ...workspaceQuery.data.materials.map((m) => m.position))
         : 0;
       const nextPosition = Math.max(maxExisting, submittedPosition) + 1;
       setMaterialDraft(initialMaterialDraft(nextPosition));
-      reload();
+      await queryClient.invalidateQueries({ queryKey: ["topic-workspace", topicId] });
       return true;
     } catch (error) {
       setMaterialMutationError(error instanceof Error ? error.message : copy.materialCreateFailed);
@@ -382,7 +356,7 @@ export function useTopicWorkspaceViewModel(topicId: string | null, copy: TopicWo
     if (!topicId) return;
     try {
       await updateTopicDates(topicId, dates);
-      reload();
+      await queryClient.invalidateQueries({ queryKey: ["topic-workspace", topicId] });
     } catch {
       // Silently fail, user can retry
     }
@@ -392,7 +366,7 @@ export function useTopicWorkspaceViewModel(topicId: string | null, copy: TopicWo
     if (!topicId) return;
     try {
       await addTopicDependency(topicId, dependsOnTopicId);
-      reload();
+      await queryClient.invalidateQueries({ queryKey: ["topic-workspace", topicId] });
     } catch {
       // Silently fail
     }
@@ -402,7 +376,7 @@ export function useTopicWorkspaceViewModel(topicId: string | null, copy: TopicWo
     if (!topicId) return;
     try {
       await removeTopicDependency(topicId, dependsOnTopicId);
-      reload();
+      await queryClient.invalidateQueries({ queryKey: ["topic-workspace", topicId] });
     } catch {
       // Silently fail
     }
@@ -410,9 +384,26 @@ export function useTopicWorkspaceViewModel(topicId: string | null, copy: TopicWo
 
   const dependencyOptions = availableTopics.filter((topic) => {
     if (topic.id === topicId) return false;
-    if (!state.data) return true;
-    return !state.data.dependencies.some((dep) => dep.topicId === topic.id);
+    if (!workspaceQuery.data) return true;
+    return !workspaceQuery.data.dependencies.some((dep) => dep.topicId === topic.id);
   });
+
+  const state: TopicResourceState = !topicId
+    ? initialTopicState("idle")
+    : workspaceQuery.isPending
+      ? initialTopicState("loading")
+      : workspaceQuery.isError
+        ? {
+            status: "error",
+            data: null,
+            errorMessage:
+              workspaceQuery.error instanceof Error ? workspaceQuery.error.message : copy.loadError
+          }
+        : {
+            status: "success",
+            data: workspaceQuery.data ?? null,
+            errorMessage: null
+          };
 
   return {
     state,

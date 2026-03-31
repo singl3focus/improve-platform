@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import Link from "next/link";
+import { useQuery } from "@tanstack/react-query";
 import { authFetch } from "@features/auth/lib/auth-fetch";
 import type { DashboardHistoryEvent } from "@features/dashboard/types";
 import { useUserPreferences } from "@shared/providers/user-preferences-provider";
@@ -12,19 +13,7 @@ import {
   formatHistoryEventBadge
 } from "@features/history/lib/format-history-event";
 
-type LoadStatus = "loading" | "success" | "error";
-
-interface HistoryState {
-  status: LoadStatus;
-  data: DashboardHistoryEvent[];
-  errorMessage: string | null;
-}
-
-function initialState(): HistoryState {
-  return { status: "loading", data: [], errorMessage: null };
-}
-
-async function fetchHistory(signal: AbortSignal): Promise<DashboardHistoryEvent[]> {
+async function fetchHistory(signal?: AbortSignal): Promise<DashboardHistoryEvent[]> {
   const response = await authFetch("/api/dashboard/history?limit=50", { method: "GET", signal });
   if (!response.ok) {
     let message = `Request failed (${response.status})`;
@@ -43,43 +32,24 @@ export function DashboardHistoryView() {
   const { language, copy } = useUserPreferences();
   const dashboardCopy = copy.dashboard;
   const locale = language === "ru" ? "ru-RU" : "en-US";
-  const [state, setState] = useState<HistoryState>(initialState);
-  const [reloadKey, setReloadKey] = useState(0);
+  const historyQuery = useQuery({
+    queryKey: ["dashboard-history", 50],
+    queryFn: ({ signal }) => fetchHistory(signal),
+    retry: false
+  });
 
   const historyCopy =
     language === "ru"
       ? {
-          eyebrow: "Лента активности",
-          lead: "Последовательность последних действий по темам, задачам и материалам.",
-          returnLabel: "Вернуться к dashboard"
+          eyebrow: "Р›РµРЅС‚Р° Р°РєС‚РёРІРЅРѕСЃС‚Рё",
+          lead: "РџРѕСЃР»РµРґРѕРІР°С‚РµР»СЊРЅРѕСЃС‚СЊ РїРѕСЃР»РµРґРЅРёС… РґРµР№СЃС‚РІРёР№ РїРѕ С‚РµРјР°Рј, Р·Р°РґР°С‡Р°Рј Рё РјР°С‚РµСЂРёР°Р»Р°Рј.",
+          returnLabel: "Р’РµСЂРЅСѓС‚СЊСЃСЏ Рє dashboard"
         }
       : {
           eyebrow: "Activity feed",
           lead: "A readable sequence of recent actions across topics, tasks, and materials.",
           returnLabel: "Back to dashboard"
         };
-
-  useEffect(() => {
-    const controller = new AbortController();
-
-    async function load() {
-      setState(initialState());
-      try {
-        const payload = await fetchHistory(controller.signal);
-        setState({ status: "success", data: payload, errorMessage: null });
-      } catch (error) {
-        if (controller.signal.aborted) return;
-        setState({
-          status: "error",
-          data: [],
-          errorMessage: error instanceof Error ? error.message : dashboardCopy.historyLoadFailed
-        });
-      }
-    }
-
-    void load();
-    return () => controller.abort();
-  }, [dashboardCopy.historyLoadFailed, reloadKey]);
 
   const header = useMemo(
     () => ({
@@ -111,7 +81,7 @@ export function DashboardHistoryView() {
           </div>
         </header>
 
-        {state.status === "loading" ? (
+        {historyQuery.isPending ? (
           <div className="dashboard-loading" aria-hidden="true">
             <span />
             <span />
@@ -120,26 +90,28 @@ export function DashboardHistoryView() {
           </div>
         ) : null}
 
-        {state.status === "error" ? (
+        {historyQuery.isError ? (
           <div className="dashboard-error">
-            <p>{state.errorMessage ?? dashboardCopy.historyLoadFailed}</p>
+            <p>{historyQuery.error instanceof Error ? historyQuery.error.message : dashboardCopy.historyLoadFailed}</p>
             <button
               type="button"
               className="button button-outline dashboard-retry"
-              onClick={() => setReloadKey((value) => value + 1)}
+              onClick={() => {
+                void historyQuery.refetch();
+              }}
             >
               {dashboardCopy.retry}
             </button>
           </div>
         ) : null}
 
-        {state.status === "success" && state.data.length === 0 ? (
+        {historyQuery.isSuccess && historyQuery.data.length === 0 ? (
           <p className="dashboard-empty">{dashboardCopy.historyEmpty}</p>
         ) : null}
 
-        {state.status === "success" && state.data.length > 0 ? (
+        {historyQuery.isSuccess && historyQuery.data.length > 0 ? (
           <ol className="history-feed-list">
-            {state.data.map((entry) => (
+            {historyQuery.data.map((entry) => (
               <li key={entry.id} className="history-feed-item">
                 <div className="history-feed-marker" aria-hidden="true" />
                 <div className="history-feed-card">
