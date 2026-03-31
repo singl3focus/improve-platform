@@ -342,6 +342,34 @@ Long task обычно считают как задачу main thread дольш
 - браузер не держит тяжёлый композитный слой постоянно;
 - уменьшается вероятность, что спустя несколько секунд граф деградирует по плавности просто из-за фонового churn.
 
+### 6.8.2 Roadmap и Topics: защита от churn после перезаходов между экранами
+
+После этого всплыл ещё один класс симптомов:
+- "сначала нормально, потом после нескольких переходов снова хуже";
+- особенно это ощущается после цепочки `roadmap -> topic -> dashboard -> roadmap`.
+
+Здесь проблема уже не обязательно в утечке памяти. Часто причина в том, что экран:
+- каждый раз aggressively refetch-ится при возврате;
+- заново проходит лишние loading/reconcile/layout-пути;
+- получает фоновый churn от query-библиотеки даже тогда, когда пользователь ждёт, что экран просто откроется из недавнего кэша.
+
+Для этого были ужесточены query-настройки в:
+- [roadmap-view.tsx](/c:/Users/Дом/Documents/1GitProjects/improve-platform/frontend/src/features/roadmap/components/roadmap-view.tsx)
+- [use-topic-workspace-view-model.ts](/c:/Users/Дом/Documents/1GitProjects/improve-platform/frontend/src/features/topics/hooks/use-topic-workspace-view-model.ts)
+
+Что именно изменили:
+- `staleTime: 5 * 60 * 1000`
+- `refetchOnWindowFocus: false`
+- `refetchOnReconnect: false`
+- `refetchOnMount: false`
+
+Почему это помогает:
+- недавний экран не пересобирается агрессивно без реальной необходимости;
+- переходы назад ощущаются стабильнее;
+- уменьшается вероятность, что после серии перезаходов пользователь почувствует "постепенное ухудшение", хотя реальной утечки нет.
+
+Важно: это не означает "никогда не обновлять данные". Это означает, что для этих экранов приоритет выше у устойчивой интерактивности, чем у мгновенного фонового refetch при каждом возврате.
+
 ### 6.9 Topics: модалки вынесены в portal
 
 Для `topic workspace` модалки были вынесены в `document.body` через portal в [topic-workspace-view.tsx](/c:/Users/Дом/Documents/1GitProjects/improve-platform/frontend/src/features/topics/components/topic-workspace-view.tsx).
@@ -460,6 +488,54 @@ Long task обычно считают как задачу main thread дольш
 
 Это хороший пример того, что perf-валидация должна включать не только мгновенный сценарий, но и сценарий с ожиданием, если дефект проявляется накопительно.
 
+### 8.4 Пятиминутный endurance-сценарий
+
+После этого был добавлен ещё более жёсткий тип проверки: не просто delayed trace после ожидания, а **endurance-проход дольше 5 минут** с переходами между экранами.
+
+Артефакты:
+- [summary.json](/c:/Users/Дом/Documents/1GitProjects/improve-platform/frontend/perf-traces/2026-03-31T21-59-43-436Z/summary.json)
+- [roadmap-pan-zoom.trace.json](/c:/Users/Дом/Documents/1GitProjects/improve-platform/frontend/perf-traces/2026-03-31T21-59-43-436Z/roadmap-pan-zoom.trace.json)
+- [roadmap-long-session-pan-zoom.trace.json](/c:/Users/Дом/Documents/1GitProjects/improve-platform/frontend/perf-traces/2026-03-31T21-59-43-436Z/roadmap-long-session-pan-zoom.trace.json)
+- [dashboard-scroll.trace.json](/c:/Users/Дом/Documents/1GitProjects/improve-platform/frontend/perf-traces/2026-03-31T21-59-43-436Z/dashboard-scroll.trace.json)
+- [topic-scroll.trace.json](/c:/Users/Дом/Documents/1GitProjects/improve-platform/frontend/perf-traces/2026-03-31T21-59-43-436Z/topic-scroll.trace.json)
+
+Сценарий был таким:
+- открыть `roadmap`;
+- сделать pan/zoom;
+- перейти в `topic`;
+- поскроллить `topic`;
+- перейти в `dashboard`;
+- поскроллить `dashboard`;
+- вернуться в `roadmap`;
+- повторить цикл 10 раз.
+
+Суммарная длительность:
+- `311298 ms`, то есть примерно `5 минут 11 секунд`.
+
+Что проверялось дополнительно:
+- размер JS heap до и после;
+- число roadmap-нод;
+- число SVG connections;
+- число connection controls;
+- наличие long tasks после endurance-цикла.
+
+Итог:
+- `usedJSHeapSize` не вырос;
+- число нод и connections не выросло;
+- `roadmap-pan-zoom.longTaskCount = 0`;
+- `roadmap-long-session-pan-zoom.longTaskCount = 0`.
+
+Практический вывод:
+- накопительной деградации по памяти, DOM и main-thread в автоматическом сценарии больше не видно;
+- если пользователь всё ещё чувствует лаг на своей машине, то следующий кандидат уже не update-loop, а локальный raster/compositor path браузера и железа.
+
+Это очень важное различие. Если автоматический endurance не показывает роста heap, DOM и long tasks, значит нужно перестать искать утечку "в логике экрана" и начать отдельно анализировать:
+- GPU compositing;
+- raster cost;
+- драйвер/браузер-специфичное поведение;
+- локальные расширения браузера;
+- масштабирование дисплея и частоту обновления экрана.
+
 ### 8.3 Почему нужен и авто-трейс, и ручная проверка
 
 Авто-трейс полезен, потому что:
@@ -520,6 +596,11 @@ Long task обычно считают как задачу main thread дольш
 - delayed trace: подождать несколько секунд, потом повторить то же действие.
 
 Без delayed trace можно легко пропустить накопительную деградацию.
+
+Если пользователь говорит "становится хуже после нескольких перезаходов и эксплуатации", нужно снимать уже **три** сценария:
+- immediate trace;
+- delayed trace;
+- endurance trace на несколько минут с реальными переходами между связанными экранами.
 
 ### Шаг 4. Сформулировать узкую гипотезу
 
@@ -586,6 +667,12 @@ Performance-работа без тестов и без собственного 
 - постоянный `will-change` или другой дорогой режим compositing;
 - слишком широкие глобальные CSS-селекторы во время interaction-state.
 
+### Урок 8
+
+Если 5-минутный endurance не показывает роста heap, DOM и long tasks, а пользователь всё ещё чувствует фризы, значит проблема уже может быть не в "утечке frontend-логики", а в paint/raster/compositor-пути конкретной машины.
+
+Это другой класс задачи. Его нужно расследовать отдельно и не смешивать с React/query/layout-проблемами.
+
 ---
 
 ## 11. Краткая карта изменённых файлов
@@ -621,6 +708,7 @@ Performance-работа без тестов и без собственного 
 6. Самостоятельно руками проверить UX.
 7. Снять trace повторно.
 8. Если дефект проявляется со временем, снять ещё и delayed trace.
-9. Только после этого считать оптимизацию валидной.
+9. Если дефект проявляется после серии перезаходов, снять endurance trace на несколько минут.
+10. Только после этого считать оптимизацию валидной.
 
 Это и есть главный практический вывод: frontend performance надо вести как инженерный цикл с измерением до и после, а не как подбор случайных "магических" CSS и React-трюков.

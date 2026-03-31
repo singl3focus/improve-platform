@@ -174,6 +174,27 @@ function summarizeTrace(traceJson) {
   };
 }
 
+async function readClientPerfSnapshot(page) {
+  return page.evaluate(() => {
+    const memory = globalThis.performance && "memory" in globalThis.performance
+      ? globalThis.performance.memory
+      : null;
+
+    return {
+      memory: memory
+        ? {
+            usedJSHeapSize: memory.usedJSHeapSize,
+            totalJSHeapSize: memory.totalJSHeapSize,
+            jsHeapSizeLimit: memory.jsHeapSizeLimit
+          }
+        : null,
+      roadmapNodes: document.querySelectorAll(".roadmap-topic-card").length,
+      roadmapConnections: document.querySelectorAll(".roadmap-connection").length,
+      connectionControls: document.querySelectorAll(".roadmap-connection-remove").length
+    };
+  });
+}
+
 async function captureScenario(page, name, action) {
   const { client, streamPromise } = await startTrace(page);
   await action();
@@ -258,6 +279,71 @@ async function traceRoadmapLongSession(page) {
   });
 }
 
+async function runRoadmapEnduranceWarmup(page) {
+  const startedAt = Date.now();
+  const rounds = [];
+  const rootCard = page.locator("article.roadmap-topic-card").filter({ hasText: "Perf Root" }).first();
+
+  for (let round = 1; round <= 10; round += 1) {
+    await page.goto(`${baseURL}/roadmap`, { waitUntil: "networkidle" });
+    await page.getByRole("heading", { name: "Дорожная карта обучения" }).waitFor({ state: "visible", timeout: 30_000 });
+    const canvas = page.locator(".roadmap-graph-canvas");
+    const box = await canvas.boundingBox();
+    if (!box) {
+      throw new Error(`Roadmap canvas is not visible in endurance round ${round}.`);
+    }
+
+    const centerX = box.x + box.width / 2;
+    const centerY = box.y + box.height / 2;
+
+    for (let step = 0; step < 3; step += 1) {
+      await page.mouse.move(centerX, centerY);
+      await page.mouse.wheel(0, -500);
+      await page.waitForTimeout(250);
+      await page.mouse.wheel(0, 500);
+      await page.waitForTimeout(250);
+      await page.mouse.down();
+      await page.mouse.move(centerX - 180, centerY + 30, { steps: 18 });
+      await page.mouse.move(centerX + 140, centerY - 20, { steps: 18 });
+      await page.mouse.up();
+      await page.waitForTimeout(7000);
+    }
+
+    await rootCard.click();
+    await page.waitForURL(/\/topics\?topicId=/, { timeout: 30_000 });
+    await page.getByRole("heading", { name: "Perf Root" }).waitFor({ state: "visible", timeout: 30_000 });
+    for (let step = 0; step < 4; step += 1) {
+      await page.mouse.wheel(0, 850);
+      await page.waitForTimeout(350);
+    }
+    for (let step = 0; step < 4; step += 1) {
+      await page.mouse.wheel(0, -850);
+      await page.waitForTimeout(350);
+    }
+
+    await page.goto(`${baseURL}/dashboard`, { waitUntil: "networkidle" });
+    await page.getByRole("heading", { name: /Срез обучения на сегодня/ }).waitFor({ state: "visible", timeout: 30_000 });
+    for (let step = 0; step < 3; step += 1) {
+      await page.mouse.wheel(0, 1000);
+      await page.waitForTimeout(350);
+    }
+    for (let step = 0; step < 3; step += 1) {
+      await page.mouse.wheel(0, -1000);
+      await page.waitForTimeout(350);
+    }
+
+    rounds.push({
+      round,
+      elapsedMs: Date.now() - startedAt
+    });
+  }
+
+  return {
+    totalDurationMs: Date.now() - startedAt,
+    rounds
+  };
+}
+
 async function traceTopic(page) {
   await page.goto(page.url().includes("/topics?topicId=") ? page.url() : `${baseURL}/topics`, {
     waitUntil: "networkidle"
@@ -286,6 +372,14 @@ async function main() {
   await createRoadmapAndTopics(page);
   await seedTopicContent(page);
 
+  await page.goto(`${baseURL}/roadmap`, { waitUntil: "networkidle" });
+  await page.getByRole("heading", { name: "Дорожная карта обучения" }).waitFor({ state: "visible", timeout: 30_000 });
+  const preEnduranceSnapshot = await readClientPerfSnapshot(page);
+  const endurance = await runRoadmapEnduranceWarmup(page);
+  await page.goto(`${baseURL}/roadmap`, { waitUntil: "networkidle" });
+  await page.getByRole("heading", { name: "Дорожная карта обучения" }).waitFor({ state: "visible", timeout: 30_000 });
+  const postEnduranceSnapshot = await readClientPerfSnapshot(page);
+
   const topicSummary = await traceTopic(page);
   const roadmapSummary = await traceRoadmap(page);
   const roadmapLongSessionSummary = await traceRoadmapLongSession(page);
@@ -294,6 +388,11 @@ async function main() {
   const summary = {
     generatedAt: new Date().toISOString(),
     baseURL,
+    endurance,
+    snapshots: {
+      beforeEndurance: preEnduranceSnapshot,
+      afterEndurance: postEnduranceSnapshot
+    },
     traces: [dashboardSummary, roadmapSummary, roadmapLongSessionSummary, topicSummary]
   };
 

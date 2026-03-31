@@ -207,13 +207,21 @@ export function useTopicWorkspaceViewModel(topicId: string | null, copy: TopicWo
     queryKey: ["topic-workspace", topicId],
     queryFn: ({ signal }) => fetchTopicWorkspace(topicId!, signal),
     enabled: Boolean(topicId),
-    retry: false
+    retry: false,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false
   });
   const topicsQuery = useQuery({
     queryKey: ["roadmap-topic-options"],
     queryFn: fetchAllTopics,
     enabled: Boolean(topicId),
-    retry: false
+    retry: false,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false
   });
 
   // Task creation state

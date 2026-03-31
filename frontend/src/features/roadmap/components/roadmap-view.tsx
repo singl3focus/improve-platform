@@ -731,7 +731,11 @@ function useRoadmapData(roadmapId: string | null, errorFallback: string) {
     queryKey: ["roadmap", roadmapId],
     queryFn: ({ signal }) => fetchRoadmap(roadmapId!, signal),
     enabled: Boolean(roadmapId),
-    retry: false
+    retry: false,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false
   });
 
   if (!roadmapId) {
