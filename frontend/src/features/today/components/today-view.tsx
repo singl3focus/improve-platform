@@ -49,7 +49,7 @@ interface TodayCopy {
 
 const RU_TODAY_COPY: TodayCopy = {
   header: (date) => `Сегодня, ${date}`,
-  sectionKicker: "Daily rhythm",
+  sectionKicker: "Ритм дня",
   focusTasks: "Задачи на сегодня",
   noTasks: "На сегодня задач нет. Добавьте первую задачу и соберите свой рабочий ритм.",
   currentMaterial: "Текущий материал",

@@ -46,11 +46,36 @@ export async function PUT(request: NextRequest, context: RouteContext) {
 
   try {
     const body = await request.json();
+
+    // If the request includes a status change, handle it via the dedicated
+    // status endpoint first — the backend PUT does not update status.
+    if (typeof body.status === "string" && body.status) {
+      const statusResult = await client.call(
+        `/api/v1/roadmaps/${encodeURIComponent(roadmapId)}/topics/${encodeURIComponent(topicId)}/status`,
+        {
+          method: "PATCH",
+          body: { status: body.status }
+        }
+      );
+
+      if (!statusResult.response.ok) {
+        const errorResponse = createBackendErrorResponse(
+          statusResult.response,
+          statusResult.payload,
+          "Topic status update failed."
+        );
+        client.applyUpdatedSession(errorResponse);
+        return errorResponse;
+      }
+    }
+
+    // Forward the remaining fields to the topic update endpoint.
+    const { status: _status, ...topicFields } = body;
     const result = await client.call(
       `/api/v1/roadmaps/${encodeURIComponent(roadmapId)}/topics/${encodeURIComponent(topicId)}`,
       {
         method: "PUT",
-        body
+        body: topicFields
       }
     );
 

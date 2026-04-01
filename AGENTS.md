@@ -42,6 +42,15 @@ Monorepo with two services:
 - Public backend endpoints: `/healthz`, `/readyz`, `/api/v1/auth/*`; other `/api/v1/*` require JWT.
 - Do not break enum contracts: topic `not_started|in_progress|paused|completed`, task `new|in_progress|paused|done`, material `book|article|course|video`.
 
+## Code Review Graph Workflow
+- Use `code-review-graph` first for code review, bugfixes, multi-file changes, and work in unfamiliar areas.
+- In this monorepo, prefer running the agent from `frontend/` for frontend tasks and from `backend/` for backend tasks so the graph stays narrow and relevant.
+- Before reading files, follow this order: build or update graph -> detect changes -> get impact radius -> get review context -> open only the relevant files.
+- If the agent is writing code, repeat graph analysis after the edits on the final diff to catch missed dependencies, risky side effects, and files that still need review or tests.
+- Skip graph-first only for tiny single-file edits where the impacted area is already obvious.
+- Prompt template for coding tasks: `Сначала используй code-review-graph. Обнови граф для текущего репозитория, определи минимальную затронутую область, прочитай только релевантные файлы, внеси изменения, затем ещё раз проанализируй итоговый diff через graph.`
+- Prompt template for review tasks: `Сначала используй code-review-graph. Обнови граф, определи изменённые файлы, посчитай impact radius, собери review context и выполни ревью только по затронутой области кода.`
+
 ## Commit & Pull Request Guidelines
 - Use short commit prefixes like `feat:`, `chore:`, `major:`.
 - Keep commits atomic and imperative.

@@ -51,6 +51,27 @@ APP_PORT=8080
 ```
 Optional (see `build/.env.example` and `internal/config`): `LOG_LEVEL` (default `info`), and Telegram notifications — `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `NOTIFY_HOUR`, `NOTIFY_MINUTE`, `NOTIFY_TIMEZONE` (scheduler disabled when token is empty).
 
+## Code Review Graph Workflow
+
+Use `code-review-graph` first for code review, bugfixes, multi-file changes, and work in unfamiliar areas. In this monorepo, prefer running from `frontend/` for frontend tasks and from `backend/` for backend tasks so the graph stays focused.
+
+Before reading source files, follow this order:
+1. build or update graph
+2. detect changes
+3. get impact radius
+4. get review context
+5. open only the relevant files
+
+If you are writing code, repeat graph analysis after the edits on the final diff to catch missed dependencies, risky side effects, and files that still need tests or review.
+
+Skip graph-first only for tiny single-file edits where the affected area is already obvious.
+
+Prompt template for coding tasks:
+`Сначала используй code-review-graph. Обнови граф для текущего репозитория, определи минимальную затронутую область, прочитай только релевантные файлы, внеси изменения, затем ещё раз проанализируй итоговый diff через graph.`
+
+Prompt template for review tasks:
+`Сначала используй code-review-graph. Обнови граф, определи изменённые файлы, посчитай impact radius, собери review context и выполни ревью только по затронутой области кода.`
+
 ## Architecture
 
 ### Frontend

@@ -280,10 +280,6 @@ function TopicHeroPanel({
               <span>{copy.statsMaterials}</span>
               <strong>{topic.materials.length}</strong>
             </article>
-            <article className="topic-stat-card">
-              <span>{copy.statsDependencies}</span>
-              <strong>{topic.dependencies.length}</strong>
-            </article>
           </div>
         </div>
 
@@ -357,82 +353,6 @@ function TopicHeroPanel({
         </aside>
       </div>
     </section>
-  );
-}
-
-function TopicDependenciesPanel({
-  topic,
-  copy,
-  completed,
-  pending,
-  dependencyOptions,
-  onAddDependency,
-  onRemoveDependency
-}: {
-  topic: TopicWorkspace;
-  copy: TopicCopy;
-  completed: number;
-  pending: number;
-  dependencyOptions: Array<{ id: string; title: string }>;
-  onAddDependency: (topicId: string) => void;
-  onRemoveDependency: (topicId: string) => void;
-}) {
-  return (
-    <aside className="topic-dependencies panel">
-      <header>
-        <p className="topic-card-kicker">{copy.dependenciesTitle}</p>
-        <h3>{copy.dependenciesTitle}</h3>
-        <p>{copy.dependenciesSummary(completed, pending)}</p>
-      </header>
-      {topic.dependencies.length === 0 ? <p className="dashboard-empty">{copy.noDependencies}</p> : null}
-      {topic.dependencies.length > 0 ? (
-        <ul className="topic-dependency-list">
-          {topic.dependencies.map((dependency) => (
-            <li key={dependency.topicId} className="topic-dependency-item">
-              <div className="topic-dependency-copy">
-                <p className="topic-dependency-title">{dependency.title}</p>
-                <p className="topic-dependency-subtitle">
-                  {dependency.isRequired ? copy.dependencyRequired : copy.dependencyOptional}
-                </p>
-              </div>
-              <div className="topic-dependency-actions">
-                {dependency.isCompleted ? (
-                  <span className="roadmap-status-badge roadmap-status-completed">{copy.dependencyReady}</span>
-                ) : (
-                  <span className="roadmap-pending-badge">{copy.dependencyPending}</span>
-                )}
-                <button type="button" className="button button-outline topic-ghost-action" onClick={() => onRemoveDependency(dependency.topicId)}>
-                  {copy.removeDependency}
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-      {dependencyOptions.length > 0 ? (
-        <label className="topic-dependency-add">
-          <span>{copy.addDependency}</span>
-          <select
-            className="input"
-            defaultValue=""
-            onChange={(event) => {
-              if (!event.target.value) return;
-              onAddDependency(event.target.value);
-              event.target.value = "";
-            }}
-          >
-            <option value="" disabled>
-              {copy.selectTopic}
-            </option>
-            {dependencyOptions.map((option) => (
-              <option key={option.id} value={option.id}>
-                {option.title}
-              </option>
-            ))}
-          </select>
-        </label>
-      ) : null}
-    </aside>
   );
 }
 
@@ -821,7 +741,6 @@ export function TopicWorkspaceView() {
   const {
     state,
     reload,
-    dependencySummary,
     taskDraft,
     setTaskDraft,
     isCreatingTask,
@@ -834,10 +753,7 @@ export function TopicWorkspaceView() {
     materialMutationError,
     clearMaterialMutationError,
     handleCreateMaterial,
-    handleUpdateDates,
-    handleAddDependency,
-    handleRemoveDependency,
-    dependencyOptions
+    handleUpdateDates
   } = useTopicWorkspaceViewModel(topicId, {
     loadError: copy.loadError,
     taskTitleRequired: copy.taskTitleRequired,
@@ -884,17 +800,6 @@ export function TopicWorkspaceView() {
         <div className="topic-workspace-layout">
           <TopicHeroPanel topic={state.data} copy={copy} language={language} handleUpdateDates={handleUpdateDates} />
           <div className="topic-grid">
-            <div className="topic-grid-stack">
-              <TopicDependenciesPanel
-                topic={state.data}
-                copy={copy}
-                completed={dependencySummary.completed}
-                pending={dependencySummary.pending}
-                dependencyOptions={dependencyOptions}
-                onAddDependency={handleAddDependency}
-                onRemoveDependency={handleRemoveDependency}
-              />
-            </div>
             <div className="topic-grid-main">
               <TopicChecklistPanel
                 topic={state.data}

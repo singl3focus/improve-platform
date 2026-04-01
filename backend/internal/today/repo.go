@@ -192,22 +192,12 @@ func (r *Repo) GetFocusTaskIDs(ctx context.Context, userID string, date time.Tim
 		 LEFT JOIN topics top ON top.id = t.topic_id AND top.user_id = t.user_id
 		 WHERE t.user_id = $1
 		   AND t.status != 'done'
-		   AND (
-		     (t.deadline IS NOT NULL AND t.deadline <= $2)
-		     OR t.status = 'in_progress'
-		     OR (t.topic_id IS NOT NULL AND top.status = 'in_progress')
-		   )
 		 ORDER BY
-		   CASE
-		     WHEN t.deadline < $2 AND t.status != 'done' THEN 1
-		     WHEN t.deadline = $2 AND t.status != 'done' THEN 2
-		     WHEN t.status = 'in_progress' THEN 3
-		     ELSE 4
-		   END ASC,
+		   t.deadline ASC NULLS LAST,
 		   top.target_date ASC NULLS LAST,
 		   t.created_at ASC
-		 LIMIT 3`,
-		userID, date)
+		 LIMIT 5`,
+		userID)
 	if err != nil {
 		return nil, apperr.E(op, err)
 	}
