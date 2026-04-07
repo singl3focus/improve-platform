@@ -14,15 +14,15 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"improve-platform/internal/auth"
-	"improve-platform/internal/config"
-	"improve-platform/internal/dashboard"
-	"improve-platform/internal/history"
-	"improve-platform/internal/material"
-	"improve-platform/internal/roadmap"
-	"improve-platform/internal/server/handler"
-	"improve-platform/internal/task"
-	"improve-platform/internal/today"
+	"github.com/singl3focus/improve-platform/internal/auth"
+	"github.com/singl3focus/improve-platform/internal/config"
+	"github.com/singl3focus/improve-platform/internal/dashboard"
+	"github.com/singl3focus/improve-platform/internal/history"
+	"github.com/singl3focus/improve-platform/internal/material"
+	"github.com/singl3focus/improve-platform/internal/roadmap"
+	"github.com/singl3focus/improve-platform/internal/server/handler"
+	"github.com/singl3focus/improve-platform/internal/task"
+	"github.com/singl3focus/improve-platform/internal/today"
 )
 
 type Server struct {

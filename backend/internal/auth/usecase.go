@@ -8,7 +8,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 
-	apperr "improve-platform/pkg/errors"
+	apperr "github.com/singl3focus/improve-platform/pkg/errors"
 )
 
 const (

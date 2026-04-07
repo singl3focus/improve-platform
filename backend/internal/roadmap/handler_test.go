@@ -11,9 +11,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"improve-platform/internal/auth"
-	"improve-platform/internal/roadmap"
-	"improve-platform/pkg/httpresp"
+	"github.com/singl3focus/improve-platform/internal/auth"
+	"github.com/singl3focus/improve-platform/internal/roadmap"
+	"github.com/singl3focus/improve-platform/pkg/httpresp"
 )
 
 type mockService struct {

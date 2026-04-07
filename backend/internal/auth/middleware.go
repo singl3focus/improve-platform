@@ -8,7 +8,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 
-	"improve-platform/pkg/httpresp"
+	"github.com/singl3focus/improve-platform/pkg/httpresp"
 )
 
 type ctxKey string

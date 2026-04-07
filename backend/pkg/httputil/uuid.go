@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"regexp"
 
-	"improve-platform/pkg/httpresp"
+	"github.com/singl3focus/improve-platform/pkg/httpresp"
 )
 
 var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)

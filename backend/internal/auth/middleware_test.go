@@ -8,7 +8,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 
-	"improve-platform/internal/auth"
+	"github.com/singl3focus/improve-platform/internal/auth"
 )
 
 const testJWTSecret = "test-jwt-secret"

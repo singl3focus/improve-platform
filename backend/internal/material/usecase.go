@@ -4,8 +4,8 @@ import (
 	"context"
 	"log/slog"
 
-	"improve-platform/internal/history"
-	apperr "improve-platform/pkg/errors"
+	"github.com/singl3focus/improve-platform/internal/history"
+	apperr "github.com/singl3focus/improve-platform/pkg/errors"
 )
 
 type UseCase struct {

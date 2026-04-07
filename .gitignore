@@ -8,3 +8,4 @@ frontend/test-results/
 frontend/*.log
 frontend/npm-debug.log*
 .code-review-graph/
+.pmp/

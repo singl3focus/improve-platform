@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"improve-platform/internal/task"
+	"github.com/singl3focus/improve-platform/internal/task"
 )
 
 // mockRepo implements task.Repository for unit tests.

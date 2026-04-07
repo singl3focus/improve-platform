@@ -7,9 +7,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"improve-platform/internal/auth"
-	apperr "improve-platform/pkg/errors"
-	"improve-platform/pkg/httpresp"
+	"github.com/singl3focus/improve-platform/internal/auth"
+	apperr "github.com/singl3focus/improve-platform/pkg/errors"
+	"github.com/singl3focus/improve-platform/pkg/httpresp"
 )
 
 type Handler struct {

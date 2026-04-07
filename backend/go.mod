@@ -1,4 +1,4 @@
-module improve-platform
+module github.com/singl3focus/improve-platform
 
 go 1.25.1
 

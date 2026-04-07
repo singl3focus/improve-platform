@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"improve-platform/internal/auth"
+	"github.com/singl3focus/improve-platform/internal/auth"
 )
 
 type mockRepo struct {

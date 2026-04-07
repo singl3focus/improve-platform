@@ -10,9 +10,9 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"improve-platform/internal/config"
-	"improve-platform/internal/notify"
-	"improve-platform/internal/server"
+	"github.com/singl3focus/improve-platform/internal/config"
+	"github.com/singl3focus/improve-platform/internal/notify"
+	"github.com/singl3focus/improve-platform/internal/server"
 )
 
 func main() {

@@ -7,7 +7,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	apperr "improve-platform/pkg/errors"
+	apperr "github.com/singl3focus/improve-platform/pkg/errors"
 )
 
 type Repo struct {

@@ -3,7 +3,7 @@ package config_test
 import (
 	"testing"
 
-	"improve-platform/internal/config"
+	"github.com/singl3focus/improve-platform/internal/config"
 )
 
 func TestLoad_Defaults(t *testing.T) {

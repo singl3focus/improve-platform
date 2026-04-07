@@ -6,8 +6,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"improve-platform/internal/config"
-	"improve-platform/internal/server"
+	"github.com/singl3focus/improve-platform/internal/config"
+	"github.com/singl3focus/improve-platform/internal/server"
 )
 
 func newTestServer() http.Handler {

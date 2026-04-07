@@ -5,9 +5,9 @@ import (
 	"log/slog"
 	"time"
 
-	"improve-platform/internal/history"
-	"improve-platform/pkg/dateutil"
-	apperr "improve-platform/pkg/errors"
+	"github.com/singl3focus/improve-platform/internal/history"
+	"github.com/singl3focus/improve-platform/pkg/dateutil"
+	apperr "github.com/singl3focus/improve-platform/pkg/errors"
 )
 
 var validTransitions = map[string][]string{

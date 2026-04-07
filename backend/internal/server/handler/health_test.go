@@ -8,7 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"improve-platform/internal/server/handler"
+	"github.com/singl3focus/improve-platform/internal/server/handler"
 )
 
 type mockPinger struct {

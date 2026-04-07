@@ -10,8 +10,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"improve-platform/internal/auth"
-	"improve-platform/internal/today"
+	"github.com/singl3focus/improve-platform/internal/auth"
+	"github.com/singl3focus/improve-platform/internal/today"
 )
 
 type mockService struct {

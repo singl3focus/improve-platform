@@ -3,7 +3,7 @@ package history
 import (
 	"context"
 
-	apperr "improve-platform/pkg/errors"
+	apperr "github.com/singl3focus/improve-platform/pkg/errors"
 )
 
 type UseCase struct {

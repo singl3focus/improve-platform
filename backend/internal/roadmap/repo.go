@@ -8,7 +8,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	apperr "improve-platform/pkg/errors"
+	apperr "github.com/singl3focus/improve-platform/pkg/errors"
 )
 
 const uniqueViolation = "23505"

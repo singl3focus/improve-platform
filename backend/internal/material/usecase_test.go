@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"improve-platform/internal/material"
+	"github.com/singl3focus/improve-platform/internal/material"
 )
 
 // mockRepo implements material.Repository for unit tests.

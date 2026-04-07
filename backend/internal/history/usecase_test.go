@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"improve-platform/internal/history"
+	"github.com/singl3focus/improve-platform/internal/history"
 )
 
 type mockRepo struct {

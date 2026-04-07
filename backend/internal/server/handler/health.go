@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"improve-platform/pkg/httpresp"
+	"github.com/singl3focus/improve-platform/pkg/httpresp"
 )
 
 type DBPinger interface {

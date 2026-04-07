@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"improve-platform/pkg/httpresp"
+	"github.com/singl3focus/improve-platform/pkg/httpresp"
 )
 
 func TestJSON_SetsContentTypeAndStatus(t *testing.T) {

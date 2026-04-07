@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	apperr "improve-platform/pkg/errors"
+	apperr "github.com/singl3focus/improve-platform/pkg/errors"
 )
 
 var errSentinel = apperr.New("sentinel")

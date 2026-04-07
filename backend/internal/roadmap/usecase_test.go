@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"improve-platform/internal/roadmap"
+	"github.com/singl3focus/improve-platform/internal/roadmap"
 )
 
 // mockRepo implements roadmap.Repository for unit tests.
